@@ -5,10 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cave Springs — Revenue Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 :root {
   --bg: #0d1117;
   --surface: #161b27;
@@ -19,480 +18,120 @@
   --accent2: #38c98a;
   --accent3: #f7a24f;
   --accent4: #e05c6b;
+  --accent5: #a78bfa;
   --text: #e2e8f4;
   --text2: #8b95b0;
   --text3: #5a6480;
   --mono: 'DM Mono', monospace;
   --sans: 'DM Sans', sans-serif;
 }
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.5;
-  min-height: 100vh;
-}
-
-/* AUTH SCREEN */
-#auth-screen {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  gap: 24px;
-}
-
-.auth-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 48px;
-  text-align: center;
-  max-width: 420px;
-  width: 90%;
-}
-
-.auth-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 8px;
-  letter-spacing: -0.3px;
-}
-
-.auth-sub {
-  font-size: 13px;
-  color: var(--text2);
-  margin-bottom: 32px;
-}
-
-.auth-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 12px 24px;
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.auth-btn:hover { opacity: 0.85; }
-
-/* LOADING */
-#loading-screen {
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  gap: 16px;
-}
-
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--border2);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.loading-text {
-  font-size: 13px;
-  color: var(--text2);
-  font-family: var(--mono);
-}
-
-/* MAIN DASHBOARD */
-#dashboard {
-  display: none;
-  padding: 0 0 60px;
-}
-
-/* HEADER */
-.header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 16px 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-left {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.header-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.2px;
-}
-
-.header-sub {
-  font-size: 12px;
-  color: var(--text3);
-  font-family: var(--mono);
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.last-updated {
-  font-size: 11px;
-  color: var(--text3);
-  font-family: var(--mono);
-}
-
-.sign-out-btn {
-  font-size: 12px;
-  color: var(--text3);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 5px 10px;
-  cursor: pointer;
-  font-family: var(--sans);
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.sign-out-btn:hover { color: var(--text2); border-color: var(--border2); }
-
-/* FILTER BAR */
-.filter-bar {
-  padding: 16px 32px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  flex-wrap: wrap;
-}
-
-.filter-label {
-  font-size: 11px;
-  color: var(--text3);
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-right: 4px;
-}
-
-.filter-btn {
-  font-size: 12px;
-  font-family: var(--sans);
-  font-weight: 500;
-  color: var(--text2);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 5px 12px;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-
-.filter-btn:hover { border-color: var(--border2); color: var(--text); }
-.filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-
-/* MAIN CONTENT */
-.content { padding: 28px 32px; }
-
-/* SCORECARDS */
-.scorecards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 28px;
-}
-
-@media (max-width: 900px) { .scorecards { grid-template-columns: repeat(2, 1fr); } }
-
-.scorecard {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px 22px;
-  position: relative;
-  overflow: hidden;
-}
-
-.scorecard::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-}
-
-.scorecard.revenue::before { background: var(--accent); }
-.scorecard.adr::before { background: var(--accent2); }
-.scorecard.revpar::before { background: var(--accent3); }
-.scorecard.occupancy::before { background: var(--accent4); }
-
-.scorecard-label {
-  font-size: 11px;
-  color: var(--text3);
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 10px;
-}
-
-.scorecard-value {
-  font-size: 28px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.5px;
-  font-family: var(--mono);
-  line-height: 1;
-  margin-bottom: 6px;
-}
-
-.scorecard-meta {
-  font-size: 11px;
-  color: var(--text3);
-}
-
-/* GRID LAYOUTS */
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.grid-3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-@media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
-
-/* PANELS */
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.panel.full { margin-bottom: 20px; }
-
-.panel-header {
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.panel-title {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text2);
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.panel-body { padding: 20px; }
-
-/* CHART CONTAINERS */
-.chart-wrap {
-  position: relative;
-  width: 100%;
-}
-
-/* DATA TABLES */
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.data-table th {
-  text-align: left;
-  padding: 8px 12px;
-  font-size: 10px;
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text3);
-  border-bottom: 1px solid var(--border);
-  font-weight: 400;
-}
-
-.data-table th.right, .data-table td.right { text-align: right; }
-
-.data-table td {
-  padding: 9px 12px;
-  color: var(--text2);
-  border-bottom: 1px solid var(--border);
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-.data-table tr:last-child td { border-bottom: none; }
-.data-table tr:hover td { background: var(--surface2); color: var(--text); }
-
-.data-table td.name-col {
-  font-family: var(--sans);
-  font-size: 12px;
-  color: var(--text);
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* REVENUE BAR */
-.rev-bar-wrap { display: flex; align-items: center; gap: 8px; }
-.rev-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-.rev-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s ease; }
-
-/* VARIANCE */
-.positive { color: var(--accent2); }
-.negative { color: var(--accent4); }
-
-/* CHANNEL PILLS */
-.channel-pill {
-  display: inline-block;
-  font-size: 10px;
-  font-family: var(--mono);
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.channel-ota { background: rgba(79,142,247,0.15); color: var(--accent); }
-.channel-direct { background: rgba(56,201,138,0.15); color: var(--accent2); }
-.channel-phone { background: rgba(90,100,128,0.2); color: var(--text2); }
-
-/* PACE TABLE */
-.pace-positive { color: var(--accent2); }
-.pace-negative { color: var(--accent4); }
-.pace-neutral { color: var(--text3); }
-
-/* BOOKING WINDOW */
-.bw-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.bw-item {
-  background: var(--surface2);
-  border-radius: 8px;
-  padding: 14px 16px;
-  text-align: center;
-}
-
-.bw-item-label {
-  font-size: 10px;
-  color: var(--text3);
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 8px;
-}
-
-.bw-item-value {
-  font-size: 24px;
-  font-weight: 500;
-  color: var(--text);
-  font-family: var(--mono);
-  line-height: 1;
-}
-
-.bw-item-unit {
-  font-size: 10px;
-  color: var(--text3);
-  margin-top: 4px;
-}
-
-/* OUTSTANDING */
-.outstanding-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-family: var(--mono);
-  color: var(--accent3);
-  background: rgba(247,162,79,0.12);
-  border: 1px solid rgba(247,162,79,0.25);
-  border-radius: 6px;
-  padding: 3px 8px;
-}
-
-.dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-
-/* EMPTY STATE */
-.empty-state {
-  padding: 32px;
-  text-align: center;
-  color: var(--text3);
-  font-size: 12px;
-  font-family: var(--mono);
-}
-
-/* ERROR */
-.error-banner {
-  background: rgba(224,92,107,0.1);
-  border: 1px solid rgba(224,92,107,0.3);
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 12px;
-  color: var(--accent4);
-  margin-bottom: 16px;
-  display: none;
-}
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.5; min-height: 100vh; }
+#auth-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; }
+.auth-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:56px; text-align:center; max-width:440px; width:90%; }
+.auth-title { font-size:24px; font-weight:600; color:var(--text); margin-bottom:8px; letter-spacing:-0.3px; }
+.auth-sub { font-size:14px; color:var(--text2); margin-bottom:36px; line-height:1.6; }
+.auth-btn { display:inline-flex; align-items:center; gap:10px; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:14px 28px; font-family:var(--sans); font-size:15px; font-weight:500; cursor:pointer; transition:opacity 0.15s; }
+.auth-btn:hover { opacity:0.85; }
+#loading-screen { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; gap:16px; }
+.spinner { width:36px; height:36px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-text { font-size:13px; color:var(--text2); font-family:var(--mono); }
+#dashboard { display:none; padding-bottom:80px; }
+.header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 36px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.header-left { display:flex; align-items:baseline; gap:14px; }
+.header-title { font-size:17px; font-weight:600; color:var(--text); letter-spacing:-0.2px; }
+.header-sub { font-size:13px; color:var(--text3); font-family:var(--mono); }
+.header-right { display:flex; align-items:center; gap:14px; }
+.last-updated { font-size:12px; color:var(--text3); font-family:var(--mono); }
+.sign-out-btn { font-size:13px; color:var(--text3); background:none; border:1px solid var(--border); border-radius:6px; padding:6px 12px; cursor:pointer; font-family:var(--sans); transition:all 0.15s; }
+.sign-out-btn:hover { color:var(--text2); border-color:var(--border2); }
+.filter-bar { padding:14px 36px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border); background:var(--bg); flex-wrap:wrap; }
+.filter-label { font-size:12px; color:var(--text3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.08em; margin-right:4px; }
+.filter-btn { font-size:13px; font-family:var(--sans); font-weight:500; color:var(--text2); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 14px; cursor:pointer; transition:all 0.12s; }
+.filter-btn:hover { border-color:var(--border2); color:var(--text); }
+.filter-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.content { padding:28px 36px; }
+.scorecards { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+@media(max-width:900px){.scorecards{grid-template-columns:repeat(2,1fr);}}
+.scorecard { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px 24px; position:relative; overflow:hidden; }
+.scorecard::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; }
+.scorecard.revenue::before{background:var(--accent);}
+.scorecard.adr::before{background:var(--accent2);}
+.scorecard.revpar::before{background:var(--accent3);}
+.scorecard.occupancy::before{background:var(--accent4);}
+.scorecard-label { font-size:12px; color:var(--text3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px; }
+.scorecard-value { font-size:32px; font-weight:600; color:var(--text); letter-spacing:-0.5px; font-family:var(--mono); line-height:1; margin-bottom:8px; }
+.scorecard-meta { font-size:12px; color:var(--text3); }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+@media(max-width:900px){.grid-2{grid-template-columns:1fr;}}
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.panel.full { margin-bottom:20px; }
+.panel-header { padding:18px 22px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+.panel-title { font-size:13px; font-weight:500; color:var(--text2); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.08em; }
+.panel-body { padding:22px; }
+.chart-wrap { position:relative; width:100%; }
+.data-table { width:100%; border-collapse:collapse; }
+.data-table th { text-align:left; padding:10px 14px; font-size:11px; font-family:var(--mono); text-transform:uppercase; letter-spacing:0.08em; color:var(--text3); border-bottom:1px solid var(--border); font-weight:400; }
+.data-table th.right,.data-table td.right { text-align:right; }
+.data-table td { padding:11px 14px; color:var(--text2); border-bottom:1px solid var(--border); font-family:var(--mono); font-size:13px; }
+.data-table tr:last-child td { border-bottom:none; }
+.data-table tr:hover td { background:var(--surface2); }
+.data-table td.name-col { font-family:var(--sans); font-size:13px; color:var(--text); max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.category-row td { background:var(--surface2); font-family:var(--sans); font-size:12px; font-weight:600; padding:9px 14px; border-bottom:1px solid var(--border); }
+.category-row td.right { font-family:var(--mono); font-size:12px; text-align:right; }
+.category-row:hover td { background:var(--surface2); }
+.rev-bar-wrap { display:flex; align-items:center; gap:8px; }
+.rev-bar-bg { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; min-width:60px; }
+.rev-bar-fill { height:100%; border-radius:2px; transition:width 0.5s ease; }
+.bw-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.bw-item { background:var(--surface2); border-radius:10px; padding:16px; text-align:center; }
+.bw-item-label { font-size:11px; color:var(--text3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px; }
+.bw-item-value { font-size:28px; font-weight:500; color:var(--text); font-family:var(--mono); line-height:1; }
+.bw-item-unit { font-size:11px; color:var(--text3); margin-top:4px; }
+.outstanding-badge { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-family:var(--mono); color:var(--accent3); background:rgba(247,162,79,0.12); border:1px solid rgba(247,162,79,0.25); border-radius:6px; padding:4px 10px; }
+.dot { width:5px; height:5px; border-radius:50%; background:currentColor; flex-shrink:0; }
+.cat-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+@media(max-width:1200px){.cat-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:800px){.cat-grid{grid-template-columns:repeat(2,1fr);}}
+.cat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+.cat-card-name { font-size:11px; color:var(--text3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px; }
+.cat-card-rev { font-size:22px; font-weight:600; color:var(--text); font-family:var(--mono); letter-spacing:-0.3px; margin-bottom:4px; }
+.cat-card-meta { font-size:11px; color:var(--text3); }
+.cat-card-bar { height:3px; background:var(--border); border-radius:2px; margin-top:10px; overflow:hidden; }
+.cat-card-bar-fill { height:100%; border-radius:2px; transition:width 0.5s; }
+.vacant-label { font-size:11px; color:var(--text3); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.06em; padding:10px 14px; border-top:1px solid var(--border); }
+.vacant-pills { display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px 14px; }
+.vacant-pill { font-size:11px; font-family:var(--sans); color:var(--text3); background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:4px 10px; }
+.pace-positive{color:#38c98a;} .pace-negative{color:#e05c6b;} .pace-neutral{color:var(--text3);}
+.import-log-table { width:100%; border-collapse:collapse; }
+.import-log-table th { text-align:left; padding:10px 14px; font-size:11px; font-family:var(--mono); text-transform:uppercase; letter-spacing:0.08em; color:var(--text3); border-bottom:1px solid var(--border); font-weight:400; }
+.import-log-table th.right,.import-log-table td.right { text-align:right; }
+.import-log-table td { padding:11px 14px; color:var(--text2); border-bottom:1px solid var(--border); font-family:var(--mono); font-size:12px; }
+.import-log-table tr:last-child td { border-bottom:none; }
+.import-log-table tr:hover td { background:var(--surface2); }
+.error-banner { background:rgba(224,92,107,0.1); border:1px solid rgba(224,92,107,0.3); border-radius:8px; padding:14px 18px; font-size:13px; color:#e05c6b; margin-bottom:16px; display:none; }
+.empty-state { padding:32px; text-align:center; color:var(--text3); font-size:13px; font-family:var(--mono); }
 </style>
 </head>
 <body>
 
-<!-- AUTH -->
 <div id="auth-screen">
   <div class="auth-card">
     <div class="auth-title">Cave Springs</div>
     <div class="auth-sub">Revenue Dashboard — sign in with your Google Workspace account to continue</div>
     <button class="auth-btn" onclick="signIn()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/></svg>
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/></svg>
       Sign in with Google
     </button>
   </div>
 </div>
 
-<!-- LOADING -->
 <div id="loading-screen">
   <div class="spinner"></div>
   <div class="loading-text">Loading dashboard data...</div>
 </div>
 
-<!-- DASHBOARD -->
 <div id="dashboard">
-
   <div class="header">
     <div class="header-left">
       <div class="header-title">Cave Springs</div>
@@ -511,7 +150,6 @@ body {
   <div class="content">
     <div class="error-banner" id="error-banner"></div>
 
-    <!-- SCORECARDS -->
     <div class="scorecards">
       <div class="scorecard revenue">
         <div class="scorecard-label">Total Revenue</div>
@@ -521,7 +159,7 @@ body {
       <div class="scorecard adr">
         <div class="scorecard-label">ADR</div>
         <div class="scorecard-value" id="sc-adr">—</div>
-        <div class="scorecard-meta">avg daily rate</div>
+        <div class="scorecard-meta">avg daily rate per night</div>
       </div>
       <div class="scorecard revpar">
         <div class="scorecard-label">RevPAR</div>
@@ -535,62 +173,54 @@ body {
       </div>
     </div>
 
-    <!-- ROW 1: Revenue trend + Channel mix -->
+    <div class="cat-grid" id="cat-grid"></div>
+
     <div class="grid-2">
       <div class="panel">
-        <div class="panel-header">
-          <span class="panel-title">Revenue by Month</span>
-        </div>
+        <div class="panel-header"><span class="panel-title">Revenue by Month</span></div>
         <div class="panel-body">
-          <div class="chart-wrap" style="height:220px">
-            <canvas id="chart-revenue"></canvas>
-          </div>
+          <div class="chart-wrap" style="height:240px"><canvas id="chart-revenue"></canvas></div>
         </div>
       </div>
       <div class="panel">
-        <div class="panel-header">
-          <span class="panel-title">Revenue by Channel</span>
-        </div>
+        <div class="panel-header"><span class="panel-title">Revenue by Channel</span></div>
         <div class="panel-body">
-          <div style="display:flex; gap:24px; align-items:center; height:220px">
-            <div class="chart-wrap" style="height:180px; width:180px; flex-shrink:0">
+          <div style="display:flex;gap:28px;align-items:center;min-height:240px;">
+            <div style="width:180px;height:180px;flex-shrink:0;position:relative;">
               <canvas id="chart-channel"></canvas>
             </div>
-            <div id="channel-legend" style="flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+            <div id="channel-legend" style="flex:1;display:flex;flex-direction:column;gap:12px;"></div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ROW 2: Unit performance -->
     <div class="panel full">
       <div class="panel-header">
         <span class="panel-title">Unit Performance</span>
-        <span class="panel-title" style="color:var(--text3);" id="unit-count-label"></span>
+        <span class="panel-title" style="color:var(--text3)" id="unit-count-label"></span>
       </div>
-      <div class="panel-body" style="padding:0">
-        <table class="data-table" id="unit-table">
+      <div>
+        <table class="data-table">
           <thead>
             <tr>
-              <th style="width:28px; padding-left:20px">#</th>
+              <th style="width:32px;padding-left:22px">#</th>
               <th>Unit</th>
               <th class="right">Revenue</th>
               <th class="right">Nights</th>
               <th class="right">ADR</th>
-              <th style="width:160px">Share</th>
+              <th style="min-width:180px">Share</th>
             </tr>
           </thead>
           <tbody id="unit-tbody"></tbody>
         </table>
+        <div id="vacant-section"></div>
       </div>
     </div>
 
-    <!-- ROW 3: Booking window + Outstanding balances -->
     <div class="grid-2">
       <div class="panel">
-        <div class="panel-header">
-          <span class="panel-title">Booking Window</span>
-        </div>
+        <div class="panel-header"><span class="panel-title">Booking Window</span></div>
         <div class="panel-body">
           <div class="bw-grid">
             <div class="bw-item">
@@ -609,52 +239,50 @@ body {
               <div class="bw-item-unit">days out</div>
             </div>
           </div>
-          <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
-            <div style="font-size:11px; color:var(--text3); font-family:var(--mono); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.06em;">Booking window distribution</div>
-            <div id="bw-breakdown" style="display:flex; flex-direction:column; gap:6px;"></div>
+          <div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--border);">
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">Distribution</div>
+            <div id="bw-breakdown" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
         </div>
       </div>
 
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">Outstanding Balances</span>
-          <span id="outstanding-count" class="outstanding-badge" style="display:none"><span class="dot"></span><span id="outstanding-count-text"></span></span>
+          <span class="panel-title">Partial Payments</span>
+          <span id="outstanding-badge" class="outstanding-badge" style="display:none"><span class="dot"></span><span id="outstanding-count-text"></span></span>
         </div>
-        <div class="panel-body" style="padding:0; max-height:320px; overflow-y:auto;">
-          <table class="data-table" id="outstanding-table">
+        <div style="max-height:340px;overflow-y:auto;">
+          <table class="data-table">
             <thead>
               <tr>
-                <th style="padding-left:16px">Res#</th>
+                <th style="padding-left:18px">Res#</th>
                 <th>Unit</th>
                 <th class="right">Charged</th>
-                <th class="right" style="padding-right:16px">Paid</th>
+                <th class="right">Paid</th>
+                <th class="right" style="padding-right:18px">Balance</th>
               </tr>
             </thead>
             <tbody id="outstanding-tbody">
-              <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+              <tr><td colspan="5" class="empty-state">Loading...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ROW 4: Pace -->
     <div class="panel full">
       <div class="panel-header">
         <span class="panel-title">Year over Year Pace — 2026 vs 2025</span>
-        <span style="font-size:11px; color:var(--text3); font-family:var(--mono);">Full year · Booked as of today</span>
+        <span style="font-size:12px;color:var(--text3);font-family:var(--mono);">Full year · Booked as of today</span>
       </div>
       <div class="panel-body">
-        <div class="chart-wrap" style="height:240px; margin-bottom:20px">
-          <canvas id="chart-pace"></canvas>
-        </div>
-        <table class="data-table" id="pace-table">
+        <div class="chart-wrap" style="height:260px;margin-bottom:22px"><canvas id="chart-pace"></canvas></div>
+        <table class="data-table">
           <thead>
             <tr>
               <th>Month</th>
-              <th class="right">2026 Rev</th>
-              <th class="right">2025 Rev</th>
+              <th class="right">2026 Revenue</th>
+              <th class="right">2025 Revenue</th>
               <th class="right">Variance $</th>
               <th class="right">Variance %</th>
               <th class="right">2026 Nights</th>
@@ -666,554 +294,287 @@ body {
       </div>
     </div>
 
+    <div class="panel full">
+      <div class="panel-header">
+        <span class="panel-title">Import History</span>
+        <span style="font-size:12px;color:var(--text3);font-family:var(--mono);" id="last-import-label"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="import-log-table">
+          <thead>
+            <tr>
+              <th>Import Date</th>
+              <th>Type</th>
+              <th class="right">Rows</th>
+              <th class="right">Revenue</th>
+              <th class="right">ADR</th>
+              <th class="right">RevPAR</th>
+              <th class="right">Occupancy</th>
+              <th class="right">Reservations</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="import-log-tbody">
+            <tr><td colspan="9" class="empty-state">No import history yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
-// ─── CONFIGURATION ───────────────────────────────────────────────
-const CLIENT_ID     = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
-const SHEET_ID      = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
-const STAYS_TAB     = 'STAYS_CLEAN';
-const PACE_TAB      = 'PACE_CLEAN';
-const ACTIVE_DOORS  = 56;
-const SCOPE         = 'https://www.googleapis.com/auth/spreadsheets.readonly';
-// ─────────────────────────────────────────────────────────────────
+const CLIENT_ID    = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
+const SHEET_ID     = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
+const STAYS_TAB    = 'STAYS_CLEAN';
+const PACE_TAB     = 'PACE_CLEAN';
+const LOG_TAB      = 'IMPORT_LOG';
+const IMPORT_TAB   = 'STAYS_IMPORT';
+const ACTIVE_DOORS = 56;
+const SCOPE        = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+const MONTH_ORDER  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const CATEGORIES = {
+  'Modern Cabins': ['Lookout Cabin - with Private Hot Tub','Modern Cabin (Alder) with Private Hot Tub','Modern Cabin (Aspen) with Private Hot Tub','Modern Cabin (Banyan) with Private Hot Tub','Modern Cabin (Blue Spruce) with Private Hot Tub','Modern Cabin (Elm)','Modern Cabin (Hawthorne)','Modern Cabin (Maple) with Private Hot Tub','Modern Cabin (Oak) with Private Hot Tub','Modern Cabin (Olive)','Modern Cabin (Pine)','Modern Cabin (REDWOOD) with Private Hot Tub','Modern Cabin (Rosewood) with Private Hot Tub','Modern Cabin (Sequoia)','Modern Cabin (Sugar Maple)','Modern Cabin (Walnut)'],
+  'Rustic Cabins': ['Cabin 02','Cabin 03','Cabin 04','Cabin 05','Cabin 06','Cabin 07','Cabin 08','Cabin 09','Cabin 10','Cabin 11','Cabin 12','Cabin 15','Cabin 16','Cabin 17'],
+  'Tiny Homes':    ['Tiny Home (Beech) with Private Hot Tub','Tiny Home (Birch)','Tiny Home (Cedar)','Tiny Home (Dogwood)','Tiny Home (Honey Locust)','Tiny Home (Koa)','Tiny Home (Sage)'],
+  'Airstreams':    ['Airstream (Buckeye)','Airstream (Cherry)','Airstream (Chestnut)','Airstream (Cottonwood)','Airstream (Eucalyptus)','Airstream (Magnolia)','Airstream (Redbud)','Airstream (White Oak)','Airstream (Willow)'],
+  'Hotel Rooms':   ['01- King Bed','02- King Bed','03- King Bed','04- King Bed','05- King Bed','06- Double Queen Beds','07- Double Queen Beds','08- Double Queen Beds','09- Double Queen Beds','10- Double Queen Beds']
+};
+
+const CAT_COLORS = { 'Modern Cabins':'#4f8ef7','Rustic Cabins':'#38c98a','Tiny Homes':'#f7a24f','Airstreams':'#a78bfa','Hotel Rooms':'#e05c6b' };
+
+function getCat(name) {
+  const n = (name||'').toLowerCase();
+  for (const [cat,units] of Object.entries(CATEGORIES)) {
+    if (units.some(u => u.toLowerCase() === n)) return cat;
+  }
+  return 'Other';
+}
+
+// CORRECTED: BookedOnline=TRUE → Direct (website), DirectConnect=TRUE → OTA
+function getChannel(bo, dc) {
+  if (bo) return 'Direct';
+  if (dc) return 'OTA';
+  return 'Phone/Manual';
+}
 
 let tokenClient, accessToken;
-let staysData = [], paceData = [];
-let activeFilter = 'ALL';
-let revenueChart, channelChart, paceChart;
+let staysData=[], paceData=[], logData=[];
+let activeFilter='ALL';
+let revChart, chChart, paceChart;
 
-// Month order for sorting
-const MONTH_ORDER = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-// ─── AUTH ─────────────────────────────────────────────────────────
-function loadGoogleAPI() {
-  return new Promise(resolve => {
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.onload = resolve;
-    document.head.appendChild(s);
-  });
+function loadGSI() {
+  return new Promise(r => { const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.onload=r; document.head.appendChild(s); });
 }
 
 async function signIn() {
-  await loadGoogleAPI();
+  await loadGSI();
   tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPE,
+    client_id: CLIENT_ID, scope: SCOPE,
     callback: async (resp) => {
-      if (resp.error) { showError('Authentication failed: ' + resp.error); return; }
+      if (resp.error) { showErr('Auth failed: '+resp.error); return; }
       accessToken = resp.access_token;
-      showLoading();
-      await loadAllData();
+      showLoad();
+      await loadAll();
     }
   });
-  tokenClient.requestAccessToken({ prompt: 'consent' });
+  tokenClient.requestAccessToken({ prompt:'consent' });
 }
 
 function signOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken);
-  accessToken = null;
-  staysData = []; paceData = [];
-  document.getElementById('dashboard').style.display = 'none';
-  document.getElementById('auth-screen').style.display = 'flex';
-  destroyCharts();
+  accessToken=null; staysData=[]; paceData=[]; logData=[];
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  [revChart,chChart,paceChart].forEach(c=>{if(c)c.destroy();});
+  revChart=chChart=paceChart=null;
 }
 
-// ─── DATA LOADING ─────────────────────────────────────────────────
-async function fetchSheet(tab) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) throw new Error(`Failed to fetch ${tab}: ${res.status} ${res.statusText}`);
-  const json = await res.json();
-  return json.values || [];
+async function fetchTab(tab) {
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`, { headers:{ Authorization:`Bearer ${accessToken}` }});
+  if (!r.ok) throw new Error(`Cannot load ${tab} (${r.status})`);
+  return (await r.json()).values || [];
 }
 
-function parseRows(raw) {
-  if (!raw || raw.length < 2) return [];
-  const headers = raw[0].map(h => h.trim());
-  return raw.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = (row[i] || '').trim());
-    return obj;
-  });
+function toRows(raw) {
+  if (!raw||raw.length<2) return [];
+  const H = raw[0].map(h=>String(h).trim());
+  return raw.slice(1).map(row=>{ const o={}; H.forEach((h,i)=>o[h]=(row[i]||'').trim()); return o; });
 }
 
-function parseDate(s) {
-  if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d) ? null : d;
-}
+function pDate(s) { if(!s)return null; const d=new Date(s); return isNaN(d)?null:d; }
+function pMoney(s) { return parseFloat(String(s||0).replace(/[$,]/g,''))||0; }
+function pBool(s) { const v=String(s).trim().toLowerCase(); return v==='true'||v==='yes'||v==='1'||v==='x'; }
+function fmt$(n) { return '$'+Math.round(n).toLocaleString('en-US'); }
 
-function parseMoney(s) {
-  if (!s) return 0;
-  return parseFloat(String(s).replace(/[$,]/g, '')) || 0;
-}
-
-function parseBool(s) {
-  const v = String(s).trim().toLowerCase();
-  return v === 'true' || v === 'yes' || v === '1' || v === 'x';
-}
-
-async function loadAllData() {
+async function loadAll() {
   try {
-    const [staysRaw, paceRaw] = await Promise.all([
-      fetchSheet(STAYS_TAB),
-      fetchSheet(PACE_TAB)
-    ]);
+    const [sr, pr] = await Promise.all([fetchTab(STAYS_TAB), fetchTab(PACE_TAB)]);
+    staysData = toRows(sr).map(r=>{
+      const bo=pBool(r['BookedOnline']), dc=pBool(r['DirectConnect']);
+      return { res:r['Res#']||r['Res'], nightDate:pDate(r['NightDate']), accommodation:r['Accommodation'], nightRevenue:pMoney(r['NightRevenue']), bookedOnline:bo, directConnect:dc, reservedOn:pDate(r['ReservedOn']), channel:getChannel(bo,dc), nightCount:parseInt(r['NightCount'])||1 };
+    }).filter(r=>r.nightDate);
 
-    staysData = parseRows(staysRaw).map(r => ({
-      res:           r['Res#'] || r['Res'],
-      nightDate:     parseDate(r['NightDate']),
-      accommodation: r['Accommodation'],
-      nightRevenue:  parseMoney(r['NightRevenue']),
-      bookedOnline:  parseBool(r['BookedOnline']),
-      directConnect: parseBool(r['DirectConnect']),
-      reservedOn:    parseDate(r['ReservedOn']),
-      channel:       r['Channel'] || (parseBool(r['BookedOnline']) ? 'OTA' : parseBool(r['DirectConnect']) ? 'Direct' : 'Phone/Manual'),
-      nightCount:    parseInt(r['NightCount']) || 1
-    })).filter(r => r.nightDate);
+    paceData = toRows(pr).map(r=>({ yearGroup:r['YearGroup'], nightDate:pDate(r['NightDate']), reservationID:r['ReservationID'], rate:pMoney(r['Rate']), unit:r['Unit'] })).filter(r=>r.nightDate&&r.yearGroup);
 
-    paceData = parseRows(paceRaw).map(r => ({
-      yearGroup:     r['YearGroup'],
-      reservedOn:    parseDate(r['ReservedOn']),
-      nightDate:     parseDate(r['NightDate']),
-      reservationID: r['ReservationID'],
-      rate:          parseMoney(r['Rate']),
-      unit:          r['Unit']
-    })).filter(r => r.nightDate && r.yearGroup);
+    try { logData = toRows(await fetchTab(LOG_TAB)); } catch(e){ logData=[]; }
 
-    buildFilters();
-    renderAll();
-    showDashboard();
-
-    document.getElementById('last-updated-text').textContent =
-      'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-
-  } catch(e) {
-    showError('Error loading data: ' + e.message);
-    showDashboard();
-  }
+    buildFilters(); renderAll(); renderLog();
+    showDash();
+    document.getElementById('last-updated-text').textContent = 'Loaded '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  } catch(e) { showErr('Error: '+e.message); showDash(); }
 }
 
-// ─── FILTERS ──────────────────────────────────────────────────────
 function buildFilters() {
-  const months = new Set();
-  staysData.forEach(r => {
-    if (r.nightDate) {
-      const key = r.nightDate.toLocaleString('en-US', {month:'short', year:'numeric'});
-      months.add(key);
-    }
-  });
-
-  const sorted = Array.from(months).sort((a, b) => {
-    const da = new Date(a), db = new Date(b);
-    return da - db;
-  });
-
-  const bar = document.getElementById('filter-bar');
-  bar.innerHTML = '<span class="filter-label">Period</span>';
-
-  const allBtn = document.createElement('button');
-  allBtn.className = 'filter-btn active';
-  allBtn.textContent = 'All data';
-  allBtn.dataset.filter = 'ALL';
-  allBtn.onclick = () => setFilter('ALL', allBtn);
-  bar.appendChild(allBtn);
-
-  sorted.forEach(m => {
-    const btn = document.createElement('button');
-    btn.className = 'filter-btn';
-    btn.textContent = m;
-    btn.dataset.filter = m;
-    btn.onclick = () => setFilter(m, btn);
-    bar.appendChild(btn);
-  });
+  const months=new Set();
+  staysData.forEach(r=>{ if(r.nightDate) months.add(r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'})); });
+  const sorted=[...months].sort((a,b)=>new Date(a)-new Date(b));
+  const bar=document.getElementById('filter-bar');
+  bar.innerHTML='<span class="filter-label">Period</span>';
+  const ab=mkBtn('All data','ALL',true); bar.appendChild(ab);
+  sorted.forEach(m=>{ const b=mkBtn(m,m,false); bar.appendChild(b); });
 }
 
-function setFilter(val, btn) {
-  activeFilter = val;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderAll();
+function mkBtn(label,val,active) {
+  const b=document.createElement('button');
+  b.className='filter-btn'+(active?' active':'');
+  b.textContent=label; b.dataset.filter=val;
+  b.onclick=()=>{ activeFilter=val; document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderAll(); };
+  return b;
 }
 
-function getFilteredStays() {
-  if (activeFilter === 'ALL') return staysData;
-  return staysData.filter(r => {
-    const key = r.nightDate.toLocaleString('en-US', {month:'short', year:'numeric'});
-    return key === activeFilter;
-  });
+function filtered() {
+  if(activeFilter==='ALL') return staysData;
+  return staysData.filter(r=>r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'})===activeFilter);
 }
 
-// ─── RENDER ALL ────────────────────────────────────────────────────
 function renderAll() {
-  const filtered = getFilteredStays();
-  renderScorecards(filtered);
-  renderRevenueChart(filtered);
-  renderChannelChart(filtered);
-  renderUnitTable(filtered);
-  renderBookingWindow(filtered);
-  renderOutstanding();
-  renderPace();
+  const rows=filtered();
+  renderScores(rows); renderCats(rows); renderRevChart(rows); renderChChart(rows); renderUnits(rows); renderBW(rows); renderOutstanding(); renderPace();
 }
 
-// ─── SCORECARDS ────────────────────────────────────────────────────
-function renderScorecards(rows) {
-  const totalRev = rows.reduce((s, r) => s + r.nightRevenue, 0);
-  const totalNights = rows.length;
-  const adr = totalNights > 0 ? totalRev / totalNights : 0;
-
-  // RevPAR: total revenue / (56 doors * days in period)
-  let days = 0;
-  if (rows.length > 0) {
-    const dates = rows.map(r => r.nightDate.getTime());
-    const minD = new Date(Math.min(...dates));
-    const maxD = new Date(Math.max(...dates));
-    days = Math.round((maxD - minD) / 86400000) + 1;
-  }
-  const revpar = days > 0 ? totalRev / (ACTIVE_DOORS * days) : 0;
-  const occupancy = days > 0 ? (totalNights / (ACTIVE_DOORS * days)) * 100 : 0;
-
-  document.getElementById('sc-revenue').textContent = fmt$(totalRev);
-  document.getElementById('sc-revenue-meta').textContent = totalNights + ' occupied nights';
-  document.getElementById('sc-adr').textContent = fmt$(adr);
-  document.getElementById('sc-revpar').textContent = fmt$(revpar);
-  document.getElementById('sc-occupancy').textContent = occupancy.toFixed(1) + '%';
-  document.getElementById('sc-occ-meta').textContent = days + ' day period';
+function renderScores(rows) {
+  const rev=rows.reduce((s,r)=>s+r.nightRevenue,0);
+  const n=rows.length, adr=n>0?rev/n:0;
+  let days=1;
+  if(n>0){ const t=rows.map(r=>r.nightDate.getTime()); days=Math.round((Math.max(...t)-Math.min(...t))/86400000)+1; }
+  const revpar=rev/(ACTIVE_DOORS*days), occ=(n/(ACTIVE_DOORS*days))*100;
+  document.getElementById('sc-revenue').textContent=fmt$(rev);
+  document.getElementById('sc-revenue-meta').textContent=n+' occupied nights';
+  document.getElementById('sc-adr').textContent=fmt$(adr);
+  document.getElementById('sc-revpar').textContent=fmt$(revpar);
+  document.getElementById('sc-occupancy').textContent=occ.toFixed(1)+'%';
+  document.getElementById('sc-occ-meta').textContent=days+' day period';
 }
 
-// ─── REVENUE CHART ────────────────────────────────────────────────
-function renderRevenueChart(rows) {
-  const byMonth = {};
-  rows.forEach(r => {
-    const key = r.nightDate.toLocaleString('en-US', {month:'short', year:'numeric'});
-    byMonth[key] = (byMonth[key] || 0) + r.nightRevenue;
-  });
-
-  const labels = Object.keys(byMonth).sort((a, b) => new Date(a) - new Date(b));
-  const values = labels.map(l => byMonth[l]);
-
-  if (revenueChart) revenueChart.destroy();
-  const ctx = document.getElementById('chart-revenue').getContext('2d');
-  revenueChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        backgroundColor: 'rgba(79,142,247,0.7)',
-        borderColor: 'rgba(79,142,247,1)',
-        borderWidth: 1,
-        borderRadius: 4,
-      }]
-    },
-    options: chartOpts({
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: 'rgba(42,47,66,0.8)' }, ticks: { color: '#5a6480', font: { family: 'DM Mono', size: 10 } } },
-        y: { grid: { color: 'rgba(42,47,66,0.8)' }, ticks: { color: '#5a6480', font: { family: 'DM Mono', size: 10 }, callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) } }
-      }
-    })
-  });
-}
-
-// ─── CHANNEL CHART ────────────────────────────────────────────────
-function renderChannelChart(rows) {
-  const channels = { OTA: 0, Direct: 0, 'Phone/Manual': 0 };
-  rows.forEach(r => {
-    const ch = r.channel || 'Phone/Manual';
-    if (channels[ch] !== undefined) channels[ch] += r.nightRevenue;
-    else channels['Phone/Manual'] += r.nightRevenue;
-  });
-
-  const total = Object.values(channels).reduce((a, b) => a + b, 0);
-  const colors = ['rgba(79,142,247,0.85)', 'rgba(56,201,138,0.85)', 'rgba(90,100,128,0.6)'];
-  const labels = Object.keys(channels);
-  const values = Object.values(channels);
-
-  if (channelChart) channelChart.destroy();
-  const ctx = document.getElementById('chart-channel').getContext('2d');
-  channelChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#161b27', borderWidth: 3 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '68%',
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmt$(c.raw) + ' (' + ((c.raw/total)*100).toFixed(1) + '%)' } } }
-    }
-  });
-
-  const legend = document.getElementById('channel-legend');
-  legend.innerHTML = '';
-  labels.forEach((l, i) => {
-    const pct = total > 0 ? ((values[i]/total)*100).toFixed(1) : '0.0';
-    legend.innerHTML += `
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <div style="width:8px; height:8px; border-radius:2px; background:${colors[i]}; flex-shrink:0;"></div>
-          <span style="font-size:12px; color:var(--text2)">${l}</span>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:12px; font-family:var(--mono); color:var(--text)">${fmt$(values[i])}</div>
-          <div style="font-size:10px; font-family:var(--mono); color:var(--text3)">${pct}%</div>
-        </div>
-      </div>`;
-  });
-}
-
-// ─── UNIT TABLE ────────────────────────────────────────────────────
-function renderUnitTable(rows) {
-  const byUnit = {};
-  rows.forEach(r => {
-    if (!r.accommodation) return;
-    if (!byUnit[r.accommodation]) byUnit[r.accommodation] = { revenue: 0, nights: 0 };
-    byUnit[r.accommodation].revenue += r.nightRevenue;
-    byUnit[r.accommodation].nights++;
-  });
-
-  const sorted = Object.entries(byUnit)
-    .map(([name, d]) => ({ name, revenue: d.revenue, nights: d.nights, adr: d.nights > 0 ? d.revenue / d.nights : 0 }))
-    .sort((a, b) => b.revenue - a.revenue);
-
-  const maxRev = sorted.length > 0 ? sorted[0].revenue : 1;
-  const totalRev = sorted.reduce((s, u) => s + u.revenue, 0);
-
-  document.getElementById('unit-count-label').textContent = sorted.length + ' units';
-
-  const tbody = document.getElementById('unit-tbody');
-  tbody.innerHTML = sorted.map((u, i) => {
-    const pct = totalRev > 0 ? (u.revenue / totalRev) * 100 : 0;
-    const barPct = maxRev > 0 ? (u.revenue / maxRev) * 100 : 0;
-    return `<tr>
-      <td style="padding-left:20px; color:var(--text3); font-size:11px">${i+1}</td>
-      <td class="name-col">${u.name}</td>
-      <td class="right">${fmt$(u.revenue)}</td>
-      <td class="right">${u.nights}</td>
-      <td class="right">${fmt$(u.adr)}</td>
-      <td>
-        <div class="rev-bar-wrap">
-          <div class="rev-bar-bg"><div class="rev-bar-fill" style="width:${barPct}%"></div></div>
-          <span style="font-size:10px; color:var(--text3); font-family:var(--mono); min-width:32px; text-align:right">${pct.toFixed(1)}%</span>
-        </div>
-      </td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="6" class="empty-state">No unit data for selected period</td></tr>';
-}
-
-// ─── BOOKING WINDOW ────────────────────────────────────────────────
-function renderBookingWindow(rows) {
-  const windows = rows
-    .filter(r => r.reservedOn && r.nightDate)
-    .map(r => Math.round((r.nightDate - r.reservedOn) / 86400000))
-    .filter(d => d >= 0);
-
-  if (windows.length === 0) {
-    document.getElementById('bw-avg').textContent = '—';
-    document.getElementById('bw-min').textContent = '—';
-    document.getElementById('bw-max').textContent = '—';
-    return;
-  }
-
-  const avg = Math.round(windows.reduce((a, b) => a + b, 0) / windows.length);
-  const min = Math.min(...windows);
-  const max = Math.max(...windows);
-
-  document.getElementById('bw-avg').textContent = avg;
-  document.getElementById('bw-min').textContent = min;
-  document.getElementById('bw-max').textContent = max;
-
-  // Breakdown buckets
-  const buckets = [
-    { label: 'Same day / 1 day', min: 0, max: 1 },
-    { label: '2–7 days', min: 2, max: 7 },
-    { label: '8–30 days', min: 8, max: 30 },
-    { label: '31–90 days', min: 31, max: 90 },
-    { label: '90+ days', min: 91, max: Infinity },
-  ];
-
-  const bwEl = document.getElementById('bw-breakdown');
-  bwEl.innerHTML = buckets.map(b => {
-    const count = windows.filter(w => w >= b.min && w <= b.max).length;
-    const pct = windows.length > 0 ? (count / windows.length) * 100 : 0;
-    return `<div style="display:flex; align-items:center; gap:8px; font-size:11px;">
-      <span style="color:var(--text3); font-family:var(--mono); min-width:130px">${b.label}</span>
-      <div style="flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden;">
-        <div style="height:100%; width:${pct}%; background:var(--accent); border-radius:2px;"></div>
-      </div>
-      <span style="color:var(--text2); font-family:var(--mono); min-width:30px; text-align:right">${pct.toFixed(0)}%</span>
-    </div>`;
+function renderCats(rows) {
+  const ct={}, cn={};
+  Object.keys(CATEGORIES).forEach(c=>{ct[c]=0;cn[c]=0;});
+  rows.forEach(r=>{ const c=getCat(r.accommodation); if(ct[c]!==undefined){ct[c]+=r.nightRevenue;cn[c]++;} });
+  const mx=Math.max(...Object.values(ct),1);
+  document.getElementById('cat-grid').innerHTML=Object.keys(CATEGORIES).map(cat=>{
+    const rev=ct[cat],nights=cn[cat],adr=nights>0?rev/nights:0,pct=mx>0?(rev/mx)*100:0,col=CAT_COLORS[cat];
+    return `<div class="cat-card"><div class="cat-card-name">${cat}</div><div class="cat-card-rev">${fmt$(rev)}</div><div class="cat-card-meta">${nights} nights · ADR ${fmt$(adr)}</div><div class="cat-card-bar"><div class="cat-card-bar-fill" style="width:${pct}%;background:${col}"></div></div></div>`;
   }).join('');
 }
 
-// ─── OUTSTANDING BALANCES ──────────────────────────────────────────
+function renderRevChart(rows) {
+  const bm={};
+  rows.forEach(r=>{ const k=r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'}); bm[k]=(bm[k]||0)+r.nightRevenue; });
+  const labels=Object.keys(bm).sort((a,b)=>new Date(a)-new Date(b));
+  if(revChart) revChart.destroy();
+  revChart=new Chart(document.getElementById('chart-revenue').getContext('2d'),{ type:'bar', data:{ labels, datasets:[{ data:labels.map(l=>bm[l]), backgroundColor:'rgba(79,142,247,0.7)', borderColor:'rgba(79,142,247,1)', borderWidth:1, borderRadius:5 }]}, options:bOpts({ plugins:{legend:{display:false}}, scales:{x:xS(),y:yS()} }) });
+}
+
+function renderChChart(rows) {
+  const ch={Direct:0,OTA:0,'Phone/Manual':0};
+  rows.forEach(r=>{ const c=getChannel(r.bookedOnline,r.directConnect); ch[c]=(ch[c]||0)+r.nightRevenue; });
+  const total=Object.values(ch).reduce((a,b)=>a+b,0);
+  const labels=Object.keys(ch), values=Object.values(ch);
+  const colors=['rgba(56,201,138,0.85)','rgba(79,142,247,0.85)','rgba(90,100,128,0.6)'];
+  if(chChart) chChart.destroy();
+  chChart=new Chart(document.getElementById('chart-channel').getContext('2d'),{ type:'doughnut', data:{labels,datasets:[{data:values,backgroundColor:colors,borderColor:'#161b27',borderWidth:3}]}, options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#1c2133',borderColor:'#2a2f42',borderWidth:1,titleColor:'#8b95b0',bodyColor:'#e2e8f4',padding:12,callbacks:{label:c=>' '+fmt$(c.raw)+' ('+(c.raw/total*100).toFixed(1)+'%)'}}}} });
+  document.getElementById('channel-legend').innerHTML=labels.map((l,i)=>{
+    const pct=total>0?(values[i]/total*100).toFixed(1):'0.0';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;"><div style="display:flex;align-items:center;gap:10px;"><div style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></div><span style="font-size:14px;color:var(--text2)">${l}</span></div><div style="text-align:right;"><div style="font-size:15px;font-family:var(--mono);color:var(--text);font-weight:500">${fmt$(values[i])}</div><div style="font-size:11px;font-family:var(--mono);color:var(--text3)">${pct}%</div></div></div>`;
+  }).join('');
+}
+
+function renderUnits(rows) {
+  const bu={};
+  rows.forEach(r=>{ if(!r.accommodation)return; if(!bu[r.accommodation])bu[r.accommodation]={rev:0,n:0}; bu[r.accommodation].rev+=r.nightRevenue; bu[r.accommodation].n++; });
+  const allUnits=Object.values(CATEGORIES).flat();
+  const totalRev=Object.values(bu).reduce((s,u)=>s+u.rev,0);
+  const maxRev=Math.max(...Object.values(bu).map(u=>u.rev),1);
+  let rn=0, html='';
+  for(const [cat,units] of Object.entries(CATEGORIES)) {
+    const cu=units.map(name=>({name,rev:bu[name]?bu[name].rev:0,n:bu[name]?bu[name].n:0})).filter(u=>u.rev>0).sort((a,b)=>b.rev-a.rev);
+    if(!cu.length) continue;
+    const cr=cu.reduce((s,u)=>s+u.rev,0), cn=cu.reduce((s,u)=>s+u.n,0), col=CAT_COLORS[cat];
+    html+=`<tr class="category-row"><td style="padding-left:22px;color:${col}"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col};margin-right:8px;vertical-align:middle;"></span>${cat}</td><td></td><td class="right">${fmt$(cr)}</td><td class="right">${cn}</td><td class="right">${fmt$(cn>0?cr/cn:0)}</td><td></td></tr>`;
+    cu.forEach(u=>{ rn++; const pct=totalRev>0?(u.rev/totalRev)*100:0, bp=maxRev>0?(u.rev/maxRev)*100:0; html+=`<tr><td style="padding-left:22px;color:var(--text3);font-size:12px">${rn}</td><td class="name-col" style="padding-left:28px">${u.name}</td><td class="right">${fmt$(u.rev)}</td><td class="right">${u.n}</td><td class="right">${fmt$(u.n>0?u.rev/u.n:0)}</td><td><div class="rev-bar-wrap"><div class="rev-bar-bg"><div class="rev-bar-fill" style="width:${bp}%;background:${col}"></div></div><span style="font-size:11px;color:var(--text3);font-family:var(--mono);min-width:36px;text-align:right">${pct.toFixed(1)}%</span></div></td></tr>`; });
+  }
+  document.getElementById('unit-tbody').innerHTML=html||'<tr><td colspan="6" class="empty-state">No unit data</td></tr>';
+  document.getElementById('unit-count-label').textContent=rn+' units with bookings';
+  const booked=new Set(rows.map(r=>(r.accommodation||'').toLowerCase()));
+  const vacant=allUnits.filter(u=>!booked.has(u.toLowerCase()));
+  document.getElementById('vacant-section').innerHTML=vacant.length?`<div class="vacant-label">No bookings in period (${vacant.length} units)</div><div class="vacant-pills">${vacant.map(u=>`<div class="vacant-pill">${u}</div>`).join('')}</div>`:'';
+}
+
+function renderBW(rows) {
+  const ws=rows.filter(r=>r.reservedOn&&r.nightDate&&r.nightDate>r.reservedOn).map(r=>Math.round((r.nightDate-r.reservedOn)/86400000)).filter(d=>d>0&&d<730);
+  if(!ws.length){ ['bw-avg','bw-min','bw-max'].forEach(id=>document.getElementById(id).textContent='—'); document.getElementById('bw-breakdown').innerHTML=''; return; }
+  const avg=Math.round(ws.reduce((a,b)=>a+b,0)/ws.length);
+  document.getElementById('bw-avg').textContent=avg;
+  document.getElementById('bw-min').textContent=Math.min(...ws);
+  document.getElementById('bw-max').textContent=Math.max(...ws);
+  const buckets=[{l:'Same day / 1 day',mn:0,mx:1},{l:'2 – 7 days',mn:2,mx:7},{l:'8 – 30 days',mn:8,mx:30},{l:'31 – 90 days',mn:31,mx:90},{l:'90+ days',mn:91,mx:Infinity}];
+  document.getElementById('bw-breakdown').innerHTML=buckets.map(b=>{ const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length, pct=ws.length>0?(cnt/ws.length)*100:0; return `<div style="display:flex;align-items:center;gap:10px;"><span style="color:var(--text3);font-family:var(--mono);font-size:12px;min-width:140px">${b.l}</span><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;"></div></div><span style="color:var(--text2);font-family:var(--mono);font-size:12px;min-width:34px;text-align:right">${pct.toFixed(0)}%</span></div>`; }).join('');
+}
+
 async function renderOutstanding() {
-  // Read from STAYS_IMPORT for Amount vs Paid comparison
   try {
-    const raw = await fetchSheet('STAYS_IMPORT');
-    const rows = parseRows(raw);
-    const outstanding = rows
-      .filter(r => {
-        const amount = parseMoney(r['amount'] || r['Amount']);
-        const paid = parseMoney(r['Paid'] || r['paid']);
-        return amount > 0 && paid < amount;
-      })
-      .map(r => ({
-        res: r['Res#'] || r['Res'],
-        unit: r['Accommodation'],
-        amount: parseMoney(r['amount'] || r['Amount']),
-        paid: parseMoney(r['Paid'] || r['paid'])
-      }))
-      .sort((a, b) => (b.amount - b.paid) - (a.amount - a.paid));
-
-    const badge = document.getElementById('outstanding-count');
-    const badgeText = document.getElementById('outstanding-count-text');
-    if (outstanding.length > 0) {
-      badge.style.display = 'inline-flex';
-      badgeText.textContent = outstanding.length + ' pending';
-    }
-
-    const tbody = document.getElementById('outstanding-tbody');
-    tbody.innerHTML = outstanding.map(r => `<tr>
-      <td style="padding-left:16px">${r.res}</td>
-      <td class="name-col">${r.unit}</td>
-      <td class="right">${fmt$(r.amount)}</td>
-      <td class="right" style="color:var(--accent3); padding-right:16px">${fmt$(r.paid)}</td>
-    </tr>`).join('') || '<tr><td colspan="4" class="empty-state">No outstanding balances</td></tr>';
-  } catch(e) {
-    document.getElementById('outstanding-tbody').innerHTML =
-      '<tr><td colspan="4" class="empty-state">Could not load balance data</td></tr>';
-  }
+    const raw=await fetchTab(IMPORT_TAB);
+    const rows=toRows(raw);
+    const partials=rows.filter(r=>{ const a=pMoney(r['amount']||r['Amount']), p=pMoney(r['Paid']||r['paid']); return a>0&&p>0&&p<a; }).map(r=>({ res:r['Res#']||r['Res'], unit:r['Accommodation'], amount:pMoney(r['amount']||r['Amount']), paid:pMoney(r['Paid']||r['paid']) })).sort((a,b)=>(b.amount-b.paid)-(a.amount-a.paid));
+    const badge=document.getElementById('outstanding-badge');
+    if(partials.length>0){ badge.style.display='inline-flex'; document.getElementById('outstanding-count-text').textContent=partials.length+' pending'; } else { badge.style.display='none'; }
+    document.getElementById('outstanding-tbody').innerHTML=partials.map(r=>`<tr><td style="padding-left:18px">${r.res}</td><td class="name-col">${r.unit}</td><td class="right">${fmt$(r.amount)}</td><td class="right">${fmt$(r.paid)}</td><td class="right" style="color:var(--accent3);padding-right:18px">${fmt$(r.amount-r.paid)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty-state">No partial payments</td></tr>';
+  } catch(e) { document.getElementById('outstanding-tbody').innerHTML='<tr><td colspan="5" class="empty-state">Could not load</td></tr>'; }
 }
 
-// ─── PACE ──────────────────────────────────────────────────────────
 function renderPace() {
-  const byMonthYear = {};
-  paceData.forEach(r => {
-    const month = r.nightDate.toLocaleString('en-US', { month: 'short' });
-    const key = `${month}_${r.yearGroup}`;
-    if (!byMonthYear[key]) byMonthYear[key] = { revenue: 0, nights: 0 };
-    byMonthYear[key].revenue += r.rate;
-    byMonthYear[key].nights++;
-  });
-
-  const months = MONTH_ORDER;
-  const rev2026 = months.map(m => (byMonthYear[`${m}_2026`] || {}).revenue || 0);
-  const rev2025 = months.map(m => (byMonthYear[`${m}_2025`] || {}).revenue || 0);
-  const nights2026 = months.map(m => (byMonthYear[`${m}_2026`] || {}).nights || 0);
-  const nights2025 = months.map(m => (byMonthYear[`${m}_2025`] || {}).nights || 0);
-
-  // Chart
-  if (paceChart) paceChart.destroy();
-  const ctx = document.getElementById('chart-pace').getContext('2d');
-  paceChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: months,
-      datasets: [
-        { label: '2026', data: rev2026, backgroundColor: 'rgba(79,142,247,0.75)', borderColor: 'rgba(79,142,247,1)', borderWidth: 1, borderRadius: 3 },
-        { label: '2025', data: rev2025, backgroundColor: 'rgba(42,47,66,0.9)', borderColor: 'rgba(60,68,92,1)', borderWidth: 1, borderRadius: 3 }
-      ]
-    },
-    options: chartOpts({
-      plugins: {
-        legend: { display: true, position: 'top', labels: { color: '#8b95b0', font: { family: 'DM Mono', size: 10 }, boxWidth: 10, padding: 16 } }
-      },
-      scales: {
-        x: { grid: { color: 'rgba(42,47,66,0.8)' }, ticks: { color: '#5a6480', font: { family: 'DM Mono', size: 10 } } },
-        y: { grid: { color: 'rgba(42,47,66,0.8)' }, ticks: { color: '#5a6480', font: { family: 'DM Mono', size: 10 }, callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) } }
-      }
-    })
-  });
-
-  // Table
-  const tbody = document.getElementById('pace-tbody');
-  let total26 = 0, total25 = 0, totalN26 = 0, totalN25 = 0;
-
-  tbody.innerHTML = months.map((m, i) => {
-    const r26 = rev2026[i], r25 = rev2025[i];
-    const varD = r26 - r25;
-    const varP = r25 > 0 ? (varD / r25) * 100 : 0;
-    total26 += r26; total25 += r25; totalN26 += nights2026[i]; totalN25 += nights2025[i];
-    const cls = varD > 0 ? 'pace-positive' : varD < 0 ? 'pace-negative' : 'pace-neutral';
-    const sign = varD > 0 ? '+' : '';
-    return `<tr>
-      <td style="color:var(--text2)">${m}</td>
-      <td class="right">${r26 > 0 ? fmt$(r26) : '—'}</td>
-      <td class="right">${r25 > 0 ? fmt$(r25) : '—'}</td>
-      <td class="right ${cls}">${r25 > 0 || r26 > 0 ? sign + fmt$(varD) : '—'}</td>
-      <td class="right ${cls}">${r25 > 0 ? sign + varP.toFixed(1) + '%' : '—'}</td>
-      <td class="right">${nights2026[i] > 0 ? nights2026[i] : '—'}</td>
-      <td class="right">${nights2025[i] > 0 ? nights2025[i] : '—'}</td>
-    </tr>`;
-  }).join('');
-
-  // Totals row
-  const totalVarD = total26 - total25;
-  const totalVarP = total25 > 0 ? (totalVarD / total25) * 100 : 0;
-  const cls = totalVarD > 0 ? 'pace-positive' : totalVarD < 0 ? 'pace-negative' : 'pace-neutral';
-  const sign = totalVarD > 0 ? '+' : '';
-  tbody.innerHTML += `<tr style="border-top:1px solid var(--border2);">
-    <td style="color:var(--text); font-weight:600">Total</td>
-    <td class="right" style="color:var(--text); font-weight:600">${fmt$(total26)}</td>
-    <td class="right" style="color:var(--text); font-weight:600">${fmt$(total25)}</td>
-    <td class="right ${cls}" style="font-weight:600">${sign + fmt$(totalVarD)}</td>
-    <td class="right ${cls}" style="font-weight:600">${total25 > 0 ? sign + totalVarP.toFixed(1) + '%' : '—'}</td>
-    <td class="right" style="color:var(--text); font-weight:600">${totalN26}</td>
-    <td class="right" style="color:var(--text); font-weight:600">${totalN25}</td>
-  </tr>`;
+  const bmy={};
+  paceData.forEach(r=>{ const m=r.nightDate.toLocaleString('en-US',{month:'short'}), k=`${m}_${r.yearGroup}`; if(!bmy[k])bmy[k]={rev:0,n:0}; bmy[k].rev+=r.rate; bmy[k].n++; });
+  const r26=MONTH_ORDER.map(m=>(bmy[`${m}_2026`]||{}).rev||0);
+  const r25=MONTH_ORDER.map(m=>(bmy[`${m}_2025`]||{}).rev||0);
+  const n26=MONTH_ORDER.map(m=>(bmy[`${m}_2026`]||{}).n||0);
+  const n25=MONTH_ORDER.map(m=>(bmy[`${m}_2025`]||{}).n||0);
+  if(paceChart) paceChart.destroy();
+  paceChart=new Chart(document.getElementById('chart-pace').getContext('2d'),{ type:'bar', data:{ labels:MONTH_ORDER, datasets:[{label:'2026',data:r26,backgroundColor:'rgba(79,142,247,0.8)',borderColor:'rgba(79,142,247,1)',borderWidth:1,borderRadius:4},{label:'2025',data:r25,backgroundColor:'rgba(42,47,66,0.95)',borderColor:'rgba(60,68,92,1)',borderWidth:1,borderRadius:4}]}, options:bOpts({ plugins:{legend:{display:true,position:'top',labels:{color:'#8b95b0',font:{family:'DM Mono',size:11},boxWidth:12,padding:18}}}, scales:{x:xS(),y:yS()} }) });
+  let t26=0,t25=0,tn26=0,tn25=0;
+  const tbody=document.getElementById('pace-tbody');
+  tbody.innerHTML=MONTH_ORDER.map((m,i)=>{ const vd=r26[i]-r25[i], vp=r25[i]>0?(vd/r25[i])*100:0; t26+=r26[i];t25+=r25[i];tn26+=n26[i];tn25+=n25[i]; const cls=vd>0?'pace-positive':vd<0?'pace-negative':'pace-neutral', sign=vd>0?'+':''; return `<tr><td style="color:var(--text2)">${m}</td><td class="right">${r26[i]>0?fmt$(r26[i]):'—'}</td><td class="right">${r25[i]>0?fmt$(r25[i]):'—'}</td><td class="right ${cls}">${(r25[i]>0||r26[i]>0)?sign+fmt$(vd):'—'}</td><td class="right ${cls}">${r25[i]>0?sign+vp.toFixed(1)+'%':'—'}</td><td class="right">${n26[i]||'—'}</td><td class="right">${n25[i]||'—'}</td></tr>`; }).join('');
+  const tvd=t26-t25, tvp=t25>0?(tvd/t25)*100:0, tcls=tvd>0?'pace-positive':tvd<0?'pace-negative':'pace-neutral', tsign=tvd>0?'+':'';
+  tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)"><td style="color:var(--text);font-weight:600">Total</td><td class="right" style="color:var(--text);font-weight:600">${fmt$(t26)}</td><td class="right" style="color:var(--text);font-weight:600">${fmt$(t25)}</td><td class="right ${tcls}" style="font-weight:600">${tsign+fmt$(tvd)}</td><td class="right ${tcls}" style="font-weight:600">${t25>0?tsign+tvp.toFixed(1)+'%':'—'}</td><td class="right" style="color:var(--text);font-weight:600">${tn26}</td><td class="right" style="color:var(--text);font-weight:600">${tn25}</td></tr>`;
 }
 
-// ─── CHART DEFAULTS ────────────────────────────────────────────────
-function chartOpts(extra = {}) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: { duration: 400 },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: '#1c2133',
-        borderColor: '#2a2f42',
-        borderWidth: 1,
-        titleColor: '#8b95b0',
-        bodyColor: '#e2e8f4',
-        titleFont: { family: 'DM Mono', size: 10 },
-        bodyFont: { family: 'DM Mono', size: 11 },
-        padding: 10,
-        callbacks: { label: c => ' ' + (typeof c.raw === 'number' && c.datasetIndex !== undefined ? fmt$(c.raw) : c.raw) }
-      }
-    },
-    ...extra
-  };
+function renderLog() {
+  if(!logData||!logData.length){ document.getElementById('import-log-tbody').innerHTML='<tr><td colspan="9" class="empty-state">No import history yet — update your Apps Script to start tracking metrics per import</td></tr>'; return; }
+  const rows=[...logData].reverse();
+  const latest=rows.find(r=>(r['ReportType']||r['Type']||'').includes('STAYS'));
+  if(latest) document.getElementById('last-import-label').textContent='Last stays import: '+(latest['ImportDate']||latest['Date']||'');
+  document.getElementById('import-log-tbody').innerHTML=rows.map(r=>`<tr><td>${r['ImportDate']||r['Date']||''}</td><td><span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--surface2);color:var(--text2)">${r['ReportType']||r['Type']||''}</span></td><td class="right">${r['RowsAdded']||r['Rows']||'—'}</td><td class="right">${r['Revenue']?'$'+Number(r['Revenue']).toLocaleString():'—'}</td><td class="right">${r['ADR']?'$'+Number(r['ADR']).toFixed(0):'—'}</td><td class="right">${r['RevPAR']?'$'+Number(r['RevPAR']).toFixed(0):'—'}</td><td class="right">${r['Occupancy']?Number(r['Occupancy']).toFixed(1)+'%':'—'}</td><td class="right">${r['Reservations']||'—'}</td><td style="color:var(--text2)">${r['Notes']||r['Period']||''}</td></tr>`).join('');
 }
 
-function destroyCharts() {
-  if (revenueChart) { revenueChart.destroy(); revenueChart = null; }
-  if (channelChart) { channelChart.destroy(); channelChart = null; }
-  if (paceChart) { paceChart.destroy(); paceChart = null; }
-}
-
-// ─── UTILITIES ────────────────────────────────────────────────────
-function fmt$(n) {
-  return '$' + Math.round(n).toLocaleString('en-US');
-}
-
-function showError(msg) {
-  const el = document.getElementById('error-banner');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-function showLoading() {
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('loading-screen').style.display = 'flex';
-}
-
-function showDashboard() {
-  document.getElementById('loading-screen').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
-}
+function bOpts(extra={}) { return { responsive:true, maintainAspectRatio:false, animation:{duration:350}, plugins:{ legend:{display:false}, tooltip:{backgroundColor:'#1c2133',borderColor:'#2a2f42',borderWidth:1,titleColor:'#8b95b0',bodyColor:'#e2e8f4',titleFont:{family:'DM Mono',size:11},bodyFont:{family:'DM Mono',size:12},padding:12} }, ...extra }; }
+function xS() { return { grid:{color:'rgba(37,45,64,0.8)'}, ticks:{color:'#5a6480',font:{family:'DM Mono',size:11}} }; }
+function yS() { return { grid:{color:'rgba(37,45,64,0.8)'}, ticks:{color:'#5a6480',font:{family:'DM Mono',size:11},callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)} }; }
+function showErr(m){ const e=document.getElementById('error-banner'); e.textContent=m; e.style.display='block'; }
+function showLoad(){ document.getElementById('auth-screen').style.display='none'; document.getElementById('loading-screen').style.display='flex'; }
+function showDash(){ document.getElementById('loading-screen').style.display='none'; document.getElementById('dashboard').style.display='block'; }
 </script>
 </body>
 </html>
