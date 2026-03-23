@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cave Springs — Revenue Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --surface: #161b27;
+  --surface2: #1c2133;
+  --border: #252d40;
+  --border2: #2e3850;
+  --accent: #4f8ef7;
+  --accent2: #38c98a;
+  --accent3: #f7a24f;
+  --accent4: #e05c6b;
+  --text: #e2e8f4;
+  --text2: #8b95b0;
+  --text3: #5a6480;
+  --mono: 'DM Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* AUTH SCREEN */
+#auth-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 24px;
+}
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 48px;
+  text-align: center;
+  max-width: 420px;
+  width: 90%;
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  letter-spacing: -0.3px;
+}
+
+.auth-sub {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 32px;
+}
+
+.auth-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 24px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.auth-btn:hover { opacity: 0.85; }
+
+/* LOADING */
+#loading-screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 16px;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text {
+  font-size: 13px;
+  color: var(--text2);
+  font-family: var(--mono);
+}
+
+/* MAIN DASHBOARD */
+#dashboard {
+  display: none;
+  padding: 0 0 60px;
+}
+
+/* HEADER */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.header-sub {
+  font-size: 12px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.last-updated {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+
+.sign-out-btn {
+  font-size: 12px;
+  color: var(--text3);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.sign-out-btn:hover { color: var(--text2); border-color: var(--border2); }
+
+/* FILTER BAR */
+.filter-bar {
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 4px;
+}
+
+.filter-btn {
+  font-size: 12px;
+  font-family: var(--sans);
+  font-weight: 500;
+  color: var(--text2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.filter-btn:hover { border-color: var(--border2); color: var(--text); }
+.filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* MAIN CONTENT */
+.content { padding: 28px 32px; }
+
+/* SCORECARDS */
+.scorecards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 900px) { .scorecards { grid-template-columns: repeat(2, 1fr); } }
+
+.scorecard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  position: relative;
+  overflow: hidden;
+}
+
+.scorecard::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+
+.scorecard.revenue::before { background: var(--accent); }
+.scorecard.adr::before { background: var(--accent2); }
+.scorecard.revpar::before { background: var(--accent3); }
+.scorecard.occupancy::before { background: var(--accent4); }
+
+.scorecard-label {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.scorecard-value {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.5px;
+  font-family: var(--mono);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.scorecard-meta {
+  font-size: 11px;
+  color: var(--text3);
+}
+
+/* GRID LAYOUTS */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+/* PANELS */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.panel.full { margin-bottom: 20px; }
+
+.panel-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.panel-body { padding: 20px; }
+
+/* CHART CONTAINERS */
+.chart-wrap {
+  position: relative;
+  width: 100%;
+}
+
+/* DATA TABLES */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  border-bottom: 1px solid var(--border);
+  font-weight: 400;
+}
+
+.data-table th.right, .data-table td.right { text-align: right; }
+
+.data-table td {
+  padding: 9px 12px;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--surface2); color: var(--text); }
+
+.data-table td.name-col {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--text);
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* REVENUE BAR */
+.rev-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.rev-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.rev-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s ease; }
+
+/* VARIANCE */
+.positive { color: var(--accent2); }
+.negative { color: var(--accent4); }
+
+/* CHANNEL PILLS */
+.channel-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--mono);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.channel-ota { background: rgba(79,142,247,0.15); color: var(--accent); }
+.channel-direct { background: rgba(56,201,138,0.15); color: var(--accent2); }
+.channel-phone { background: rgba(90,100,128,0.2); color: var(--text2); }
+
+/* PACE TABLE */
+.pace-positive { color: var(--accent2); }
+.pace-negative { color: var(--accent4); }
+.pace-neutral { color: var(--text3); }
+
+/* BOOKING WINDOW */
+.bw-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.bw-item {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.bw-item-label {
+  font-size: 10px;
+  color: var(--text3);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.bw-item-value {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: var(--mono);
+  line-height: 1;
+}
+
+.bw-item-unit {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+
+/* OUTSTANDING */
+.outstanding-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--accent3);
+  background: rgba(247,162,79,0.12);
+  border: 1px solid rgba(247,162,79,0.25);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* EMPTY STATE */
+.empty-state {
+  padding: 32px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+/* ERROR */
+.error-banner {
+  background: rgba(224,92,107,0.1);
+  border: 1px solid rgba(224,92,107,0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--accent4);
+  margin-bottom: 16px;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-title">Cave Springs</div>
+    <div class="auth-sub">Revenue Dashboard — sign in with your Google Workspace account to continue</div>
+    <button class="auth-btn" onclick="signIn()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/></svg>
+      Sign in with Google
+    </button>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading dashboard data...</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <div class="header">
+    <div class="header-left">
+      <div class="header-title">Cave Springs</div>
+      <div class="header-sub">Revenue Dashboard</div>
+    </div>
+    <div class="header-right">
+      <div class="last-updated" id="last-updated-text"></div>
+      <button class="sign-out-btn" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="filter-bar" id="filter-bar">
+    <span class="filter-label">Period</span>
+  </div>
+
+  <div class="content">
+    <div class="error-banner" id="error-banner"></div>
+
+    <!-- SCORECARDS -->
+    <div class="scorecards">
+      <div class="scorecard revenue">
+        <div class="scorecard-label">Total Revenue</div>
+        <div class="scorecard-value" id="sc-revenue">—</div>
+        <div class="scorecard-meta" id="sc-revenue-meta"></div>
+      </div>
+      <div class="scorecard adr">
+        <div class="scorecard-label">ADR</div>
+        <div class="scorecard-value" id="sc-adr">—</div>
+        <div class="scorecard-meta">avg daily rate</div>
+      </div>
+      <div class="scorecard revpar">
+        <div class="scorecard-label">RevPAR</div>
+        <div class="scorecard-value" id="sc-revpar">—</div>
+        <div class="scorecard-meta">56 active doors</div>
+      </div>
+      <div class="scorecard occupancy">
+        <div class="scorecard-label">Occupancy</div>
+        <div class="scorecard-value" id="sc-occupancy">—</div>
+        <div class="scorecard-meta" id="sc-occ-meta"></div>
+      </div>
+    </div>
+
+    <!-- ROW 1: Revenue trend + Channel mix -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Revenue by Month</span>
+        </div>
+        <div class="panel-body">
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="chart-revenue"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Revenue by Channel</span>
+        </div>
+        <div class="panel-body">
+          <div style="display:flex; gap:24px; align-items:center; height:220px">
+            <div class="chart-wrap" style="height:180px; width:180px; flex-shrink:0">
+              <canvas id="chart-channel"></canvas>
+            </div>
+            <div id="channel-legend" style="flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 2: Unit performance -->
+    <div class="panel full">
+      <div class="panel-header">
+        <span class="panel-title">Unit Performance</span>
+        <span class="panel-title" style="color:var(--text3);" id="unit-count-label"></span>
+      </div>
+      <div class="panel-body" style="padding:0">
+        <table class="data-table" id="unit-table">
+          <thead>
+            <tr>
+              <th style="width:28px; padding-left:20px">#</th>
+              <th>Unit</th>
+              <th class="right">Revenue</th>
+              <th class="right">Nights</th>
+              <th class="right">ADR</th>
+              <th style="width:160px">Share</th>
+            </tr>
+          </thead>
+          <tbody id="unit-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ROW 3: Booking window + Outstanding balances -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Booking Window</span>
+        </div>
+        <div class="panel-body">
+          <div class="bw-grid">
+            <div class="bw-item">
+              <div class="bw-item-label">Average</div>
+              <div class="bw-item-value" id="bw-avg">—</div>
+              <div class="bw-item-unit">days out</div>
+            </div>
+            <div class="bw-item">
+              <div class="bw-item-label">Shortest</div>
+              <div class="bw-item-value" id="bw-min">—</div>
+              <div class="bw-item-unit">days out</div>
+            </div>
+            <div class="bw-item">
+              <div class="bw-item-label">Longest</div>
+              <div class="bw-item-value" id="bw-max">—</div>
+              <div class="bw-item-unit">days out</div>
+            </div>
+          </div>
+          <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+            <div style="font-size:11px; color:var(--text3); font-family:var(--mono); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.06em;">Booking window distribution</div>
+            <div id="bw-breakdown" style="display:flex; flex-direction:column; gap:6px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Outstanding Balances</span>
+          <span id="outstanding-count" class="outstanding-badge" style="display:none"><span class="dot"></span><span id="outstanding-count-text"></span></span>
+        </div>
+        <div class="panel-body" style="padding:0; max-height:320px; overflow-y:auto;">
+          <table class="data-table" id="outstanding-table">
+            <thead>
+              <tr>
+                <th style="padding-left:16px">Res#</th>
+                <th>Unit</th>
+                <th class="right">Charged</th>
+                <th class="right" style="padding-right:16px">Paid</th>
+              </tr>
+            </thead>
+            <tbody id="outstanding-tbody">
+              <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 4: Pace -->
+    <div class="panel full">
+      <div class="panel-header">
+        <span class="panel-title">Year over Year Pace — 2026 vs 2025</span>
+        <span style="font-size:11px; color:var(--text3); font-family:var(--mono);">Full year · Booked as of today</span>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap" style="height:240px; margin-bottom:20px">
+          <canvas id="chart-pace"></canvas>
+        </div>
+        <table class="data-table" id="pace-table">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th class="right">2026 Rev</th>
+              <th class="right">2025 Rev</th>
+              <th class="right">Variance $</th>
+              <th class="right">Variance %</th>
+              <th class="right">2026 Nights</th>
+              <th class="right">2025 Nights</th>
+            </tr>
+          </thead>
+          <tbody id="pace-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── CONFIGURATION ───────────────────────────────────────────────
+const CLIENT_ID     = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
+const SHEET_ID      = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
+const STAYS_TAB     = 'STAYS_CLEAN';
+const PACE_TAB      = 'PACE_CLEAN';
+const ACTIVE_DOORS  = 56;
+const SCOPE         = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+// ─────────────────────────────────────────────────────────────────
+
+let tokenClient, accessToken;
+let staysData = [], paceData = [];
+let activeFilter = 'ALL';
+let revenueChart, channelChart, paceChart;
+
+// Month order for sorting
+const MONTH_ORDER = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ─── AUTH ─────────────────────────────────────────────────────────
+function loadGoogleAPI() {
+  return new Promise(resolve => {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = resolve;
+    document.head.appendChild(s);
+  });
+}
+
+async function signIn() {
+  await loadGoogleAPI();
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPE,
+    callback: async (resp) => {
+      if (resp.error) { showError('Authentication failed: ' + resp.error); return; }
+      accessToken = resp.access_token;
+      showLoading();
+      await loadAllData();
+    }
+  });
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function signOut() {
+  if (accessToken) google.accounts.oauth2.revoke(accessToken);
+  accessToken = null;
+  staysData = []; paceData = [];
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  destroyCharts();
+}
+
+// ─── DATA LOADING ─────────────────────────────────────────────────
+async function fetchSheet(tab) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) throw new Error(`Failed to fetch ${tab}: ${res.status} ${res.statusText}`);
+  const json = await res.json();
+  return json.values || [];
+}
+
+function parseRows(raw) {
+  if (!raw || raw.length < 2) return [];
+  const headers = raw[0].map(h => h.trim());
+  return raw.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (row[i] || '').trim());
+    return obj;
+  });
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function parseMoney(s) {
+  if (!s) return 0;
+  return parseFloat(String(s).replace(/[$,]/g, '')) || 0;
+}
+
+function parseBool(s) {
+  const v = String(s).trim().toLowerCase();
+  return v === 'true' || v === 'yes' || v === '1' || v === 'x';
+}
+
+async function loadAllData() {
+  try {
+    const [staysRaw, paceRaw] = await Promise.all([
+      fetchSheet(STAYS_TAB),
+      fetchSheet(PACE_TAB)
+    ]);
+
+    staysData = parseRows(staysRaw).map(r => ({
+      res:           r['Res#'] || r['Res'],
+      nightDate:     parseDate(r['NightDate']),
+      accommodation: r['Accommodation'],
+      nightRevenue:  parseMoney(r['NightRevenue']),
+      bookedOnline:  parseBool(r['BookedOnline']),
+      directConnect: parseBool(r['DirectConnect']),
+      reservedOn:    parseDate(r['ReservedOn']),
+      channel:       r['Channel'] || (parseBool(r['BookedOnline']) ? 'OTA' : parseBool(r['DirectConnect']) ? 'Direct' : 'Phone/Manual'),
+      nightCount:    parseInt(r['NightCount']) || 1
+    })).filter(r => r.nightDate);
+
+    paceData = parseRows(paceRaw).map(r => ({
+      yearGroup:     r['YearGroup'],
+      reservedOn:    parseDate(r['ReservedOn']),
+      nightDate:     parseDate(r['NightDate']),
+      reservationID: r['ReservationID'],
+      rate:          parseMoney(r['Rate']),
+      unit:          r['Unit']
+    })).filter(r => r.nightDate && r.yearGroup);
+
+    buildFilters();
+    renderAll();
+    showDashboard();
+
+    document.getElementById('last-updated-text').textContent =
+      'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+  } catch(e) {
+    showError('Error loading data: ' + e.message);
+    showDashboard();
+  }
+}
+
+// ─── FILTERS ──────────────────────────────────────────────────────
+function buildFilters() {
+  const months = new Set();
+  staysData.forEach(r => {
+    if (r.nightDate) {
+      const key = r.nightDate.toLocaleString('en-US', {month:'short', year:'numeric'});
+      months.add(key);
+    }
+  });
+
+  const sorted = Array.from(months).sort((a, b) => {
+    const da = new Date(a), db = new Date(b);
+    return da - db;
+  });
+
+  const bar = document.getElementById('filter-bar');
+  bar.innerHTML = '<span class="filter-label">Period</span>';
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'filter-btn active';
+  allBtn.textContent = 'All data';
+  allBtn.dataset.filter = 'ALL';
+  allBtn.onclick = () => setFilter('ALL', allBtn);
+  bar.appendChild(allBtn);
+
+  sorted.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.textContent = m;
+    btn.dataset.filter = m;
+    btn.onclick = () => setFilter(m, btn);
+    bar.appendChild(btn);
+  });
+}
+
+function setFilter(val, btn) {
+  activeFilter = val;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+
+function getFilteredStays() {
+  if (activeFilter === 'ALL') return staysData;
+  return staysData.filter(r => {
+    const key = r.nightDate.toLocaleString('en-US', {month:'short', year:'numeric'});
+    return key === activeFilter;
+  });
+}
+
+// ─── RENDER ALL ────────────────────────────────────────────────────
+function renderAll() {
+  const filtered = getFilteredStays();
+  renderScorecards(filtered);
+  renderRevenueChart(filtered);
+  renderChannelChart(filtered);
+  renderUnitTable(filtered);
+  renderBookingWindow(filtered);
+  renderOutstanding();
+  renderPace();
+}
+
+// ─── SCORECARDS ────────────────────────────────────────────────────
+function renderScorecards(rows) {
+  const totalRev = rows.reduce((s, r) => s + r.nightRevenue, 0);
+  const totalNights = rows.length;
+  const adr = totalNights > 0 ? totalRev / totalNights : 0;
+
+  // RevPAR: total revenue / (56 doors * days in period)
+  let days = 0;
+  if (rows.length > 0) {
+    const dates = rows.map(r => r.nightDate.getTime());
+    const minD = new Date(Math.min(...dates));
+    const maxD = new Date(Math.max(...dates));
+    days = Math.round((maxD - minD) / 86400000) + 1;
+  }
+  const revpar = days > 0 ? totalRev / (ACTIVE_DOORS * days) : 0;
+  const occupancy = days > 0 ? (totalNights / (ACTIVE_DOORS * days)) * 100 : 0;
+
+  document.getElementById('sc-revenue').textContent = fmt$(totalRev);
+  document.getElementById('sc-revenue-meta').textContent = totalNights + ' occupied nights';
+  document.getElementById('sc-adr').textContent = fmt$(adr);
+  document.getElementById('sc-revpar').textContent = fmt$(revpar);
+  document.getElementById('sc-occupancy').textContent = occupancy.toFixed(1) + '%';
+  document.getElementById('sc-occ-meta').textContent = days + ' day period';
+}
+
+// ─── REVENUE CHART ────────────────────────────────────────────────
+function renderRevenueChart(rows) {
+  const byMonth = {};
+  rows.forEach(r => {
+    const key = r.nightDate.toLocaleString('en-US', {month:'short', year:'numeric'});
+    byMonth[key] = (byMonth[key] || 0) + r.nightRevenue;
+  });
+
+  const labels = Object.keys(byMonth).sort((a, b) => new Date(a) - new Date(b));
+  const values = labels.map(l => byMonth[l]);
+
+  if (revenueChart) revenueChart.destroy();
+  const ctx = document.getElementById('chart-revenue').getContext('2d');
+  revenueChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: 'rgba(79,142,247,0.7)',
+        borderColor: 'rgba(79,142,247,1)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: chartOpts({
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(42,47,66,0.8)' }, ticks: { color: '#5a6480', font: { family: 'DM Mono', size: 10 } } },
+        y: { grid: { color: 'rgba(42,47,66,0.8)' }, ticks: { color: '#5a6480', font: { family: 'DM Mono', size: 10 }, callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) } }
+      }
+    })
+  });
+}
+
+// ─── CHANNEL CHART ────────────────────────────────────────────────
+function renderChannelChart(rows) {
+  const channels = { OTA: 0, Direct: 0, 'Phone/Manual': 0 };
+  rows.forEach(r => {
+    const ch = r.channel || 'Phone/Manual';
+    if (channels[ch] !== undefined) channels[ch] += r.nightRevenue;
+    else channels['Phone/Manual'] += r.nightRevenue;
+  });
+
+  const total = Object.values(channels).reduce((a, b) => a + b, 0);
+  const colors = ['rgba(79,142,247,0.85)', 'rgba(56,201,138,0.85)', 'rgba(90,100,128,0.6)'];
+  const labels = Object.keys(channels);
+  const values = Object.values(channels);
+
+  if (channelChart) channelChart.destroy();
+  const ctx = document.getElementById('chart-channel').getContext('2d');
+  channelChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#161b27', borderWidth: 3 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmt$(c.raw) + ' (' + ((c.raw/total)*100).toFixed(1) + '%)' } } }
+    }
+  });
+
+  const legend = document.getElementById('channel-legend');
+  legend.innerHTML = '';
+  labels.forEach((l, i) => {
+    const pct = total > 0 ? ((values[i]/total)*100).toFixed(1) : '0.0';
+    legend.innerHTML += `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="width:8px; height:8px; border-radius:2px; background:${colors[i]}; flex-shrink:0;"></div>
+          <span style="font-size:12px; color:var(--text2)">${l}</span>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px; font-family:var(--mono); color:var(--text)">${fmt$(values[i])}</div>
+          <div style="font-size:10px; font-family:var(--mono); color:var(--text3)">${pct}%</div>
+        </div>
+      </div>`;
+  });
+}
+
+// ─── UNIT TABLE ────────────────────────────────────────────────────
+function renderUnitTable(rows) {
+  const byUnit = {};
+  rows.forEach(r => {
+    if (!r.accommodation) return;
+    if (!byUnit[r.accommodation]) byUnit[r.accommodation] = { revenue: 0, nights: 0 };
+    byUnit[r.accommodation].revenue += r.nightRevenue;
+    byUnit[r.accommodation].nights++;
+  });
+
+  const sorted = Object.entries(byUnit)
+    .map(([name, d]) => ({ name, revenue: d.revenue, nights: d.nights, adr: d.nights > 0 ? d.revenue / d.nights : 0 }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  const maxRev = sorted.length > 0 ? sorted[0].revenue : 1;
+  const totalRev = sorted.reduce((s, u) => s + u.revenue, 0);
+
+  document.getElementById('unit-count-label').textContent = sorted.length + ' units';
+
+  const tbody = document.getElementById('unit-tbody');
+  tbody.innerHTML = sorted.map((u, i) => {
+    const pct = totalRev > 0 ? (u.revenue / totalRev) * 100 : 0;
+    const barPct = maxRev > 0 ? (u.revenue / maxRev) * 100 : 0;
+    return `<tr>
+      <td style="padding-left:20px; color:var(--text3); font-size:11px">${i+1}</td>
+      <td class="name-col">${u.name}</td>
+      <td class="right">${fmt$(u.revenue)}</td>
+      <td class="right">${u.nights}</td>
+      <td class="right">${fmt$(u.adr)}</td>
+      <td>
+        <div class="rev-bar-wrap">
+          <div class="rev-bar-bg"><div class="rev-bar-fill" style="width:${barPct}%"></div></div>
+          <span style="font-size:10px; color:var(--text3); font-family:var(--mono); min-width:32px; text-align:right">${pct.toFixed(1)}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="empty-state">No unit data for selected period</td></tr>';
+}
+
+// ─── BOOKING WINDOW ────────────────────────────────────────────────
+function renderBookingWindow(rows) {
+  const windows = rows
+    .filter(r => r.reservedOn && r.nightDate)
+    .map(r => Math.round((r.nightDate - r.reservedOn) / 86400000))
+    .filter(d => d >= 0);
+
+  if (windows.length === 0) {
+    document.getElementById('bw-avg').textContent = '—';
+    document.getElementById('bw-min').textContent = '—';
+    document.getElementById('bw-max').textContent = '—';
+    return;
+  }
+
+  const avg = Math.round(windows.reduce((a, b) => a + b, 0) / windows.length);
+  const min = Math.min(...windows);
+  const max = Math.max(...windows);
+
+  document.getElementById('bw-avg').textContent = avg;
+  document.getElementById('bw-min').textContent = min;
+  document.getElementById('bw-max').textContent = max;
+
+  // Breakdown buckets
+  const buckets = [
+    { label: 'Same day / 1 day', min: 0, max: 1 },
+    { label: '2–7 days', min: 2, max: 7 },
+    { label: '8–30 days', min: 8, max: 30 },
+    { label: '31–90 days', min: 31, max: 90 },
+    { label: '90+ days', min: 91, max: Infinity },
+  ];
+
+  const bwEl = document.getElementById('bw-breakdown');
+  bwEl.innerHTML = buckets.map(b => {
+    const count = windows.filter(w => w >= b.min && w <= b.max).length;
+    const pct = windows.length > 0 ? (count / windows.length) * 100 : 0;
+    return `<div style="display:flex; align-items:center; gap:8px; font-size:11px;">
+      <span style="color:var(--text3); font-family:var(--mono); min-width:130px">${b.label}</span>
+      <div style="flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden;">
+        <div style="height:100%; width:${pct}%; background:var(--accent); border-radius:2px;"></div>
+      </div>
+      <span style="color:var(--text2); font-family:var(--mono); min-width:30px; text-align:right">${pct.toFixed(0)}%</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── OUTSTANDING BALANCES ──────────────────────────────────────────
+async function renderOutstanding() {
+  // Read from STAYS_IMPORT for Amount vs Paid comparison
+  try {
+    const raw = await fetchSheet('STAYS_IMPORT');
+    const rows = parseRows(raw);
+    const outstanding = rows
+      .filter(r => {
+        const amount = parseMoney(r['amount'] || r['Amount']);
+        const paid = parseMoney(r['Paid'] || r['paid']);
+        return amount > 0 && paid < amount;
+      })
+      .map(r => ({
+        res: r['Res#'] || r['Res'],
+        unit: r['Accommodation'],
+        amount: parseMoney(r['amount'] || r['Amount']),
+        paid: parseMoney(r['Paid'] || r['paid'])
+      }))
+      .sort((a, b) => (b.amount - b.paid) - (a.amount - a.paid));
+
+    const badge = document.getElementById('outstanding-count');
+    const badgeText = document.getElementById('outstanding-count-text');
+    if (outstanding.length > 0) {
+      badge.style.display = 'inline-flex';
+      badgeText.textContent = outstanding.length + ' pending';
+    }
+
+    const tbody = document.getElementById('outstanding-tbody');
+    tbody.innerHTML = outstanding.map(r => `<tr>
+      <td style="padding-left:16px">${r.res}</td>
+      <td class="name-col">${r.unit}</td>
+      <td class="right">${fmt$(r.amount)}</td>
+      <td class="right" style="color:var(--accent3); padding-right:16px">${fmt$(r.paid)}</td>
+    </tr>`).join('') || '<tr><td colspan="4" class="empty-state">No outstanding balances</td></tr>';
+  } catch(e) {
+    document.getElementById('outstanding-tbody').innerHTML =
+      '<tr><td colspan="4" class="empty-state">Could not load balance data</td></tr>';
+  }
+}
+
+// ─── PACE ──────────────────────────────────────────────────────────
+function renderPace() {
+  const byMonthYear = {};
+  paceData.forEach(r => {
+    const month = r.nightDate.toLocaleString('en-US', { month: 'short' });
+    const key = `${month}_${r.yearGroup}`;
+    if (!byMonthYear[key]) byMonthYear[key] = { revenue: 0, nights: 0 };
+    byMonthYear[key].revenue += r.rate;
+    byMonthYear[key].nights++;
+  });
+
+  const months = MONTH_ORDER;
+  const rev2026 = months.map(m => (byMonthYear[`${m}_2026`] || {}).revenue || 0);
+  const rev2025 = months.map(m => (byMonthYear[`${m}_2025`] || {}).revenue || 0);
+  const nights2026 = months.map(m => (byMonthYear[`${m}_2026`] || {}).nights || 0);
+  const nights2025 = months.map(m => (byMonthYear[`${m}_2025`] || {}).nights || 0);
+
+  // Chart
+  if (paceChart) paceChart.destroy();
+  const ctx = document.getElementById('chart-pace').getContext('2d');
+  paceChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        { label: '2026', data: rev2026, backgroundColor: 'rgba(79,142,247,0.75)', borderColor: 'rgba(79,142,247,1)', borderWidth: 1, borderRadius: 3 },
+        { label: '2025', data: rev2025, backgroundColor: 'rgba(42,47,66,0.9)', borderColor: 'rgba(60,68,92,1)', borderWidth: 1, borderRadius: 3 }
+      ]
+    },
+    options: chartOpts({
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: '#8b95b0', font: { family: 'DM Mono', size: 10 }, boxWidth: 10, padding: 16 } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(42,47,66,0.8)' }, ticks: { color: '#5a6480', font: { family: 'DM Mono', size: 10 } } },
+        y: { grid: { color: 'rgba(42,47,66,0.8)' }, ticks: { color: '#5a6480', font: { family: 'DM Mono', size: 10 }, callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) } }
+      }
+    })
+  });
+
+  // Table
+  const tbody = document.getElementById('pace-tbody');
+  let total26 = 0, total25 = 0, totalN26 = 0, totalN25 = 0;
+
+  tbody.innerHTML = months.map((m, i) => {
+    const r26 = rev2026[i], r25 = rev2025[i];
+    const varD = r26 - r25;
+    const varP = r25 > 0 ? (varD / r25) * 100 : 0;
+    total26 += r26; total25 += r25; totalN26 += nights2026[i]; totalN25 += nights2025[i];
+    const cls = varD > 0 ? 'pace-positive' : varD < 0 ? 'pace-negative' : 'pace-neutral';
+    const sign = varD > 0 ? '+' : '';
+    return `<tr>
+      <td style="color:var(--text2)">${m}</td>
+      <td class="right">${r26 > 0 ? fmt$(r26) : '—'}</td>
+      <td class="right">${r25 > 0 ? fmt$(r25) : '—'}</td>
+      <td class="right ${cls}">${r25 > 0 || r26 > 0 ? sign + fmt$(varD) : '—'}</td>
+      <td class="right ${cls}">${r25 > 0 ? sign + varP.toFixed(1) + '%' : '—'}</td>
+      <td class="right">${nights2026[i] > 0 ? nights2026[i] : '—'}</td>
+      <td class="right">${nights2025[i] > 0 ? nights2025[i] : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Totals row
+  const totalVarD = total26 - total25;
+  const totalVarP = total25 > 0 ? (totalVarD / total25) * 100 : 0;
+  const cls = totalVarD > 0 ? 'pace-positive' : totalVarD < 0 ? 'pace-negative' : 'pace-neutral';
+  const sign = totalVarD > 0 ? '+' : '';
+  tbody.innerHTML += `<tr style="border-top:1px solid var(--border2);">
+    <td style="color:var(--text); font-weight:600">Total</td>
+    <td class="right" style="color:var(--text); font-weight:600">${fmt$(total26)}</td>
+    <td class="right" style="color:var(--text); font-weight:600">${fmt$(total25)}</td>
+    <td class="right ${cls}" style="font-weight:600">${sign + fmt$(totalVarD)}</td>
+    <td class="right ${cls}" style="font-weight:600">${total25 > 0 ? sign + totalVarP.toFixed(1) + '%' : '—'}</td>
+    <td class="right" style="color:var(--text); font-weight:600">${totalN26}</td>
+    <td class="right" style="color:var(--text); font-weight:600">${totalN25}</td>
+  </tr>`;
+}
+
+// ─── CHART DEFAULTS ────────────────────────────────────────────────
+function chartOpts(extra = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 400 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1c2133',
+        borderColor: '#2a2f42',
+        borderWidth: 1,
+        titleColor: '#8b95b0',
+        bodyColor: '#e2e8f4',
+        titleFont: { family: 'DM Mono', size: 10 },
+        bodyFont: { family: 'DM Mono', size: 11 },
+        padding: 10,
+        callbacks: { label: c => ' ' + (typeof c.raw === 'number' && c.datasetIndex !== undefined ? fmt$(c.raw) : c.raw) }
+      }
+    },
+    ...extra
+  };
+}
+
+function destroyCharts() {
+  if (revenueChart) { revenueChart.destroy(); revenueChart = null; }
+  if (channelChart) { channelChart.destroy(); channelChart = null; }
+  if (paceChart) { paceChart.destroy(); paceChart = null; }
+}
+
+// ─── UTILITIES ────────────────────────────────────────────────────
+function fmt$(n) {
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function showLoading() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+}
+
+function showDashboard() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+}
+</script>
+</body>
+</html>
