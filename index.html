@@ -76,17 +76,35 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .content { padding:32px 40px; max-width:1600px; margin:0 auto; }
 
 /* SCORECARDS */
-.scorecards { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
-@media(max-width:900px){ .scorecards { grid-template-columns:repeat(2,1fr); } }
+.scorecards { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:24px; }
+@media(max-width:1100px){ .scorecards { grid-template-columns:repeat(3,1fr); } }
+@media(max-width:700px){ .scorecards { grid-template-columns:repeat(2,1fr); } }
 .scorecard { background:var(--surface); border-radius:16px; padding:24px 26px; box-shadow:var(--shadow); border:1px solid var(--border); position:relative; overflow:hidden; }
 .scorecard::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; }
 .scorecard.revenue::after  { background:var(--slate); }
 .scorecard.adr::after      { background:var(--green); }
 .scorecard.revpar::after   { background:var(--amber); }
 .scorecard.occupancy::after{ background:var(--terra); }
+.scorecard.los::after      { background:var(--purple); }
 .scorecard-label { font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--text3); margin-bottom:10px; }
 .scorecard-value { font-size:34px; font-weight:700; color:var(--text); letter-spacing:-0.5px; line-height:1; margin-bottom:8px; }
 .scorecard-meta { font-size:12px; color:var(--text3); }
+/* SETTINGS */
+.settings-btn { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text3); background:none; border:1px solid var(--border2); border-radius:6px; padding:6px 12px; cursor:pointer; font-family:var(--sans); transition:all 0.15s; }
+.settings-btn:hover { color:var(--slate); border-color:var(--slate3); }
+.settings-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.3); z-index:200; }
+.settings-panel { position:fixed; top:0; right:0; bottom:0; width:360px; background:var(--surface); box-shadow:-4px 0 24px rgba(0,0,0,0.12); z-index:201; display:flex; flex-direction:column; overflow:hidden; }
+.settings-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.settings-title { font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text); }
+.settings-close { background:none; border:none; font-size:22px; color:var(--text3); cursor:pointer; line-height:1; padding:0 4px; }
+.settings-body { flex:1; overflow-y:auto; padding:20px 24px; }
+.settings-sub { font-size:12px; color:var(--text3); margin-bottom:6px; line-height:1.5; }
+.settings-count { font-size:13px; font-weight:600; color:var(--slate); margin-bottom:16px; padding:8px 12px; background:var(--slate-bg); border-radius:8px; }
+.settings-cat { font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text3); padding:12px 0 6px; border-top:1px solid var(--border); margin-top:8px; }
+.settings-unit { display:flex; align-items:center; gap:10px; padding:7px 0; cursor:pointer; }
+.settings-unit input { width:15px; height:15px; accent-color:var(--terra); cursor:pointer; flex-shrink:0; }
+.settings-unit-name { font-size:13px; color:var(--text2); }
+.settings-unit.blocked .settings-unit-name { color:var(--terra); text-decoration:line-through; }
 
 /* GRIDS */
 .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
@@ -196,6 +214,20 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
   <div class="loading-text">Loading dashboard</div>
 </div>
 
+<!-- SETTINGS OVERLAY -->
+<div class="settings-overlay" id="settings-overlay" onclick="closeSettings()"></div>
+<div class="settings-panel" id="settings-panel" style="display:none">
+  <div class="settings-header">
+    <div class="settings-title">Blocked Units</div>
+    <button class="settings-close" onclick="closeSettings()">&#215;</button>
+  </div>
+  <div class="settings-body">
+    <div class="settings-sub" id="settings-period-label"></div>
+    <div class="settings-count" id="settings-count"></div>
+    <div id="settings-units-list"></div>
+  </div>
+</div>
+
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
@@ -205,6 +237,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
     </div>
     <div class="header-right">
       <div class="last-updated" id="last-updated-text"></div>
+      <button class="settings-btn" onclick="openSettings()">&#9881; Blocked Units</button>
       <button class="sign-out-btn" onclick="signOut()">Sign out</button>
     </div>
   </div>
@@ -231,12 +264,17 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
       <div class="scorecard revpar">
         <div class="scorecard-label">RevPAR</div>
         <div class="scorecard-value" id="sc-revpar">—</div>
-        <div class="scorecard-meta">56 active doors</div>
+        <div class="scorecard-meta" id="sc-revpar-meta">56 active doors</div>
       </div>
       <div class="scorecard occupancy">
         <div class="scorecard-label">Occupancy</div>
         <div class="scorecard-value" id="sc-occupancy">—</div>
         <div class="scorecard-meta" id="sc-occ-meta"></div>
+      </div>
+      <div class="scorecard los">
+        <div class="scorecard-label">Avg Length of Stay</div>
+        <div class="scorecard-value" id="sc-los">—</div>
+        <div class="scorecard-meta">nights per reservation</div>
       </div>
     </div>
 
@@ -443,7 +481,8 @@ const STAYS_TAB    = 'STAYS_CLEAN';
 const PACE_TAB     = 'PACE_CLEAN';
 const LOG_TAB      = 'IMPORT_LOG';
 const IMPORT_TAB   = 'STAYS_IMPORT';
-const ACTIVE_DOORS = 56;
+const TOTAL_DOORS  = 56;
+const ACTIVE_DOORS = 56; // kept for pace/other uses
 const SCOPE        = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 const MONTH_ORDER  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -500,6 +539,63 @@ function signOut(){
   revChart=chChart=paceChart=bwChart=catChart=null;
 }
 
+// ─── BLOCKED UNITS SETTINGS ───────────────────────────────────────
+function getStorageKey(){return 'cavesprings_blocked_'+activeFilter;}
+
+function getBlockedForPeriod(){
+  try{
+    const saved=localStorage.getItem(getStorageKey());
+    return saved?new Set(JSON.parse(saved)):new Set();
+  }catch(e){return new Set();}
+}
+
+function saveBlockedForPeriod(blocked){
+  try{localStorage.setItem(getStorageKey(),JSON.stringify([...blocked]));}catch(e){}
+}
+
+function openSettings(){
+  const blocked=getBlockedForPeriod();
+  const activeDoors=TOTAL_DOORS-blocked.size;
+  document.getElementById('settings-period-label').textContent=
+    'Marking blocked units for: '+(activeFilter==='ALL'?'All data':activeFilter)+
+    '. Check units that are unavailable for this period.';
+  document.getElementById('settings-count').textContent=
+    activeDoors+' of '+TOTAL_DOORS+' doors active · '+blocked.size+' blocked';
+  // Build unit list
+  const list=document.getElementById('settings-units-list');
+  list.innerHTML='';
+  for(const[cat,units]of Object.entries(CATEGORIES)){
+    const catLabel=document.createElement('div');
+    catLabel.className='settings-cat';
+    catLabel.textContent=cat;
+    list.appendChild(catLabel);
+    units.forEach(unit=>{
+      const isBlocked=blocked.has(unit);
+      const row=document.createElement('label');
+      row.className='settings-unit'+(isBlocked?' blocked':'');
+      row.innerHTML=`<input type="checkbox" ${isBlocked?'checked':''}/><span class="settings-unit-name">${unit}</span>`;
+      row.querySelector('input').addEventListener('change',function(){
+        const b=getBlockedForPeriod();
+        if(this.checked){b.add(unit);row.classList.add('blocked');}
+        else{b.delete(unit);row.classList.remove('blocked');}
+        saveBlockedForPeriod(b);
+        const active=TOTAL_DOORS-b.size;
+        document.getElementById('settings-count').textContent=
+          active+' of '+TOTAL_DOORS+' doors active · '+b.size+' blocked';
+        renderAll();
+      });
+      list.appendChild(row);
+    });
+  }
+  document.getElementById('settings-overlay').style.display='block';
+  document.getElementById('settings-panel').style.display='flex';
+}
+
+function closeSettings(){
+  document.getElementById('settings-overlay').style.display='none';
+  document.getElementById('settings-panel').style.display='none';
+}
+
 async function fetchTab(tab){
   const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});
   if(!r.ok)throw new Error(`Cannot load ${tab} (${r.status})`);
@@ -538,8 +634,10 @@ function buildFilters(){
   const sorted=[...months].sort((a,b)=>new Date(a)-new Date(b));
   const bar=document.getElementById('filter-bar');
   bar.innerHTML='<span class="filter-label">Period</span>';
-  bar.appendChild(mkBtn('All data','ALL',true));
-  sorted.forEach(m=>bar.appendChild(mkBtn(m,m,false)));
+  // No "All data" button — just months
+  sorted.forEach((m,i)=>bar.appendChild(mkBtn(m,m,i===0)));
+  // Set active filter to first month
+  if(sorted.length>0) activeFilter=sorted[0];
 }
 
 function mkBtn(label,val,active){
@@ -552,6 +650,11 @@ function mkBtn(label,val,active){
 
 function filtered(){return activeFilter==='ALL'?staysData:staysData.filter(r=>r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'})===activeFilter);}
 
+function getActiveDoors(){
+  const blocked=getBlockedForPeriod();
+  return TOTAL_DOORS-blocked.size;
+}
+
 function renderAll(){
   const rows=filtered();
   renderScores(rows);renderCats(rows);renderRevChart(rows);renderChChart(rows);renderUnits(rows);renderBW(rows);renderCatChart(rows);renderPace();
@@ -561,12 +664,18 @@ function renderScores(rows){
   const rev=rows.reduce((s,r)=>s+r.nightRevenue,0),n=rows.length,adr=n>0?rev/n:0;
   let days=1;
   if(n>0){const t=rows.map(r=>r.nightDate.getTime());days=Math.round((Math.max(...t)-Math.min(...t))/86400000)+1;}
+  const activeDoors=getActiveDoors();
+  // LOS: total nights / unique reservations
+  const uniqueRes=new Set(rows.map(r=>r.res));
+  const los=uniqueRes.size>0?(n/uniqueRes.size).toFixed(1):'—';
   document.getElementById('sc-revenue').textContent=fmt$(rev);
   document.getElementById('sc-revenue-meta').textContent=n+' occupied nights';
   document.getElementById('sc-adr').textContent=fmt$(adr);
-  document.getElementById('sc-revpar').textContent=fmt$(rev/(ACTIVE_DOORS*days));
-  document.getElementById('sc-occupancy').textContent=((n/(ACTIVE_DOORS*days))*100).toFixed(1)+'%';
+  document.getElementById('sc-revpar').textContent=fmt$(activeDoors>0?rev/(activeDoors*days):0);
+  document.getElementById('sc-revpar-meta').textContent=activeDoors+' of '+TOTAL_DOORS+' doors active';
+  document.getElementById('sc-occupancy').textContent=(activeDoors>0?(n/(activeDoors*days))*100:0).toFixed(1)+'%';
   document.getElementById('sc-occ-meta').textContent=days+' day period';
+  document.getElementById('sc-los').textContent=los;
 }
 
 function renderCats(rows){
