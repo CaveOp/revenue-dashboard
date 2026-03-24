@@ -176,6 +176,7 @@ tr.unit-row.hidden { display:none; }
 .type-badge { display:inline-block; font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:3px 8px; border-radius:4px; }
 .type-stays { background:var(--slate-bg); color:var(--slate); }
 .type-pace  { background:var(--terra-bg); color:var(--terra2); }
+.type-disc  { background:var(--green-bg); color:var(--green); }
 
 /* VACANT */
 .vacant-label { font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text3); padding:12px 16px 8px; border-top:1px solid var(--border); }
@@ -510,11 +511,15 @@ tr.unit-row.hidden { display:none; }
 
     <!-- IMPORT HISTORY -->
     <div class="panel full">
-      <div class="panel-header">
+      <div class="panel-header" style="cursor:pointer;" onclick="toggleImportLog()">
         <span class="panel-title">Import History</span>
-        <span style="font-size:11px;color:var(--text3);" id="last-import-label"></span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:11px;color:var(--text3);" id="last-import-label"></span>
+          <span style="font-size:11px;color:var(--text3);" id="import-log-count"></span>
+          <span id="import-log-chevron" style="font-size:11px;color:var(--text3);transition:transform 0.2s;display:inline-block;">▼</span>
+        </div>
       </div>
-      <div style="overflow-x:auto;">
+      <div id="import-log-body" style="display:none;overflow-x:auto;">
         <table class="log-table">
           <thead>
             <tr>
@@ -1098,14 +1103,28 @@ function renderPace(){
 
 // ─── IMPORT LOG ────────────────────────────────────────────────────
 function renderLog(){
-  if(!logData||!logData.length){document.getElementById('import-log-tbody').innerHTML='<tr><td colspan="9" class="empty-state">No import history yet</td></tr>';return;}
+  const countEl=document.getElementById('import-log-count');
+  if(!logData||!logData.length){
+    document.getElementById('import-log-tbody').innerHTML='<tr><td colspan="9" class="empty-state">No import history yet</td></tr>';
+    if(countEl)countEl.textContent='';
+    return;
+  }
   const rows=[...logData].reverse();
   const latest=rows.find(r=>(r['ReportType']||r['Type']||'').includes('STAYS'));
-  if(latest)document.getElementById('last-import-label').textContent='Last stays import: '+(latest['ImportDate']||latest['Date']||'');
+  if(latest)document.getElementById('last-import-label').textContent='Last stays: '+(latest['ImportDate']||latest['Date']||'');
+  if(countEl)countEl.textContent=rows.length+' import'+(rows.length!==1?'s':'');
   document.getElementById('import-log-tbody').innerHTML=rows.map(r=>{
-    const type=r['ReportType']||r['Type']||'',cls=type.includes('STAYS')?'type-stays':'type-pace';
+    const type=r['ReportType']||r['Type']||'',cls=type.includes('STAYS')?'type-stays':type.includes('DISCOUNTS')?'type-disc':'type-pace';
     return`<tr><td>${r['ImportDate']||r['Date']||''}</td><td><span class="type-badge ${cls}">${type}</span></td><td class="right">${r['RowsAdded']||r['Rows']||'—'}</td><td class="right">${r['Revenue']?'$'+Number(r['Revenue']).toLocaleString():'—'}</td><td class="right">${r['ADR']?'$'+Number(r['ADR']).toFixed(0):'—'}</td><td class="right">${r['RevPAR']?'$'+Number(r['RevPAR']).toFixed(0):'—'}</td><td class="right">${r['Occupancy']?Number(r['Occupancy']).toFixed(1)+'%':'—'}</td><td class="right">${r['Reservations']||'—'}</td><td style="color:var(--text2)">${r['Notes']||r['Period']||''}</td></tr>`;
   }).join('');
+}
+
+function toggleImportLog(){
+  const body=document.getElementById('import-log-body');
+  const chevron=document.getElementById('import-log-chevron');
+  const isHidden=body.style.display==='none';
+  body.style.display=isHidden?'block':'none';
+  chevron.style.transform=isHidden?'rotate(180deg)':'rotate(0deg)';
 }
 
 // ─── CHART HELPERS ────────────────────────────────────────────────
