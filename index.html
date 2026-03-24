@@ -280,7 +280,7 @@ tr.unit-row.hidden { display:none; }
       <div class="scorecard adr">
         <div class="scorecard-label">ADR</div>
         <div class="scorecard-value" id="sc-adr">—</div>
-        <div class="scorecard-meta">net avg daily rate</div>
+        <div class="scorecard-meta">avg daily rate per night</div>
       </div>
       <div class="scorecard revpar">
         <div class="scorecard-label">RevPAR</div>
@@ -404,42 +404,6 @@ tr.unit-row.hidden { display:none; }
       </div>
     </div>
 
-    <!-- DISCOUNTS & PACKAGES -->
-    <div class="panel full" id="discounts-panel" style="display:none">
-      <div class="panel-header">
-        <span class="panel-title">Discounts &amp; Packages</span>
-        <span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)" id="disc-period-label"></span>
-      </div>
-      <div class="panel-body">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;">
-          <div style="background:var(--terra-bg);border:1px solid rgba(196,87,42,0.15);border-radius:12px;padding:18px 20px;">
-            <div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--terra);margin-bottom:8px;">Total Discounted</div>
-            <div style="font-size:28px;font-weight:700;color:var(--text);letter-spacing:-0.3px;" id="disc-total">—</div>
-          </div>
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
-            <div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Reservations Affected</div>
-            <div style="font-size:28px;font-weight:700;color:var(--text);letter-spacing:-0.3px;" id="disc-res-count">—</div>
-          </div>
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;">
-            <div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">% of Gross Revenue</div>
-            <div style="font-size:28px;font-weight:700;color:var(--text);letter-spacing:-0.3px;" id="disc-pct">—</div>
-          </div>
-        </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Package / Discount</th>
-              <th class="right">Amount</th>
-              <th style="min-width:140px"></th>
-              <th class="right">Reservations</th>
-              <th class="right">Avg per Res</th>
-            </tr>
-          </thead>
-          <tbody id="disc-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- PARTIAL PAYMENTS ALERT -->
     <div class="partial-alert" id="partial-alert">
       <div>
@@ -521,11 +485,10 @@ tr.unit-row.hidden { display:none; }
 <script>
 const CLIENT_ID    = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
 const SHEET_ID     = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
-const STAYS_TAB      = 'STAYS_CLEAN';
-const PACE_TAB       = 'PACE_CLEAN';
-const LOG_TAB        = 'IMPORT_LOG';
-const IMPORT_TAB     = 'STAYS_IMPORT';
-const DISCOUNTS_TAB  = 'DISCOUNTS_CLEAN';
+const STAYS_TAB    = 'STAYS_CLEAN';
+const PACE_TAB     = 'PACE_CLEAN';
+const LOG_TAB      = 'IMPORT_LOG';
+const IMPORT_TAB   = 'STAYS_IMPORT';
 const TOTAL_DOORS  = 56;
 const SCOPE        = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 const MONTH_ORDER  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -551,7 +514,7 @@ function getCat(n){
 function getChannel(bo,dc){return bo?'Direct':dc?'OTA':'Phone/Manual';}
 
 let tokenClient,accessToken;
-let staysData=[],paceData=[],logData=[],discountsData=[];
+let staysData=[],paceData=[],logData=[];
 let activeFilter='';
 let revChart,chChart,paceChart,bwChart,catChart;
 let partialsVisible=false;
@@ -710,14 +673,6 @@ async function loadAll(){
     }).filter(r=>r.nightDate);
     paceData=toRows(pr).map(r=>({yearGroup:r['YearGroup'],nightDate:pDate(r['NightDate']),rate:pMoney(r['Rate']),unit:r['Unit']})).filter(r=>r.nightDate&&r.yearGroup);
     try{logData=toRows(await fetchTab(LOG_TAB));}catch(e){logData=[];}
-    try{
-      discountsData=toRows(await fetchTab(DISCOUNTS_TAB)).map(r=>({
-        res:     r['Res#']||r['Res'],
-        date:    pDate(r['Date']),
-        details: cleanDiscountLabel(r['Details']||''),
-        amount:  pMoney(r['Amount'])
-      })).filter(r=>r.date&&r.amount>0&&r.details);
-    }catch(e){discountsData=[];}
     buildFilters();
     renderAll();
     renderLog();
@@ -725,11 +680,6 @@ async function loadAll(){
     showDash();
     document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }catch(e){showErr('Error loading data: '+e.message);showDash();}
-}
-
-function cleanDiscountLabel(s){
-  // Strip "Package:" prefix and trim
-  return s.replace(/^Package:\s*/i,'').trim();
 }
 
 // ─── FILTERS ──────────────────────────────────────────────────────
@@ -772,32 +722,21 @@ function renderAll(){
   renderUnits(rows);
   renderBW(rows);
   renderCatChart(rows);
-  renderDiscounts();
   renderPace();
-}
-
-// ─── DISCOUNTS FILTER ─────────────────────────────────────────────
-function getFilteredDiscounts(){
-  if(!activeFilter) return discountsData;
-  return discountsData.filter(r=>r.date&&r.date.toLocaleString('en-US',{month:'short',year:'numeric'})===activeFilter);
 }
 
 // ─── SCORECARDS ───────────────────────────────────────────────────
 function renderScores(rows){
-  const grossRev=rows.reduce((s,r)=>s+r.nightRevenue,0),n=rows.length;
+  const rev=rows.reduce((s,r)=>s+r.nightRevenue,0),n=rows.length,adr=n>0?rev/n:0;
   let days=1;
   if(n>0){const t=rows.map(r=>r.nightDate.getTime());days=Math.round((Math.max(...t)-Math.min(...t))/86400000)+1;}
   const activeDoors=getActiveDoors();
   const uniqueRes=new Set(rows.map(r=>r.res));
   const los=uniqueRes.size>0?(n/uniqueRes.size).toFixed(1):'—';
-  // Net ADR = (gross revenue - discounts) / occupied nights
-  const discTotal=getFilteredDiscounts().reduce((s,r)=>s+r.amount,0);
-  const netRev=grossRev-discTotal;
-  const adr=n>0?netRev/n:0;
-  document.getElementById('sc-revenue').textContent=fmt$(grossRev);
+  document.getElementById('sc-revenue').textContent=fmt$(rev);
   document.getElementById('sc-revenue-meta').textContent=n+' occupied nights';
   document.getElementById('sc-adr').textContent=fmt$(adr);
-  document.getElementById('sc-revpar').textContent=fmt$(activeDoors>0?netRev/(activeDoors*days):0);
+  document.getElementById('sc-revpar').textContent=fmt$(activeDoors>0?rev/(activeDoors*days):0);
   document.getElementById('sc-revpar-meta').textContent=activeDoors+' of '+TOTAL_DOORS+' doors active';
   document.getElementById('sc-occupancy').textContent=(activeDoors>0?(n/(activeDoors*days))*100:0).toFixed(1)+'%';
   document.getElementById('sc-occ-meta').textContent=days+' day period';
@@ -818,25 +757,17 @@ function renderCats(rows){
 
 // ─── REVENUE CHART ────────────────────────────────────────────────
 function renderRevChart(rows){
+  // Always show all months for context, highlight selected
   const bm={};
   staysData.forEach(r=>{const k=r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'});bm[k]=(bm[k]||0)+r.nightRevenue;});
   const labels=Object.keys(bm).sort((a,b)=>new Date(a)-new Date(b));
-  const values=labels.map(l=>Math.round(bm[l]));
-  const colors=labels.map(l=>l===activeFilter?'rgba(74,94,109,0.85)':'rgba(74,94,109,0.28)');
-  const borders=labels.map(l=>l===activeFilter?'rgba(74,94,109,1)':'rgba(74,94,109,0.35)');
-  if(revChart){revChart.destroy();revChart=null;}
-  if(labels.length===0)return;
+  const values=labels.map(l=>bm[l]);
+  const colors=labels.map(l=>l===activeFilter?'rgba(74,94,109,0.85)':'rgba(74,94,109,0.3)');
+  if(revChart)revChart.destroy();
   revChart=new Chart(document.getElementById('chart-revenue').getContext('2d'),{
     type:'bar',
-    data:{labels,datasets:[{data:values,backgroundColor:colors,borderColor:borders,borderWidth:1,borderRadius:5,borderSkipped:false}]},
-    options:{
-      responsive:true,maintainAspectRatio:false,animation:{duration:300},
-      plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e8e2da',borderWidth:1,titleColor:'#4a5568',bodyColor:'#1a2530',padding:12,callbacks:{label:c=>' '+fmt$(c.raw)}}},
-      scales:{
-        x:{grid:{display:false},ticks:{color:'#8a9bb0',font:{family:'Raleway',size:11}}},
-        y:{grid:{color:'rgba(232,226,218,0.8)'},ticks:{color:'#8a9bb0',font:{family:'Raleway',size:11},callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},beginAtZero:true}
-      }
-    }
+    data:{labels,datasets:[{data:values,backgroundColor:colors,borderColor:labels.map(l=>l===activeFilter?'rgba(74,94,109,1)':'rgba(74,94,109,0.4)'),borderWidth:1,borderRadius:6}]},
+    options:bOpts({plugins:{legend:{display:false}},scales:{x:xS(),y:yS()}})
   });
 }
 
@@ -915,8 +846,8 @@ function renderBW(rows){
     ];
     let modeBucket=buckets[0],modeCount=0;
     buckets.forEach(b=>{const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length;if(cnt>modeCount){modeCount=cnt;modeBucket=b;}});
-    document.getElementById('bw-mode').textContent=modeBucket.l;
-    document.getElementById('bw-mode-label').textContent=((modeCount/ws.length)*100).toFixed(0)+'% of bookings';
+    document.getElementById('bw-mode').textContent=modeBucket.l==='Same day'?'0':modeBucket.l.split('–')[0].replace('+','').trim();
+    document.getElementById('bw-mode-label').textContent=modeBucket.l+' ('+((modeCount/ws.length)*100).toFixed(0)+'%)';
     document.getElementById('bw-breakdown').innerHTML=buckets.map(b=>{
       const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length,pct=ws.length>0?(cnt/ws.length)*100:0;
       return`<div style="display:flex;align-items:center;gap:10px;"><span style="color:var(--text3);font-size:12px;min-width:110px">${b.l}</span><div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:var(--slate);border-radius:3px;transition:width 0.5s;"></div></div><span style="font-size:12px;font-weight:600;color:var(--text2);min-width:30px;text-align:right">${pct.toFixed(0)}%</span><span style="font-size:11px;color:var(--text3);min-width:28px;text-align:right">${cnt}</span></div>`;
@@ -967,50 +898,7 @@ function renderCatChart(rows){
   }).join('');
 }
 
-// ─── DISCOUNTS PANEL ──────────────────────────────────────────────
-function renderDiscounts(){
-  const disc=getFilteredDiscounts();
-  const panel=document.getElementById('discounts-panel');
-  if(!disc.length){panel.style.display='none';return;}
-  panel.style.display='block';
-  document.getElementById('disc-period-label').textContent=activeFilter||'';
-
-  const totalDisc=disc.reduce((s,r)=>s+r.amount,0);
-  const uniqueRes=new Set(disc.map(r=>r.res)).size;
-
-  // Gross revenue for the period
-  const grossRev=filtered().reduce((s,r)=>s+r.nightRevenue,0);
-  const pct=grossRev>0?(totalDisc/grossRev)*100:0;
-
-  document.getElementById('disc-total').textContent=fmt$(totalDisc);
-  document.getElementById('disc-res-count').textContent=uniqueRes;
-  document.getElementById('disc-pct').textContent=pct.toFixed(1)+'%';
-
-  // Group by label
-  const byLabel={};
-  disc.forEach(r=>{
-    if(!byLabel[r.details])byLabel[r.details]={amount:0,res:new Set()};
-    byLabel[r.details].amount+=r.amount;
-    byLabel[r.details].res.add(r.res);
-  });
-
-  const sorted=Object.entries(byLabel).sort((a,b)=>b[1].amount-a[1].amount);
-  const maxAmt=sorted.length>0?sorted[0][1].amount:1;
-
-  document.getElementById('disc-tbody').innerHTML=sorted.map(([label,d])=>{
-    const avg=d.res.size>0?d.amount/d.res.size:0;
-    const barPct=maxAmt>0?(d.amount/maxAmt)*100:0;
-    return`<tr>
-      <td style="color:var(--text);font-weight:500">${label}</td>
-      <td class="right">${fmt$(d.amount)}</td>
-      <td><div style="display:flex;align-items:center;gap:8px;padding:0 8px;"><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${barPct}%;background:var(--terra);border-radius:2px;"></div></div></div></td>
-      <td class="right">${d.res.size}</td>
-      <td class="right">${fmt$(avg)}</td>
-    </tr>`;
-  }).join('');
-}
-
-
+// ─── OUTSTANDING BALANCES ──────────────────────────────────────────
 async function renderOutstanding(){
   try{
     const raw=await fetchTab(IMPORT_TAB);
