@@ -83,8 +83,21 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .scorecard.revpar .scorecard-label   { color:var(--amber); }
 .scorecard.occupancy .scorecard-label{ color:var(--terra); }
 .scorecard.los .scorecard-label      { color:var(--purple); }
-.scorecard-value { font-size:34px; font-weight:700; color:var(--text); letter-spacing:-0.5px; line-height:1; margin-bottom:8px; }
+.scorecard-value { font-size:34px; font-weight:700; color:var(--text); letter-spacing:-0.5px; line-height:1; margin-bottom:6px; }
 .scorecard-meta { font-size:12px; color:var(--text3); }
+.scorecard-net { font-size:11px; color:var(--text3); margin-top:5px; line-height:1.4; }
+.scorecard-net strong { font-weight:600; color:var(--text2); }
+
+@media print {
+  .header, .filter-bar, .settings-overlay, .settings-panel, .hdr-btn, .error-banner { display:none !important; }
+  body { background:#fff; }
+  .content { padding:16px; }
+  .panel, .scorecard, .cat-card { box-shadow:none; border:1px solid #ddd; }
+  .scorecards { grid-template-columns:repeat(5,1fr); }
+  .grid-2 { grid-template-columns:1fr 1fr; }
+  canvas { max-height:200px; }
+  @page { margin:12mm; size:A4 landscape; }
+}
 
 /* GRIDS */
 .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
@@ -258,6 +271,7 @@ tr.unit-row.hidden { display:none; }
     </div>
     <div class="header-right">
       <div class="last-updated" id="last-updated-text"></div>
+      <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
       <button class="hdr-btn" onclick="openSettings()">&#9881; Blocked Units</button>
       <button class="hdr-btn" onclick="signOut()">Sign out</button>
     </div>
@@ -276,16 +290,19 @@ tr.unit-row.hidden { display:none; }
         <div class="scorecard-label">Total Revenue</div>
         <div class="scorecard-value" id="sc-revenue">—</div>
         <div class="scorecard-meta" id="sc-revenue-meta"></div>
+        <div class="scorecard-net" id="sc-revenue-net"></div>
       </div>
       <div class="scorecard adr">
         <div class="scorecard-label">ADR</div>
         <div class="scorecard-value" id="sc-adr">—</div>
-        <div class="scorecard-meta">net avg daily rate</div>
+        <div class="scorecard-meta">avg daily rate per night</div>
+        <div class="scorecard-net" id="sc-adr-net"></div>
       </div>
       <div class="scorecard revpar">
         <div class="scorecard-label">RevPAR</div>
         <div class="scorecard-value" id="sc-revpar">—</div>
         <div class="scorecard-meta" id="sc-revpar-meta">56 active doors</div>
+        <div class="scorecard-net" id="sc-revpar-net"></div>
       </div>
       <div class="scorecard occupancy">
         <div class="scorecard-label">Occupancy</div>
@@ -790,15 +807,34 @@ function renderScores(rows){
   const activeDoors=getActiveDoors();
   const uniqueRes=new Set(rows.map(r=>r.res));
   const los=uniqueRes.size>0?(n/uniqueRes.size).toFixed(1):'—';
-  // Net ADR = (gross revenue - discounts) / occupied nights
+
   const discTotal=getFilteredDiscounts().reduce((s,r)=>s+r.amount,0);
   const netRev=grossRev-discTotal;
-  const adr=n>0?netRev/n:0;
+  const grossAdr=n>0?grossRev/n:0;
+  const netAdr=n>0?netRev/n:0;
+  const grossRevpar=activeDoors>0?grossRev/(activeDoors*days):0;
+  const netRevpar=activeDoors>0?netRev/(activeDoors*days):0;
+
+  // Total Revenue — gross headline, net + discounts secondary
   document.getElementById('sc-revenue').textContent=fmt$(grossRev);
   document.getElementById('sc-revenue-meta').textContent=n+' occupied nights';
-  document.getElementById('sc-adr').textContent=fmt$(adr);
-  document.getElementById('sc-revpar').textContent=fmt$(activeDoors>0?netRev/(activeDoors*days):0);
+  document.getElementById('sc-revenue-net').innerHTML=discTotal>0
+    ?`<strong>${fmt$(netRev)} net</strong> · ${fmt$(discTotal)} discounts`
+    :'';
+
+  // ADR — gross headline, net secondary
+  document.getElementById('sc-adr').textContent=fmt$(grossAdr);
+  document.getElementById('sc-adr-net').innerHTML=discTotal>0
+    ?`<strong>${fmt$(netAdr)} net</strong>`
+    :'';
+
+  // RevPAR — gross headline, net secondary
+  document.getElementById('sc-revpar').textContent=fmt$(grossRevpar);
   document.getElementById('sc-revpar-meta').textContent=activeDoors+' of '+TOTAL_DOORS+' doors active';
+  document.getElementById('sc-revpar-net').innerHTML=discTotal>0
+    ?`<strong>${fmt$(netRevpar)} net</strong>`
+    :'';
+
   document.getElementById('sc-occupancy').textContent=(activeDoors>0?(n/(activeDoors*days))*100:0).toFixed(1)+'%';
   document.getElementById('sc-occ-meta').textContent=days+' day period';
   document.getElementById('sc-los').textContent=los;
