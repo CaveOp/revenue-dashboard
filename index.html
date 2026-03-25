@@ -54,6 +54,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 /* FILTER BAR */
 .filter-bar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 40px; display:flex; align-items:center; gap:6px; height:52px; flex-wrap:wrap; overflow:hidden; }
 .filter-label { font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text3); margin-right:8px; }
+.filter-year { font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text3); margin-left:10px; margin-right:4px; padding:4px 8px; background:var(--surface2); border:1px solid var(--border); border-radius:5px; }
 .filter-btn { font-size:12px; font-weight:600; letter-spacing:0.06em; font-family:var(--sans); color:var(--text3); background:transparent; border:1px solid var(--border); border-radius:6px; padding:5px 14px; cursor:pointer; transition:all 0.12s; }
 .filter-btn:hover { border-color:var(--slate3); color:var(--slate); background:var(--slate-bg); }
 .filter-btn.active { background:var(--slate); border-color:var(--slate); color:#fff; }
@@ -87,6 +88,9 @@ body { background:var(--bg); color:var(--text); font-family:var(--sans); font-si
 .scorecard-meta { font-size:12px; color:var(--text3); }
 .scorecard-net { font-size:11px; color:var(--text3); margin-top:5px; line-height:1.4; }
 .scorecard-net strong { font-weight:600; color:var(--text2); }
+.yoy-up   { font-size:11px; font-weight:600; color:var(--green); }
+.yoy-down { font-size:11px; font-weight:600; color:var(--terra); }
+.yoy-flat { font-size:11px; color:var(--text3); }
 
 @media print {
   .header, .filter-bar, .settings-overlay, .settings-panel, .hdr-btn, .error-banner { display:none !important; }
@@ -309,11 +313,13 @@ tr.unit-row.hidden { display:none; }
         <div class="scorecard-label">Occupancy</div>
         <div class="scorecard-value" id="sc-occupancy">—</div>
         <div class="scorecard-meta" id="sc-occ-meta"></div>
+        <div class="scorecard-net" id="sc-occ-net"></div>
       </div>
       <div class="scorecard los">
         <div class="scorecard-label">Avg Length of Stay</div>
         <div class="scorecard-value" id="sc-los">—</div>
         <div class="scorecard-meta">nights per reservation</div>
+        <div class="scorecard-net" id="sc-los-net"></div>
       </div>
     </div>
 
@@ -391,6 +397,10 @@ tr.unit-row.hidden { display:none; }
           <div style="margin-bottom:20px;">
             <div class="section-label">Distribution</div>
             <div id="bw-breakdown" style="display:flex;flex-direction:column;gap:9px;"></div>
+          </div>
+          <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
+            <div class="section-label" style="margin-bottom:10px;">Percentiles</div>
+            <div id="bw-percentiles" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;"></div>
           </div>
           <div style="padding-top:18px;border-top:1px solid var(--border);">
             <div class="section-label">Avg booking window by month (all data)</div>
@@ -761,9 +771,49 @@ function buildFilters(){
   const sorted=[...months].sort((a,b)=>new Date(a)-new Date(b));
   const bar=document.getElementById('filter-bar');
   bar.innerHTML='<span class="filter-label">Period</span>';
-  // Default to most recent month
   activeFilter=sorted.length>0?sorted[sorted.length-1]:'';
-  sorted.forEach(m=>bar.appendChild(mkBtn(m,m,m===activeFilter)));
+
+  // Group by year
+  const byYear={};
+  sorted.forEach(m=>{
+    const yr=new Date(m).getFullYear();
+    if(!byYear[yr])byYear[yr]=[];
+    byYear[yr].push(m);
+  });
+
+  Object.keys(byYear).sort().forEach(yr=>{
+    const yearLabel=document.createElement('span');
+    yearLabel.className='filter-year';
+    yearLabel.textContent=yr;
+    bar.appendChild(yearLabel);
+    byYear[yr].forEach(m=>bar.appendChild(mkBtn(m,m,m===activeFilter)));
+  });
+}
+
+// ─── YOY HELPER ───────────────────────────────────────────────────
+function getYoyMonth(){
+  // Returns the same month from the prior year, or null if no data exists
+  if(!activeFilter) return null;
+  const d=new Date(activeFilter);
+  const priorYear=d.getFullYear()-1;
+  const priorKey=d.toLocaleString('en-US',{month:'short'})+' '+priorYear;
+  const hasPrior=staysData.some(r=>r.nightDate&&r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'})===priorKey);
+  return hasPrior?priorKey:null;
+}
+
+function getYoyRows(priorKey){
+  if(!priorKey) return [];
+  return staysData.filter(r=>r.nightDate&&r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'})===priorKey);
+}
+
+function yoyBadge(current,prior,fmt){
+  if(prior===0||prior===null)return '';
+  const diff=current-prior;
+  const pct=((diff/prior)*100).toFixed(1);
+  const sign=diff>=0?'+':'';
+  const cls=diff>0?'yoy-up':diff<0?'yoy-down':'yoy-flat';
+  const arrow=diff>0?'↑':diff<0?'↓':'→';
+  return`<span class="${cls}">${arrow} ${sign}${fmt?fmt(Math.abs(diff)):Math.abs(diff).toFixed(1)} (${sign}${pct}%) vs ${new Date(getYoyMonth()).toLocaleString('en-US',{month:'short',year:'numeric'})}</span>`;
 }
 
 function mkBtn(label,val,active){
@@ -819,30 +869,49 @@ function renderScores(rows){
   const netAdr=n>0?netRev/n:0;
   const grossRevpar=activeDoors>0?grossRev/(activeDoors*days):0;
   const netRevpar=activeDoors>0?netRev/(activeDoors*days):0;
+  const occ=activeDoors>0?(n/(activeDoors*days))*100:0;
 
-  // Total Revenue — gross headline, net + discounts secondary
+  // YoY
+  const priorKey=getYoyMonth();
+  const priorRows=getYoyRows(priorKey);
+  const priorRev=priorRows.reduce((s,r)=>s+r.nightRevenue,0);
+  const priorN=priorRows.length;
+  let priorDays=1;
+  if(priorN>0){const t=priorRows.map(r=>r.nightDate.getTime());priorDays=Math.round((Math.max(...t)-Math.min(...t))/86400000)+1;}
+  const priorAdr=priorN>0?priorRev/priorN:0;
+  const priorRevpar=activeDoors>0?priorRev/(activeDoors*priorDays):0;
+  const priorOcc=activeDoors>0?(priorN/(activeDoors*priorDays))*100:0;
+  const priorLos=new Set(priorRows.map(r=>r.res)).size>0?(priorN/new Set(priorRows.map(r=>r.res)).size):0;
+
+  // Revenue
   document.getElementById('sc-revenue').textContent=fmt$(grossRev);
   document.getElementById('sc-revenue-meta').textContent=n+' occupied nights';
-  document.getElementById('sc-revenue-net').innerHTML=discTotal>0
-    ?`<strong>${fmt$(netRev)} net</strong> · ${fmt$(discTotal)} discounts`
-    :'';
+  document.getElementById('sc-revenue-net').innerHTML=
+    (discTotal>0?`<strong>${fmt$(netRev)} net</strong> · ${fmt$(discTotal)} discounts<br>`:'')
+    +(priorKey?yoyBadge(grossRev,priorRev,fmt$):'');
 
-  // ADR — gross headline, net secondary
+  // ADR
   document.getElementById('sc-adr').textContent=fmt$(grossAdr);
-  document.getElementById('sc-adr-net').innerHTML=discTotal>0
-    ?`<strong>${fmt$(netAdr)} net</strong>`
-    :'';
+  document.getElementById('sc-adr-net').innerHTML=
+    (discTotal>0?`<strong>${fmt$(netAdr)} net</strong><br>`:'')
+    +(priorKey?yoyBadge(grossAdr,priorAdr,fmt$):'');
 
-  // RevPAR — gross headline, net secondary
+  // RevPAR
   document.getElementById('sc-revpar').textContent=fmt$(grossRevpar);
   document.getElementById('sc-revpar-meta').textContent=activeDoors+' of '+TOTAL_DOORS+' doors active';
-  document.getElementById('sc-revpar-net').innerHTML=discTotal>0
-    ?`<strong>${fmt$(netRevpar)} net</strong>`
-    :'';
+  document.getElementById('sc-revpar-net').innerHTML=
+    (discTotal>0?`<strong>${fmt$(netRevpar)} net</strong><br>`:'')
+    +(priorKey?yoyBadge(grossRevpar,priorRevpar,fmt$):'');
 
-  document.getElementById('sc-occupancy').textContent=(activeDoors>0?(n/(activeDoors*days))*100:0).toFixed(1)+'%';
+  // Occupancy
+  document.getElementById('sc-occupancy').textContent=occ.toFixed(1)+'%';
   document.getElementById('sc-occ-meta').textContent=days+' day period';
-  document.getElementById('sc-los').textContent=los;
+  document.getElementById('sc-occ-net').innerHTML=priorKey?yoyBadge(occ,priorOcc,v=>v.toFixed(1)+'pp'):'';
+
+  // LOS
+  const losNum=uniqueRes.size>0?n/uniqueRes.size:0;
+  document.getElementById('sc-los').textContent=losNum>0?losNum.toFixed(1):'—';
+  document.getElementById('sc-los-net').innerHTML=priorKey&&priorLos>0?yoyBadge(losNum,priorLos,v=>v.toFixed(1)+'n'):'';
 }
 
 // ─── CATEGORY CARDS ───────────────────────────────────────────────
@@ -850,10 +919,28 @@ function renderCats(rows){
   const ct={},cn={};
   Object.keys(CATEGORIES).forEach(c=>{ct[c]=0;cn[c]=0;});
   rows.forEach(r=>{const c=getCat(r.accommodation);if(ct[c]!==undefined){ct[c]+=r.nightRevenue;cn[c]++;}});
+
+  // YoY
+  const priorKey=getYoyMonth();
+  const priorRows=getYoyRows(priorKey);
+  const pt={};
+  Object.keys(CATEGORIES).forEach(c=>{pt[c]=0;});
+  priorRows.forEach(r=>{const c=getCat(r.accommodation);if(pt[c]!==undefined)pt[c]+=r.nightRevenue;});
+
   const mx=Math.max(...Object.values(ct),1);
   document.getElementById('cat-grid').innerHTML=Object.keys(CATEGORIES).map(cat=>{
     const rev=ct[cat],nights=cn[cat],adr=nights>0?rev/nights:0,pct=mx>0?(rev/mx)*100:0,col=CAT_COLORS[cat];
-    return`<div class="cat-card"><div class="cat-card-name">${cat}</div><div class="cat-card-rev">${fmt$(rev)}</div><div class="cat-card-meta">${nights} nights · ADR ${fmt$(adr)}</div><div class="cat-card-bar"><div class="cat-card-bar-fill" style="width:${pct}%;background:${col}"></div></div></div>`;
+    const priorRev=pt[cat]||0;
+    let yoyHtml='';
+    if(priorKey&&(rev>0||priorRev>0)){
+      const diff=rev-priorRev;
+      const sign=diff>=0?'+':'';
+      const cls=diff>0?'yoy-up':diff<0?'yoy-down':'yoy-flat';
+      const arrow=diff>0?'↑':diff<0?'↓':'→';
+      const pctStr=priorRev>0?` (${sign}${((diff/priorRev)*100).toFixed(0)}%)`:'';
+      yoyHtml=`<div class="${cls}" style="font-size:11px;margin-top:4px;">${arrow} ${sign}${fmt$(diff)}${pctStr} vs prior yr</div>`;
+    }
+    return`<div class="cat-card"><div class="cat-card-name">${cat}</div><div class="cat-card-rev">${fmt$(rev)}</div><div class="cat-card-meta">${nights} nights · ADR ${fmt$(adr)}</div>${yoyHtml}<div class="cat-card-bar"><div class="cat-card-bar-fill" style="width:${pct}%;background:${col}"></div></div></div>`;
   }).join('');
 }
 
@@ -886,6 +973,14 @@ function renderChChart(rows){
   const ch={Direct:0,OTA:0,'Phone/Manual':0};
   rows.forEach(r=>{const c=getChannel(r.bookedOnline,r.directConnect);ch[c]=(ch[c]||0)+r.nightRevenue;});
   const total=Object.values(ch).reduce((a,b)=>a+b,0);
+
+  // YoY channel
+  const priorKey=getYoyMonth();
+  const priorRows=getYoyRows(priorKey);
+  const pch={Direct:0,OTA:0,'Phone/Manual':0};
+  priorRows.forEach(r=>{const c=getChannel(r.bookedOnline,r.directConnect);pch[c]=(pch[c]||0)+r.nightRevenue;});
+  const priorTotal=Object.values(pch).reduce((a,b)=>a+b,0);
+
   const labels=Object.keys(ch),values=Object.values(ch);
   const colors=['rgba(58,125,92,0.85)','rgba(74,94,109,0.85)','rgba(184,124,42,0.7)'];
   if(chChart)chChart.destroy();
@@ -895,7 +990,17 @@ function renderChChart(rows){
   });
   document.getElementById('channel-legend').innerHTML=labels.map((l,i)=>{
     const pct=total>0?(values[i]/total*100).toFixed(1):'0.0';
-    return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;"><div style="display:flex;align-items:center;gap:10px;"><div style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></div><span style="font-size:14px;color:var(--text2);font-weight:500">${l}</span></div><div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:var(--text)">${fmt$(values[i])}</div><div style="font-size:11px;color:var(--text3)">${pct}%</div></div></div>`;
+    const priorVal=pch[l]||0;
+    const priorPct=priorTotal>0?(priorVal/priorTotal*100).toFixed(1):'0.0';
+    let yoyHtml='';
+    if(priorKey&&priorTotal>0){
+      const diff=values[i]-priorVal;
+      const sign=diff>=0?'+':'';
+      const cls=diff>0?'yoy-up':diff<0?'yoy-down':'yoy-flat';
+      const arrow=diff>0?'↑':diff<0?'↓':'→';
+      yoyHtml=`<div class="${cls}" style="font-size:10px;margin-top:2px;">${arrow} ${sign}${fmt$(diff)} · was ${priorPct}%</div>`;
+    }
+    return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;"><div style="display:flex;align-items:center;gap:10px;"><div style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></div><span style="font-size:14px;color:var(--text2);font-weight:500">${l}</span></div><div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:var(--text)">${fmt$(values[i])}</div><div style="font-size:11px;color:var(--text3)">${pct}%</div>${yoyHtml}</div></div>`;
   }).join('');
 }
 
@@ -945,28 +1050,69 @@ function toggleCat(catId){
 function renderBW(rows){
   const ws=rows.filter(r=>r.reservedOn&&r.nightDate).map(r=>Math.round((r.nightDate-r.reservedOn)/86400000)).filter(d=>d>=0&&d<730);
   document.getElementById('bw-period-label').textContent=activeFilter||'';
+
   if(ws.length){
     const avg=Math.round(ws.reduce((a,b)=>a+b,0)/ws.length);
     document.getElementById('bw-avg').textContent=avg;
     document.getElementById('bw-max').textContent=Math.max(...ws);
+
+    // Tighter buckets
     const buckets=[
-      {l:'Same day',mn:0,mx:0},{l:'1–7 days',mn:1,mx:7},
-      {l:'8–30 days',mn:8,mx:30},{l:'31–90 days',mn:31,mx:90},
-      {l:'91–180 days',mn:91,mx:180},{l:'180+ days',mn:181,mx:Infinity}
+      {l:'Same day',  mn:0,  mx:0},
+      {l:'1–3 days',  mn:1,  mx:3},
+      {l:'4–7 days',  mn:4,  mx:7},
+      {l:'8–14 days', mn:8,  mx:14},
+      {l:'15–21 days',mn:15, mx:21},
+      {l:'22–30 days',mn:22, mx:30},
+      {l:'31–60 days',mn:31, mx:60},
+      {l:'61–90 days',mn:61, mx:90},
+      {l:'90+ days',  mn:91, mx:Infinity}
     ];
+
     let modeBucket=buckets[0],modeCount=0;
-    buckets.forEach(b=>{const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length;if(cnt>modeCount){modeCount=cnt;modeBucket=b;}});
+    buckets.forEach(b=>{
+      const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length;
+      if(cnt>modeCount){modeCount=cnt;modeBucket=b;}
+    });
     document.getElementById('bw-mode').textContent=modeBucket.l;
     document.getElementById('bw-mode-label').textContent=((modeCount/ws.length)*100).toFixed(0)+'% of bookings';
+
     document.getElementById('bw-breakdown').innerHTML=buckets.map(b=>{
       const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length,pct=ws.length>0?(cnt/ws.length)*100:0;
-      return`<div style="display:flex;align-items:center;gap:10px;"><span style="color:var(--text3);font-size:12px;min-width:110px">${b.l}</span><div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:var(--slate);border-radius:3px;transition:width 0.5s;"></div></div><span style="font-size:12px;font-weight:600;color:var(--text2);min-width:30px;text-align:right">${pct.toFixed(0)}%</span><span style="font-size:11px;color:var(--text3);min-width:28px;text-align:right">${cnt}</span></div>`;
+      const isMost=b.l===modeBucket.l;
+      return`<div style="display:flex;align-items:center;gap:10px;">
+        <span style="color:var(--text3);font-size:12px;min-width:100px">${b.l}</span>
+        <div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${isMost?'var(--slate)':'rgba(74,94,109,0.45)'};border-radius:3px;transition:width 0.5s;"></div>
+        </div>
+        <span style="font-size:12px;font-weight:${isMost?700:600};color:${isMost?'var(--slate)':'var(--text2)'};min-width:30px;text-align:right">${pct.toFixed(0)}%</span>
+        <span style="font-size:11px;color:var(--text3);min-width:28px;text-align:right">${cnt}</span>
+      </div>`;
     }).join('');
+
+    // Percentiles
+    const sorted=[...ws].sort((a,b)=>a-b);
+    const pct=p=>sorted[Math.floor((p/100)*(sorted.length-1))];
+    document.getElementById('bw-percentiles').innerHTML=[
+      {l:'p25',v:pct(25),desc:'25% book within'},
+      {l:'p50 (median)',v:pct(50),desc:'50% book within'},
+      {l:'p75',v:pct(75),desc:'75% book within'},
+      {l:'p90',v:pct(90),desc:'90% book within'}
+    ].map(p=>`
+      <div style="text-align:center;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;">${p.l}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text);line-height:1;">${p.v}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px;">${p.desc}<br>${p.v} days</div>
+      </div>`).join('');
+
   }else{
     ['bw-avg','bw-mode','bw-max'].forEach(id=>document.getElementById(id).textContent='—');
     document.getElementById('bw-mode-label').textContent='';
     document.getElementById('bw-breakdown').innerHTML='';
+    document.getElementById('bw-percentiles').innerHTML='';
   }
+
+  // Monthly trend (always all data)
   const bwByMonth={};
   staysData.forEach(r=>{
     if(!r.reservedOn||!r.nightDate)return;
