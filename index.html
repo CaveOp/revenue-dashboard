@@ -374,33 +374,12 @@ tr.unit-row.hidden { display:none; }
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Booking Window</span>
-          <span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)" id="bw-period-label"></span>
+          <span id="bw-summary" style="font-size:11px;color:var(--text3);letter-spacing:0.04em;"></span>
         </div>
         <div class="panel-body">
-          <div class="bw-stat-grid">
-            <div class="bw-stat">
-              <div class="bw-stat-label">Average</div>
-              <div class="bw-stat-value" id="bw-avg">—</div>
-              <div class="bw-stat-unit">days out</div>
-            </div>
-            <div class="bw-stat">
-              <div class="bw-stat-label">Most Common</div>
-              <div class="bw-stat-value" id="bw-mode">—</div>
-              <div class="bw-stat-sub" id="bw-mode-label"></div>
-            </div>
-            <div class="bw-stat">
-              <div class="bw-stat-label">Longest</div>
-              <div class="bw-stat-value" id="bw-max">—</div>
-              <div class="bw-stat-unit">days out</div>
-            </div>
-          </div>
           <div style="margin-bottom:20px;">
-            <div class="section-label">Distribution</div>
+            <div class="section-label">Distribution — reservations</div>
             <div id="bw-breakdown" style="display:flex;flex-direction:column;gap:9px;"></div>
-          </div>
-          <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
-            <div class="section-label" style="margin-bottom:10px;">Percentiles</div>
-            <div id="bw-percentiles" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;"></div>
           </div>
           <div style="padding-top:18px;border-top:1px solid var(--border);">
             <div class="section-label">Avg booking window by month (all data)</div>
@@ -1048,87 +1027,92 @@ function toggleCat(catId){
 
 // ─── BOOKING WINDOW ───────────────────────────────────────────────
 function renderBW(rows){
-  const ws=rows.filter(r=>r.reservedOn&&r.nightDate).map(r=>Math.round((r.nightDate-r.reservedOn)/86400000)).filter(d=>d>=0&&d<730);
-  document.getElementById('bw-period-label').textContent=activeFilter||'';
+  // Deduplicate by Res# + Accommodation — count each reservation once
+  // Use the minimum night date as the stay date reference point
+  const resMap={};
+  rows.forEach(r=>{
+    if(!r.reservedOn||!r.nightDate)return;
+    const key=r.res+'|'+(r.accommodation||'');
+    if(!resMap[key]||r.nightDate<resMap[key].nightDate){
+      resMap[key]={nightDate:r.nightDate,reservedOn:r.reservedOn};
+    }
+  });
 
-  if(ws.length){
-    const avg=Math.round(ws.reduce((a,b)=>a+b,0)/ws.length);
-    document.getElementById('bw-avg').textContent=avg;
-    document.getElementById('bw-max').textContent=Math.max(...ws);
+  const ws=Object.values(resMap).map(r=>Math.round((r.nightDate-r.reservedOn)/86400000)).filter(d=>d>=0&&d<730);
+  const totalRes=ws.length;
 
-    // Tighter buckets
-    const buckets=[
-      {l:'Same day',  mn:0,  mx:0},
-      {l:'1–3 days',  mn:1,  mx:3},
-      {l:'4–7 days',  mn:4,  mx:7},
-      {l:'8–14 days', mn:8,  mx:14},
-      {l:'15–21 days',mn:15, mx:21},
-      {l:'22–30 days',mn:22, mx:30},
-      {l:'31–60 days',mn:31, mx:60},
-      {l:'61–90 days',mn:61, mx:90},
-      {l:'90+ days',  mn:91, mx:Infinity}
-    ];
+  if(totalRes>0){
+    const avg=Math.round(ws.reduce((a,b)=>a+b,0)/totalRes);
+    const sorted=[...ws].sort((a,b)=>a-b);
+    const median=sorted[Math.floor(sorted.length/2)];
+    document.getElementById('bw-summary').textContent=
+      `Avg ${avg} days · Median ${median} days · ${totalRes} reservations · ${activeFilter||''}`;
+  } else {
+    document.getElementById('bw-summary').textContent='';
+  }
 
+  const buckets=[
+    {l:'Same day',  mn:0,  mx:0},
+    {l:'1–3 days',  mn:1,  mx:3},
+    {l:'4–7 days',  mn:4,  mx:7},
+    {l:'8–14 days', mn:8,  mx:14},
+    {l:'15–21 days',mn:15, mx:21},
+    {l:'22–30 days',mn:22, mx:30},
+    {l:'31–60 days',mn:31, mx:60},
+    {l:'61–90 days',mn:61, mx:90},
+    {l:'90+ days',  mn:91, mx:Infinity}
+  ];
+
+  if(totalRes>0){
     let modeBucket=buckets[0],modeCount=0;
     buckets.forEach(b=>{
       const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length;
       if(cnt>modeCount){modeCount=cnt;modeBucket=b;}
     });
-    document.getElementById('bw-mode').textContent=modeBucket.l;
-    document.getElementById('bw-mode-label').textContent=((modeCount/ws.length)*100).toFixed(0)+'% of bookings';
 
     document.getElementById('bw-breakdown').innerHTML=buckets.map(b=>{
-      const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length,pct=ws.length>0?(cnt/ws.length)*100:0;
+      const cnt=ws.filter(w=>w>=b.mn&&w<=b.mx).length;
+      const pct=totalRes>0?(cnt/totalRes)*100:0;
       const isMost=b.l===modeBucket.l;
       return`<div style="display:flex;align-items:center;gap:10px;">
         <span style="color:var(--text3);font-size:12px;min-width:100px">${b.l}</span>
         <div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-          <div style="height:100%;width:${pct}%;background:${isMost?'var(--slate)':'rgba(74,94,109,0.45)'};border-radius:3px;transition:width 0.5s;"></div>
+          <div style="height:100%;width:${pct}%;background:${isMost?'var(--slate)':'rgba(74,94,109,0.4)'};border-radius:3px;transition:width 0.5s;"></div>
         </div>
         <span style="font-size:12px;font-weight:${isMost?700:600};color:${isMost?'var(--slate)':'var(--text2)'};min-width:30px;text-align:right">${pct.toFixed(0)}%</span>
         <span style="font-size:11px;color:var(--text3);min-width:28px;text-align:right">${cnt}</span>
       </div>`;
     }).join('');
-
-    // Percentiles
-    const sorted=[...ws].sort((a,b)=>a-b);
-    const pct=p=>sorted[Math.floor((p/100)*(sorted.length-1))];
-    document.getElementById('bw-percentiles').innerHTML=[
-      {l:'p25',v:pct(25),desc:'25% book within'},
-      {l:'p50 (median)',v:pct(50),desc:'50% book within'},
-      {l:'p75',v:pct(75),desc:'75% book within'},
-      {l:'p90',v:pct(90),desc:'90% book within'}
-    ].map(p=>`
-      <div style="text-align:center;">
-        <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;">${p.l}</div>
-        <div style="font-size:22px;font-weight:700;color:var(--text);line-height:1;">${p.v}</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:3px;">${p.desc}<br>${p.v} days</div>
-      </div>`).join('');
-
-  }else{
-    ['bw-avg','bw-mode','bw-max'].forEach(id=>document.getElementById(id).textContent='—');
-    document.getElementById('bw-mode-label').textContent='';
+  } else {
     document.getElementById('bw-breakdown').innerHTML='';
-    document.getElementById('bw-percentiles').innerHTML='';
   }
 
-  // Monthly trend (always all data)
+  // Monthly trend (always all data, per reservation)
   const bwByMonth={};
+  const allResMap={};
   staysData.forEach(r=>{
     if(!r.reservedOn||!r.nightDate)return;
-    const d=Math.round((r.nightDate-r.reservedOn)/86400000);
-    if(d<0||d>=730)return;
-    const k=r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'});
-    if(!bwByMonth[k])bwByMonth[k]={sum:0,count:0};
-    bwByMonth[k].sum+=d;bwByMonth[k].count++;
+    const key=r.res+'|'+(r.accommodation||'');
+    const mo=r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'});
+    const mapKey=key+'|'+mo;
+    if(!allResMap[mapKey]||r.nightDate<allResMap[mapKey].nightDate){
+      allResMap[mapKey]={nightDate:r.nightDate,reservedOn:r.reservedOn,mo};
+    }
   });
+  Object.values(allResMap).forEach(({nightDate,reservedOn,mo})=>{
+    const d=Math.round((nightDate-reservedOn)/86400000);
+    if(d<0||d>=730)return;
+    if(!bwByMonth[mo])bwByMonth[mo]={sum:0,count:0};
+    bwByMonth[mo].sum+=d;bwByMonth[mo].count++;
+  });
+
   const bwLabels=Object.keys(bwByMonth).sort((a,b)=>new Date(a)-new Date(b));
   const bwVals=bwLabels.map(k=>Math.round(bwByMonth[k].sum/bwByMonth[k].count));
   if(bwChart)bwChart.destroy();
   if(bwLabels.length>0){
     bwChart=new Chart(document.getElementById('chart-bw-trend').getContext('2d'),{
       type:'line',
-      data:{labels:bwLabels,datasets:[{data:bwVals,borderColor:'rgba(74,94,109,0.8)',backgroundColor:'rgba(74,94,109,0.08)',borderWidth:2,pointRadius:5,pointBackgroundColor:'#4a5e6d',fill:true,tension:0.3}]},
+      data:{labels:bwLabels,datasets:[{data:bwVals,borderColor:'rgba(74,94,109,0.8)',backgroundColor:'rgba(74,94,109,0.08)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#4a5e6d',fill:true,tension:0.3}]},
       options:bOpts({plugins:{legend:{display:false}},scales:{x:xS(),y:{...yS(),ticks:{...yS().ticks,callback:v=>v+'d'}}}})
     });
   }
