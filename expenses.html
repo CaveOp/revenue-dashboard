@@ -301,7 +301,7 @@ const TAB_NAME = '2026 OPERATION COSTS';
 const CLIENT_ID  = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
 const SCOPE      = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 const KNOWN_CATS = ['MAINTENANCE','HOUSEKEEPING','OPERATING','MARKETING'];
-const MONTH_RE   = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(uary|ruary|ch|il|e|y|ust|tember|ober|vember|ember)?\s+\d{4}$/i;
+const MONTH_RE   = /^(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(tember)?|oct(ober)?|nov(ember)?|dec(ember)?)\s+\d{2,4}$/i;
 
 const CAT_COLORS = {
   'MAINTENANCE':'#c4572a','HOUSEKEEPING':'#3a7d5c',
@@ -384,13 +384,14 @@ function parseSheet(rows) {
 
     if (!colA) continue;
 
-    // Month row — "January 2026" style
+    // Month row — "Jan 2026" or "January 2026" style
     if (MONTH_RE.test(colA)) {
       currentMonth = colA;
       continue;
     }
 
     // Category row — exact match to known cats (case-insensitive)
+    // May have a subtotal in col B — still treat as category header
     const colAUp = colA.toUpperCase();
     if (KNOWN_CATS.includes(colAUp)) {
       currentCat = colAUp;
@@ -398,7 +399,10 @@ function parseSheet(rows) {
     }
 
     // Skip header and title rows
-    if (colAUp === 'ITEM' || colAUp.includes('OPERATION COSTS')) continue;
+    if (colAUp === 'ITEM' || colAUp.includes('OPERATION COSTS') || colAUp === '$') continue;
+
+    // Skip rows that are just month totals or blank labels
+    if (colAUp.startsWith('TOTAL') || colAUp === '') continue;
 
     // Line item — skip if no cost and no company (likely a stray row)
     const cost = parseMoney(colB);
