@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cave Springs — Housekeeping</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f2ee;--surface:#fff;--surface2:#f9f7f4;
+  --border:#e8e2da;--border2:#d6cec3;
+  --slate:#4a5e6d;--slate2:#3a4d5c;--slate3:#6a7e8d;--slate-bg:#eef2f5;
+  --terra:#c4572a;--terra2:#a8451f;--terra-bg:#faf0eb;
+  --green:#3a7d5c;--green-bg:#edf6f1;
+  --amber:#b87c2a;--amber-bg:#fdf5e8;
+  --purple:#6b5b8c;--purple-bg:#f2f0f7;
+  --text:#1a2530;--text2:#4a5568;--text3:#8a9bb0;
+  --sans:'Raleway',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+  --shadow2:0 2px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.06);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* AUTH */
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+.auth-card{background:var(--surface);border-radius:20px;box-shadow:var(--shadow2);padding:60px 56px;text-align:center;max-width:460px;width:90%;}
+.auth-logo-title{font-size:22px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--slate);}
+.auth-logo-sub{font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--text3);}
+.auth-divider{width:40px;height:2px;background:var(--terra);margin:20px auto 28px;}
+.auth-desc{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.7;}
+.auth-btn{display:inline-flex;align-items:center;gap:10px;background:var(--slate);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.auth-btn:hover{background:var(--slate2);}
+
+/* LOADING */
+#loading-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;}
+.spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--slate);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:12px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;}
+
+#dashboard{display:none;}
+
+/* HEADER */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;}
+.header-title{font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
+.header-sub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.last-updated{font-size:12px;color:var(--text3);}
+.hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
+.hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
+
+/* NAV */
+.nav-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;height:44px;gap:4px;}
+.nav-tab{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:0 16px;height:44px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;}
+.nav-tab:hover{color:var(--slate);}
+.nav-tab.active{color:var(--slate);border-bottom-color:var(--slate);}
+
+/* FILTER BAR */
+.filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;gap:6px;height:52px;flex-wrap:wrap;overflow:hidden;}
+.filter-label{font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-right:8px;}
+.filter-year{font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-left:10px;margin-right:4px;padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;}
+.filter-btn{font-size:12px;font-weight:600;font-family:var(--sans);color:var(--text3);background:transparent;border:1px solid var(--border);border-radius:6px;padding:5px 14px;cursor:pointer;}
+.filter-btn:hover{border-color:var(--slate3);color:var(--slate);background:var(--slate-bg);}
+.filter-btn.active{background:var(--slate);border-color:var(--slate);color:#fff;}
+
+/* CONTENT */
+.content{padding:32px 40px;max-width:1600px;margin:0 auto;}
+
+/* SCORECARDS */
+.scorecards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.scorecard{border-radius:16px;padding:24px 26px;box-shadow:var(--shadow);border:1px solid;position:relative;overflow:hidden;}
+.scorecard::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;}
+.scorecard.total   {background:#f0f4f7;border-color:#c4d2db;}.scorecard.total::after  {background:var(--slate);}
+.scorecard.amazon  {background:#fdf6ec;border-color:#e5d0a8;}.scorecard.amazon::after {background:var(--amber);}
+.scorecard.mendes  {background:#eaf5ef;border-color:#b8d9c8;}.scorecard.mendes::after {background:var(--green);}
+.scorecard.avg     {background:#f4f2f8;border-color:#cbc5dc;}.scorecard.avg::after    {background:var(--purple);}
+.scorecard-label{font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:10px;}
+.scorecard.total .scorecard-label  {color:var(--slate);}
+.scorecard.amazon .scorecard-label {color:var(--amber);}
+.scorecard.mendes .scorecard-label {color:var(--green);}
+.scorecard.avg .scorecard-label    {color:var(--purple);}
+.scorecard-value{font-size:34px;font-weight:700;color:var(--text);letter-spacing:-0.5px;line-height:1;margin-bottom:6px;}
+.scorecard-meta{font-size:12px;color:var(--text3);}
+
+/* GRIDS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr;}}
+
+/* PANELS */
+.panel{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;}
+.panel.full{margin-bottom:20px;}
+.panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.panel-title{font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);}
+.panel-body{padding:24px;}
+
+/* SEASON BADGE */
+.season-winter{color:#4a5e6d;font-weight:600;}
+.season-spring{color:#3a7d5c;font-weight:600;}
+.season-summer{color:#b87c2a;font-weight:600;}
+.season-fall  {color:#6b5b8c;font-weight:600;}
+
+/* TABLES */
+.data-table{width:100%;border-collapse:collapse;}
+.data-table th{text-align:left;padding:10px 16px;font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);}
+.data-table th.right,.data-table td.right{text-align:right;}
+.data-table td{padding:12px 16px;color:var(--text2);border-bottom:1px solid var(--border);font-size:13px;}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table tr:hover td{background:var(--surface2);}
+.data-table td.name-col{color:var(--text);font-weight:500;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.price-up{color:var(--terra);font-weight:600;}
+.price-down{color:var(--green);font-weight:600;}
+.price-same{color:var(--text3);}
+
+/* REV BAR */
+.rev-bar-wrap{display:flex;align-items:center;gap:8px;}
+.rev-bar-bg{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;min-width:60px;}
+.rev-bar-fill{height:100%;border-radius:2px;transition:width 0.5s ease;}
+
+/* LOG TABLE */
+.log-table{width:100%;border-collapse:collapse;}
+.log-table th{text-align:left;padding:10px 16px;font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);}
+.log-table td{padding:11px 16px;color:var(--text2);border-bottom:1px solid var(--border);font-size:12px;}
+.log-table tr:last-child td{border-bottom:none;}
+.type-amazon{background:var(--amber-bg);color:var(--amber);display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;}
+.type-mendes{background:var(--green-bg);color:var(--green);display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;}
+
+.error-banner{background:#fff5f5;border:1px solid #fcc;border-radius:10px;padding:14px 18px;font-size:13px;color:#c0392b;margin-bottom:16px;display:none;}
+.empty-state{padding:36px;text-align:center;color:var(--text3);font-size:13px;}
+.chart-wrap{position:relative;width:100%;}
+
+@media print{
+  .header,.nav-bar,.filter-bar,.hdr-btn{display:none!important;}
+  body{background:#fff;}
+  .content{padding:16px;}
+  .panel,.scorecard{box-shadow:none;border:1px solid #ddd;}
+  @page{margin:12mm;size:A4 landscape;}
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo-title">Cave Springs</div>
+    <div class="auth-logo-sub">Housekeeping Intelligence</div>
+    <div class="auth-divider"></div>
+    <div class="auth-desc">Sign in with your Cave Springs Google account to continue</div>
+    <button class="auth-btn" onclick="signIn()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/></svg>
+      Sign in with Google
+    </button>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading dashboard</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="header">
+    <div>
+      <div class="header-title">Cave Springs</div>
+      <div class="header-sub">Housekeeping Intelligence · Dunsmuir, CA</div>
+    </div>
+    <div class="header-right">
+      <div class="last-updated" id="last-updated-text"></div>
+      <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
+      <button class="hdr-btn" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <a class="nav-tab" href="index.html">Revenue</a>
+    <a class="nav-tab active" href="housekeeping.html">Housekeeping</a>
+  </div>
+
+  <div class="filter-bar" id="filter-bar">
+    <span class="filter-label">Period</span>
+  </div>
+
+  <div class="content">
+    <div class="error-banner" id="error-banner"></div>
+
+    <!-- SCORECARDS -->
+    <div class="scorecards">
+      <div class="scorecard total">
+        <div class="scorecard-label">Total Spend</div>
+        <div class="scorecard-value" id="sc-total">—</div>
+        <div class="scorecard-meta" id="sc-total-meta"></div>
+      </div>
+      <div class="scorecard amazon">
+        <div class="scorecard-label">Amazon</div>
+        <div class="scorecard-value" id="sc-amazon">—</div>
+        <div class="scorecard-meta" id="sc-amazon-meta"></div>
+      </div>
+      <div class="scorecard mendes">
+        <div class="scorecard-label">Mendes Supply</div>
+        <div class="scorecard-value" id="sc-mendes">—</div>
+        <div class="scorecard-meta" id="sc-mendes-meta"></div>
+      </div>
+      <div class="scorecard avg">
+        <div class="scorecard-label">Avg Monthly Spend</div>
+        <div class="scorecard-value" id="sc-avg">—</div>
+        <div class="scorecard-meta">based on loaded data</div>
+      </div>
+    </div>
+
+    <!-- SPEND BY MONTH + VENDOR SPLIT -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Spend by Month</span>
+          <span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">All data · seasonal shading</span>
+        </div>
+        <div class="panel-body">
+          <div class="chart-wrap" style="height:260px"><canvas id="chart-monthly"></canvas></div>
+          <div id="season-legend" style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Vendor Split</span></div>
+        <div class="panel-body">
+          <div style="display:flex;gap:28px;align-items:center;min-height:260px;">
+            <div style="width:180px;height:180px;flex-shrink:0;"><canvas id="chart-vendor"></canvas></div>
+            <div id="vendor-legend" style="flex:1;display:flex;flex-direction:column;gap:12px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOP ITEMS -->
+    <div class="panel full">
+      <div class="panel-header">
+        <span class="panel-title">Top Items by Spend</span>
+        <span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)" id="items-period-label"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Item</th>
+              <th class="right">Vendor</th>
+              <th class="right">Orders</th>
+              <th class="right">Total Qty</th>
+              <th class="right">Total Spend</th>
+              <th class="right">First Price</th>
+              <th class="right">Latest Price</th>
+              <th class="right">Price Change</th>
+              <th style="min-width:140px">Share</th>
+            </tr>
+          </thead>
+          <tbody id="items-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SEASONAL PATTERNS -->
+    <div class="panel full">
+      <div class="panel-header">
+        <span class="panel-title">Seasonal Spend Patterns</span>
+        <span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">All data</span>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap" style="height:220px;margin-bottom:24px"><canvas id="chart-seasonal"></canvas></div>
+        <div id="seasonal-breakdown" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;"></div>
+      </div>
+    </div>
+
+    <!-- IMPORT HISTORY -->
+    <div class="panel full">
+      <div class="panel-header" style="cursor:pointer;" onclick="toggleLog()">
+        <span class="panel-title">Import History</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:11px;color:var(--text3);" id="log-count"></span>
+          <span id="log-chevron" style="font-size:11px;color:var(--text3);transition:transform 0.2s;display:inline-block;">▼</span>
+        </div>
+      </div>
+      <div id="log-body" style="display:none;">
+        <table class="log-table">
+          <thead><tr><th>Date</th><th>Type</th><th class="right">Items Added</th></tr></thead>
+          <tbody id="log-tbody"><tr><td colspan="3" class="empty-state">No imports yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CLIENT_ID   = '`535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com`';
+const SHEET_ID    = '1KK11XN2h1rJz9HHadXCzBXkYpyBivUJUOThfIxNbu9I';
+const AMAZON_TAB  = 'AMAZON_CLEAN';
+const MENDES_TAB  = 'MENDES_CLEAN';
+const LOG_TAB     = 'IMPORT_LOG';
+const SCOPE       = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+const SEASONS     = {
+  winter:{months:[11,0,1],label:'Winter',color:'rgba(74,94,109,0.7)',light:'rgba(74,94,109,0.1)'},
+  spring:{months:[2,3,4], label:'Spring',color:'rgba(58,125,92,0.7)',light:'rgba(58,125,92,0.1)'},
+  summer:{months:[5,6,7], label:'Summer',color:'rgba(184,124,42,0.7)',light:'rgba(184,124,42,0.1)'},
+  fall:  {months:[8,9,10],label:'Fall',  color:'rgba(107,91,140,0.7)',light:'rgba(107,91,140,0.1)'}
+};
+
+let tokenClient,accessToken;
+let amazonData=[],mendesData=[],logData=[];
+let activeFilter='';
+let monthlyChart,vendorChart,seasonalChart;
+
+function getSeason(month){
+  for(const[k,s]of Object.entries(SEASONS)){if(s.months.includes(month))return k;}
+  return 'winter';
+}
+
+function loadGSI(){return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});}
+
+async function signIn(){
+  await loadGSI();
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPE,
+    callback:async(resp)=>{
+      if(resp.error){showErr('Auth failed: '+resp.error);return;}
+      accessToken=resp.access_token;showLoad();await loadAll();
+    }
+  });
+  tokenClient.requestAccessToken({prompt:'consent'});
+}
+
+function signOut(){
+  if(accessToken)google.accounts.oauth2.revoke(accessToken);
+  accessToken=null;amazonData=[];mendesData=[];logData=[];activeFilter='';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  [monthlyChart,vendorChart,seasonalChart].forEach(c=>{if(c)c.destroy();});
+  monthlyChart=vendorChart=seasonalChart=null;
+}
+
+async function fetchTab(tab){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  if(!r.ok)throw new Error(`Cannot load ${tab} (${r.status})`);
+  return(await r.json()).values||[];
+}
+
+function toRows(raw){
+  if(!raw||raw.length<2)return[];
+  const H=raw[0].map(h=>String(h).trim());
+  return raw.slice(1).map(row=>{const o={};H.forEach((h,i)=>o[h]=(row[i]||'').trim());return o;});
+}
+
+function pDate(s){if(!s)return null;const d=new Date(s);return isNaN(d)?null:d;}
+function pMoney(s){return parseFloat(String(s||0).replace(/[$,]/g,''))||0;}
+function fmt$(n){return '$'+Math.round(n).toLocaleString('en-US');}
+function fmtDec(n){return '$'+n.toFixed(2);}
+
+async function loadAll(){
+  try{
+    const[ar,mr]=await Promise.all([fetchTab(AMAZON_TAB),fetchTab(MENDES_TAB)]);
+    // AMAZON_CLEAN: OrderID|ASIN|Date|PO|Title|Brand|Qty|PPU|Net|Promo|Status|Vendor
+    amazonData=toRows(ar).map(r=>({
+      date:pDate(r['Date']),title:r['Title'],brand:r['Brand'],
+      qty:pMoney(r['Qty']),ppu:pMoney(r['PPU']),net:pMoney(r['Net']),
+      vendor:'Amazon',asin:r['ASIN'],orderId:r['OrderID']
+    })).filter(r=>r.date&&r.net>0);
+    // MENDES_CLEAN: InvoiceNum|Date|ProductCode|Description|UOM|QtyOrd|QtyShip|QtyBO|NetPrice|Extension|Notes|Vendor
+    mendesData=toRows(mr).map(r=>({
+      date:pDate(r['Date']),title:r['Description']||r['ProductCode'],
+      productCode:r['ProductCode'],qty:pMoney(r['QtyShip']),
+      ppu:pMoney(r['NetPrice']),net:pMoney(r['Extension']),
+      vendor:'Mendes',invoiceNum:r['InvoiceNum']
+    })).filter(r=>r.date&&r.net>0);
+    try{logData=toRows(await fetchTab(LOG_TAB));}catch(e){logData=[];}
+    buildFilters();renderAll();renderLog();
+    showDash();
+    document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }catch(e){showErr('Error loading data: '+e.message);showDash();}
+}
+
+function allData(){return[...amazonData,...mendesData];}
+
+function buildFilters(){
+  const months=new Set();
+  allData().forEach(r=>{if(r.date)months.add(r.date.toLocaleString('en-US',{month:'short',year:'numeric'}));});
+  const sorted=[...months].sort((a,b)=>new Date(a)-new Date(b));
+  const bar=document.getElementById('filter-bar');
+  bar.innerHTML='<span class="filter-label">Period</span>';
+  activeFilter=sorted.length>0?sorted[sorted.length-1]:'';
+  const byYear={};
+  sorted.forEach(m=>{const yr=new Date(m).getFullYear();if(!byYear[yr])byYear[yr]=[];byYear[yr].push(m);});
+  Object.keys(byYear).sort().forEach(yr=>{
+    const yl=document.createElement('span');yl.className='filter-year';yl.textContent=yr;bar.appendChild(yl);
+    byYear[yr].forEach(m=>bar.appendChild(mkBtn(m,m,m===activeFilter)));
+  });
+}
+
+function mkBtn(label,val,active){
+  const b=document.createElement('button');
+  b.className='filter-btn'+(active?' active':'');
+  b.textContent=label;
+  b.onclick=()=>{activeFilter=val;document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderAll();};
+  return b;
+}
+
+function filtered(){
+  return allData().filter(r=>r.date&&r.date.toLocaleString('en-US',{month:'short',year:'numeric'})===activeFilter);
+}
+
+function renderAll(){
+  const rows=filtered();
+  renderScores(rows);
+  renderMonthlyChart();
+  renderVendorChart(rows);
+  renderItems(rows);
+  renderSeasonal();
+}
+
+function renderScores(rows){
+  const total=rows.reduce((s,r)=>s+r.net,0);
+  const amazon=rows.filter(r=>r.vendor==='Amazon').reduce((s,r)=>s+r.net,0);
+  const mendes=rows.filter(r=>r.vendor==='Mendes').reduce((s,r)=>s+r.net,0);
+  const aCount=rows.filter(r=>r.vendor==='Amazon').length;
+  const mCount=rows.filter(r=>r.vendor==='Mendes').length;
+
+  // Avg monthly across all data
+  const byMonth={};
+  allData().forEach(r=>{const k=r.date.toLocaleString('en-US',{month:'short',year:'numeric'});byMonth[k]=(byMonth[k]||0)+r.net;});
+  const months=Object.keys(byMonth);
+  const avgMonthly=months.length>0?Object.values(byMonth).reduce((a,b)=>a+b,0)/months.length:0;
+
+  document.getElementById('sc-total').textContent=fmt$(total);
+  document.getElementById('sc-total-meta').textContent=rows.length+' items';
+  document.getElementById('sc-amazon').textContent=fmt$(amazon);
+  document.getElementById('sc-amazon-meta').textContent=aCount+' items';
+  document.getElementById('sc-mendes').textContent=fmt$(mendes);
+  document.getElementById('sc-mendes-meta').textContent=mCount+' line items';
+  document.getElementById('sc-avg').textContent=fmt$(avgMonthly);
+}
+
+function renderMonthlyChart(){
+  const byMonth={};
+  allData().forEach(r=>{
+    const k=r.date.toLocaleString('en-US',{month:'short',year:'numeric'});
+    if(!byMonth[k])byMonth[k]={amazon:0,mendes:0,date:r.date};
+    byMonth[k][r.vendor==='Amazon'?'amazon':'mendes']+=r.net;
+  });
+  const labels=Object.keys(byMonth).sort((a,b)=>new Date(a)-new Date(b));
+  const amazonVals=labels.map(l=>Math.round(byMonth[l].amazon));
+  const mendesVals=labels.map(l=>Math.round(byMonth[l].mendes));
+
+  // Season background colors
+  const bgColors=labels.map(l=>{
+    const mo=new Date(l).getMonth();
+    const s=getSeason(mo);
+    return SEASONS[s].light;
+  });
+
+  if(monthlyChart)monthlyChart.destroy();
+  monthlyChart=new Chart(document.getElementById('chart-monthly').getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Amazon',data:amazonVals,backgroundColor:'rgba(184,124,42,0.75)',borderColor:'rgba(184,124,42,1)',borderWidth:1,borderRadius:4},
+      {label:'Mendes',data:mendesVals,backgroundColor:'rgba(58,125,92,0.75)',borderColor:'rgba(58,125,92,1)',borderWidth:1,borderRadius:4}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      plugins:{
+        legend:{display:true,position:'top',labels:{color:'#4a5568',font:{family:'Raleway',size:11},boxWidth:10,padding:16}},
+        tooltip:{backgroundColor:'#fff',borderColor:'#e8e2da',borderWidth:1,titleColor:'#4a5568',bodyColor:'#1a2530',padding:12,callbacks:{label:c=>' '+c.dataset.label+': $'+c.raw.toLocaleString()}}
+      },
+      scales:{
+        x:{stacked:true,grid:{display:false},ticks:{color:'#8a9bb0',font:{family:'Raleway',size:11}}},
+        y:{stacked:true,grid:{color:'rgba(232,226,218,0.8)'},ticks:{color:'#8a9bb0',font:{family:'Raleway',size:11},callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},beginAtZero:true}
+      }
+    }
+  });
+
+  // Season legend
+  document.getElementById('season-legend').innerHTML=Object.entries(SEASONS).map(([k,s])=>`
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div style="width:12px;height:12px;border-radius:3px;background:${s.color};"></div>
+      <span style="font-size:11px;color:var(--text3);">${s.label}</span>
+    </div>`).join('');
+}
+
+function renderVendorChart(rows){
+  const amazon=rows.filter(r=>r.vendor==='Amazon').reduce((s,r)=>s+r.net,0);
+  const mendes=rows.filter(r=>r.vendor==='Mendes').reduce((s,r)=>s+r.net,0);
+  const total=amazon+mendes;
+  const colors=['rgba(184,124,42,0.85)','rgba(58,125,92,0.85)'];
+  if(vendorChart)vendorChart.destroy();
+  vendorChart=new Chart(document.getElementById('chart-vendor').getContext('2d'),{
+    type:'doughnut',
+    data:{labels:['Amazon','Mendes'],datasets:[{data:[amazon,mendes],backgroundColor:colors,borderColor:'#fff',borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e8e2da',borderWidth:1,padding:12,callbacks:{label:c=>' $'+Math.round(c.raw).toLocaleString()+' ('+(c.raw/total*100).toFixed(1)+'%)'}}}}}
+  );
+  document.getElementById('vendor-legend').innerHTML=['Amazon','Mendes'].map((l,i)=>{
+    const val=i===0?amazon:mendes;
+    const pct=total>0?(val/total*100).toFixed(1):'0.0';
+    return`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:10px;height:10px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></div>
+        <span style="font-size:14px;color:var(--text2);font-weight:500">${l}</span>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:16px;font-weight:700;color:var(--text)">${fmt$(val)}</div>
+        <div style="font-size:11px;color:var(--text3)">${pct}%</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderItems(rows){
+  document.getElementById('items-period-label').textContent=activeFilter||'';
+  // Group by title+vendor
+  const byItem={};
+  rows.forEach(r=>{
+    const key=(r.title||'').substring(0,60)+'|'+r.vendor;
+    if(!byItem[key])byItem[key]={title:r.title,vendor:r.vendor,orders:0,qty:0,spend:0,prices:[],dates:[]};
+    byItem[key].orders++;
+    byItem[key].qty+=r.qty;
+    byItem[key].spend+=r.net;
+    if(r.ppu>0){byItem[key].prices.push(r.ppu);byItem[key].dates.push(r.date);}
+  });
+
+  const totalSpend=rows.reduce((s,r)=>s+r.net,0);
+  const maxSpend=Math.max(...Object.values(byItem).map(i=>i.spend),1);
+  const sorted=Object.values(byItem).sort((a,b)=>b.spend-a.spend);
+
+  document.getElementById('items-tbody').innerHTML=sorted.map((item,idx)=>{
+    const pct=totalSpend>0?(item.spend/totalSpend)*100:0;
+    const bp=maxSpend>0?(item.spend/maxSpend)*100:0;
+    const vendorColor=item.vendor==='Amazon'?'var(--amber)':'var(--green)';
+
+    // Price change
+    let priceHtml='—';
+    if(item.prices.length>=2){
+      const first=item.prices[0];
+      const latest=item.prices[item.prices.length-1];
+      const diff=latest-first;
+      const diffPct=first>0?((diff/first)*100).toFixed(1):0;
+      const sign=diff>0?'+':'';
+      const cls=diff>0?'price-up':diff<0?'price-down':'price-same';
+      const arrow=diff>0?'↑':diff<0?'↓':'→';
+      priceHtml=`<span class="${cls}">${arrow} ${sign}${fmtDec(diff)} (${sign}${diffPct}%)</span>`;
+    }
+
+    return`<tr>
+      <td style="color:var(--text3);font-size:12px;padding-left:18px">${idx+1}</td>
+      <td class="name-col">${item.title}</td>
+      <td class="right"><span style="font-size:11px;font-weight:700;color:${vendorColor}">${item.vendor}</span></td>
+      <td class="right">${item.orders}</td>
+      <td class="right">${item.qty>0?Math.round(item.qty):'—'}</td>
+      <td class="right">${fmt$(item.spend)}</td>
+      <td class="right">${item.prices.length>0?fmtDec(item.prices[0]):'—'}</td>
+      <td class="right">${item.prices.length>0?fmtDec(item.prices[item.prices.length-1]):'—'}</td>
+      <td class="right">${priceHtml}</td>
+      <td><div class="rev-bar-wrap"><div class="rev-bar-bg"><div class="rev-bar-fill" style="width:${bp}%;background:var(--slate)"></div></div><span style="font-size:11px;color:var(--text3);min-width:36px;text-align:right">${pct.toFixed(1)}%</span></div></td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="10" class="empty-state">No items for selected period</td></tr>';
+}
+
+function renderSeasonal(){
+  const seasonTotals={winter:{amazon:0,mendes:0},spring:{amazon:0,mendes:0},summer:{amazon:0,mendes:0},fall:{amazon:0,mendes:0}};
+  allData().forEach(r=>{
+    const s=getSeason(r.date.getMonth());
+    seasonTotals[s][r.vendor==='Amazon'?'amazon':'mendes']+=r.net;
+  });
+
+  const labels=['Winter','Spring','Summer','Fall'];
+  const keys=['winter','spring','summer','fall'];
+  const amazonVals=keys.map(k=>Math.round(seasonTotals[k].amazon));
+  const mendesVals=keys.map(k=>Math.round(seasonTotals[k].mendes));
+
+  if(seasonalChart)seasonalChart.destroy();
+  seasonalChart=new Chart(document.getElementById('chart-seasonal').getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Amazon',data:amazonVals,backgroundColor:'rgba(184,124,42,0.75)',borderColor:'rgba(184,124,42,1)',borderWidth:1,borderRadius:4},
+      {label:'Mendes',data:mendesVals,backgroundColor:'rgba(58,125,92,0.75)',borderColor:'rgba(58,125,92,1)',borderWidth:1,borderRadius:4}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      plugins:{legend:{display:true,position:'top',labels:{color:'#4a5568',font:{family:'Raleway',size:11},boxWidth:10,padding:16}},tooltip:{backgroundColor:'#fff',borderColor:'#e8e2da',borderWidth:1,padding:12,callbacks:{label:c=>' '+c.dataset.label+': $'+c.raw.toLocaleString()}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#8a9bb0',font:{family:'Raleway',size:12,weight:'600'}}},y:{stacked:true,grid:{color:'rgba(232,226,218,0.8)'},ticks:{color:'#8a9bb0',font:{family:'Raleway',size:11},callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},beginAtZero:true}}
+    }
+  });
+
+  // Season cards
+  document.getElementById('seasonal-breakdown').innerHTML=keys.map((k,i)=>{
+    const s=SEASONS[k];
+    const total=seasonTotals[k].amazon+seasonTotals[k].mendes;
+    const months=s.months.map(m=>['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]).join(', ');
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:${s.color.replace('0.7','1')};margin-bottom:6px;">${s.label}</div>
+      <div style="font-size:24px;font-weight:700;color:var(--text);margin-bottom:4px;">${fmt$(total)}</div>
+      <div style="font-size:11px;color:var(--text3);">${months}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;">Amazon ${fmt$(seasonTotals[k].amazon)} · Mendes ${fmt$(seasonTotals[k].mendes)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderLog(){
+  const countEl=document.getElementById('log-count');
+  if(!logData||!logData.length){
+    document.getElementById('log-tbody').innerHTML='<tr><td colspan="3" class="empty-state">No imports yet</td></tr>';
+    if(countEl)countEl.textContent='';
+    return;
+  }
+  const rows=[...logData].reverse();
+  if(countEl)countEl.textContent=rows.length+' import'+(rows.length!==1?'s':'');
+  document.getElementById('log-tbody').innerHTML=rows.map(r=>{
+    const type=r['Type']||'';
+    const cls=type==='AMAZON'?'type-amazon':'type-mendes';
+    return`<tr><td>${r['ImportDate']||''}</td><td><span class="${cls}">${type}</span></td><td class="right">${r['RowsAdded']||'—'}</td></tr>`;
+  }).join('');
+}
+
+function toggleLog(){
+  const body=document.getElementById('log-body');
+  const chevron=document.getElementById('log-chevron');
+  const hidden=body.style.display==='none';
+  body.style.display=hidden?'block':'none';
+  chevron.style.transform=hidden?'rotate(180deg)':'rotate(0deg)';
+}
+
+function showErr(m){const e=document.getElementById('error-banner');e.textContent=m;e.style.display='block';}
+function showLoad(){document.getElementById('auth-screen').style.display='none';document.getElementById('loading-screen').style.display='flex';}
+function showDash(){document.getElementById('loading-screen').style.display='none';document.getElementById('dashboard').style.display='block';}
+</script>
+</body>
+</html>
