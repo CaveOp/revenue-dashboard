@@ -151,6 +151,9 @@ tr.unit-row.hidden{display:none;}
 .error-banner{background:#fff5f5;border:1px solid #fcc;border-radius:10px;padding:14px 18px;font-size:13px;color:#c0392b;margin-bottom:16px;display:none;}
 .empty-state{padding:36px;text-align:center;color:var(--text3);font-size:13px;}
 .chart-wrap{position:relative;width:100%;}
+.snap-delete-btn{font-size:10px;font-weight:700;letter-spacing:0.06em;color:var(--terra);background:none;border:1px solid rgba(196,87,42,0.25);border-radius:4px;padding:3px 8px;cursor:pointer;font-family:var(--sans);white-space:nowrap;}
+.snap-delete-btn:hover{background:var(--terra-bg);}
+.snap-deleting{opacity:0.4;pointer-events:none;}
 </style>
 </head>
 <body>
@@ -260,11 +263,14 @@ tr.unit-row.hidden{display:none;}
     <div class="panel full" id="snapshots-panel" style="display:none">
       <div class="panel-header" style="cursor:pointer;" onclick="toggleSnapshots()">
         <span class="panel-title">Import Snapshots</span>
-        <div style="display:flex;align-items:center;gap:12px;"><span style="font-size:11px;color:var(--text3);">Week-over-week changes · open in Sheets for Claude Chrome analysis</span><span id="snap-chevron" style="font-size:11px;color:var(--text3);transition:transform 0.2s;display:inline-block;">▼</span></div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:11px;color:var(--text3);">Last Import Comparisons</span>
+          <span id="snap-chevron" style="font-size:11px;color:var(--text3);transition:transform 0.2s;display:inline-block;">▼</span>
+        </div>
       </div>
       <div id="snap-body" style="display:none;overflow-x:auto;">
         <table class="log-table">
-          <thead><tr><th>Import Date</th><th>Scope</th><th>Period</th><th class="right">Revenue</th><th class="right">vs Prev</th><th class="right">ADR</th><th class="right">Occupancy</th><th class="right">Reservations</th><th class="right">LOS</th><th class="right">Modern</th><th class="right">Tiny Homes</th><th class="right">Airstreams</th><th class="right">Hotel</th><th class="right">Direct</th><th class="right">OTA</th><th class="right">Phone</th></tr></thead>
+          <thead><tr><th style="width:32px;"></th><th>Import Date</th><th>Scope</th><th>Period</th><th class="right">Revenue</th><th class="right">vs Prev</th><th class="right">ADR</th><th class="right">Occupancy</th><th class="right">Reservations</th><th class="right">LOS</th><th class="right">Modern</th><th class="right">Tiny Homes</th><th class="right">Airstreams</th><th class="right">Hotel</th><th class="right">Direct</th><th class="right">OTA</th><th class="right">Phone</th></tr></thead>
           <tbody id="snap-tbody"></tbody>
         </table>
       </div>
@@ -284,7 +290,7 @@ tr.unit-row.hidden{display:none;}
 const CLIENT_ID='535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
 const SHEET_ID='18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
 const STAYS_TAB='STAYS_CLEAN',PACE_TAB='PACE_CLEAN',LOG_TAB='IMPORT_LOG',IMPORT_TAB='STAYS_IMPORT',DISCOUNTS_TAB='DISCOUNTS_CLEAN',SNAPSHOTS_TAB='SNAPSHOTS';
-const TOTAL_DOORS=56,SCOPE='https://www.googleapis.com/auth/spreadsheets.readonly';
+const TOTAL_DOORS=56,SCOPE='https://www.googleapis.com/auth/spreadsheets';
 const MONTH_ORDER=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CATEGORIES={'Modern Cabins':['Lookout Cabin - with Private Hot Tub','Modern Cabin (Alder) with Private Hot Tub','Modern Cabin (Aspen) with Private Hot Tub','Modern Cabin (Banyan) with Private Hot Tub','Modern Cabin (Blue Spruce) with Private Hot Tub','Modern Cabin (Elm)','Modern Cabin (Hawthorne)','Modern Cabin (Maple) with Private Hot Tub','Modern Cabin (Oak) with Private Hot Tub','Modern Cabin (Olive)','Modern Cabin (Pine)','Modern Cabin (REDWOOD) with Private Hot Tub','Modern Cabin (Rosewood) with Private Hot Tub','Modern Cabin (Sequoia)','Modern Cabin (Sugar Maple)','Modern Cabin (Walnut)'],'Rustic Cabins':['Cabin 02','Cabin 03','Cabin 04','Cabin 05','Cabin 06','Cabin 07','Cabin 08','Cabin 09','Cabin 10','Cabin 11','Cabin 12','Cabin 15','Cabin 16','Cabin 17'],'Tiny Homes':['Tiny Home (Beech) with Private Hot Tub','Tiny Home (Birch)','Tiny Home (Cedar)','Tiny Home (Dogwood)','Tiny Home (Honey Locust)','Tiny Home (Koa)','Tiny Home (Sage)'],'Airstreams':['Airstream (Buckeye)','Airstream (Cherry)','Airstream (Chestnut)','Airstream (Cottonwood)','Airstream (Eucalyptus)','Airstream (Magnolia)','Airstream (Redbud)','Airstream (White Oak)','Airstream (Willow)'],'Hotel Rooms':['01- King Bed','02- King Bed','03- King Bed','04- King Bed','05- King Bed','06- Double Queen Beds','07- Double Queen Beds','08- Double Queen Beds','09- Double Queen Beds','10- Double Queen Beds']};
 const CAT_COLORS={'Modern Cabins':'#4a5e6d','Rustic Cabins':'#3a7d5c','Tiny Homes':'#b87c2a','Airstreams':'#6b5b8c','Hotel Rooms':'#c4572a'};
@@ -345,6 +351,18 @@ function addCustomUnit(){const input=document.getElementById('custom-unit-input'
 function removeCustomUnit(name){saveCustom(getCustom().filter(u=>u!==name));renderCustomList();updateSettingsCount();renderAll();}
 function renderCustomList(){document.getElementById('custom-unit-list').innerHTML=getCustom().map(u=>`<div class="settings-custom-item"><span>${u}</span><button class="settings-custom-remove" onclick="removeCustomUnit('${u.replace(/'/g,"\\'")}')">&#215;</button></div>`).join('');}
 async function fetchTab(tab){const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});if(!r.ok)throw new Error(`Cannot load ${tab} (${r.status})`);return(await r.json()).values||[];}
+async function deleteSheetRow(rowIndex){
+  // rowIndex is 0-based from the sheet data array (so sheet row = rowIndex+1, but we need the actual sheet row number)
+  // We need the sheetId first
+  const metaResp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  const meta=await metaResp.json();
+  const snapSheet=meta.sheets.find(s=>s.properties.title===SNAPSHOTS_TAB);
+  if(!snapSheet)throw new Error('SNAPSHOTS tab not found');
+  const sheetId=snapSheet.properties.sheetId;
+  const body={requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:rowIndex,endIndex:rowIndex+1}}}]};
+  const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,{method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Delete failed');}
+}
 function toRows(raw){if(!raw||raw.length<2)return[];const H=raw[0].map(h=>String(h).trim());return raw.slice(1).map(row=>{const o={};H.forEach((h,i)=>o[h]=(row[i]||'').trim());return o;});}
 function pDate(s){if(!s)return null;const d=new Date(s);return isNaN(d)?null:d;}
 function pMoney(s){return parseFloat(String(s||0).replace(/[$,]/g,''))||0;}
@@ -518,9 +536,11 @@ function renderSnapshots(){
   const panel=document.getElementById('snapshots-panel');
   if(!snapshotData||!snapshotData.length){panel.style.display='none';return;}
   panel.style.display='block';
-  const rows=[...snapshotData].reverse().slice(0,20);
+  // Show all snapshots in reverse order (newest first), store original index for deletion
+  const rawTab=snapshotData; // index 0 = first data row (sheet row 2)
+  const rows=[...rawTab].map((r,i)=>({r,origIdx:i})).reverse().slice(0,20);
   const prevByScopeKey={};
-  document.getElementById('snap-tbody').innerHTML=rows.map(r=>{
+  document.getElementById('snap-tbody').innerHTML=rows.map(({r,origIdx})=>{
     const scope=r['Scope']||'',rev=parseFloat((r['Revenue']||'0').replace(/[$,]/g,''))||0;
     const adr=parseFloat((r['ADR']||'0').replace(/[$,]/g,''))||0,occ=parseFloat((r['Occupancy']||'0').replace(/%/g,''))||0;
     const res=parseInt(r['Reservations']||'0')||0,los=parseFloat(r['LOS']||'0')||0;
@@ -534,10 +554,28 @@ function renderSnapshots(){
     let vsHtml='—';
     if(prevByScopeKey[scope]!==undefined){const prevRev=prevByScopeKey[scope],diff=rev-prevRev,pct=prevRev>0?((diff/prevRev)*100).toFixed(1):0,sign=diff>=0?'+':'',cls=diff>0?'pace-positive':diff<0?'pace-negative':'pace-neutral',arrow=diff>0?'↑':diff<0?'↓':'→';vsHtml=`<span class="${cls}">${arrow} ${sign}$${Math.abs(Math.round(diff)).toLocaleString()} (${sign}${pct}%)</span>`;}
     prevByScopeKey[scope]=rev;
-    const badge=scope.startsWith('YTD')?`<span style="font-size:10px;font-weight:700;background:var(--slate-bg);color:var(--slate);padding:2px 6px;border-radius:4px;">${scope}</span>`:`<span style="font-size:10px;font-weight:700;background:var(--amber-bg);color:var(--amber);padding:2px 6px;border-radius:4px;">${scope}</span>`;
+    // Badge: slate for YTD/Range-style scopes, amber for month scopes — always show scope text as-is
+    const isRange=scope.startsWith('YTD')||scope.startsWith('Range')||(!scope.startsWith('Month')&&!/^[A-Z][a-z]{2}\s\d{4}$/.test(scope));
+    const badge=`<span style="font-size:10px;font-weight:700;background:${isRange?'var(--slate-bg)':'var(--amber-bg)'};color:${isRange?'var(--slate)':'var(--amber)'};padding:2px 6px;border-radius:4px;">${scope}</span>`;
     const fmtK=n=>n>0?'$'+Math.round(n).toLocaleString():'—';
-    return`<tr><td style="font-size:11px;">${r['SnapshotDate']||''}</td><td>${badge}</td><td style="font-size:11px;color:var(--text3);">${r['Period']||''}</td><td class="right" style="font-weight:600;">${fmtK(rev)}</td><td class="right">${vsHtml}</td><td class="right">${fmtK(adr)}</td><td class="right">${occ.toFixed(1)}%</td><td class="right">${res}</td><td class="right">${los.toFixed(1)}</td><td class="right" style="color:var(--slate)">${fmtK(modern)}</td><td class="right" style="color:var(--amber)">${fmtK(tiny)}</td><td class="right" style="color:var(--purple)">${fmtK(airstream)}</td><td class="right" style="color:var(--terra)">${fmtK(hotel)}</td><td class="right" style="color:var(--green)">${fmtK(direct)}</td><td class="right">${fmtK(ota)}</td><td class="right">${fmtK(phone)}</td></tr>`;
+    // origIdx is 0-based in snapshotData array; sheet row = origIdx + 2 (header is row 1)
+    const sheetRowIdx=origIdx+1; // +1 for header row = actual 0-based sheet row index for the API
+    return`<tr id="snap-row-${origIdx}"><td style="padding:8px 12px;"><button class="snap-delete-btn" onclick="deleteSnapshot(${sheetRowIdx},'snap-row-${origIdx}')" title="Delete this snapshot">✕</button></td><td style="font-size:11px;">${r['SnapshotDate']||''}</td><td>${badge}</td><td style="font-size:11px;color:var(--text3);">${r['Period']||''}</td><td class="right" style="font-weight:600;">${fmtK(rev)}</td><td class="right">${vsHtml}</td><td class="right">${fmtK(adr)}</td><td class="right">${occ.toFixed(1)}%</td><td class="right">${res}</td><td class="right">${los.toFixed(1)}</td><td class="right" style="color:var(--slate)">${fmtK(modern)}</td><td class="right" style="color:var(--amber)">${fmtK(tiny)}</td><td class="right" style="color:var(--purple)">${fmtK(airstream)}</td><td class="right" style="color:var(--terra)">${fmtK(hotel)}</td><td class="right" style="color:var(--green)">${fmtK(direct)}</td><td class="right">${fmtK(ota)}</td><td class="right">${fmtK(phone)}</td></tr>`;
   }).join('');
+}
+async function deleteSnapshot(sheetRowIdx,trId){
+  if(!confirm('Delete this snapshot? This cannot be undone.'))return;
+  const tr=document.getElementById(trId);
+  if(tr)tr.classList.add('snap-deleting');
+  try{
+    await deleteSheetRow(sheetRowIdx);
+    // Reload snapshot data from sheet and re-render
+    snapshotData=toRows(await fetchTab(SNAPSHOTS_TAB));
+    renderSnapshots();
+  }catch(e){
+    if(tr)tr.classList.remove('snap-deleting');
+    alert('Could not delete snapshot: '+e.message);
+  }
 }
 function toggleSnapshots(){const body=document.getElementById('snap-body'),chevron=document.getElementById('snap-chevron'),hidden=body.style.display==='none';body.style.display=hidden?'block':'none';chevron.style.transform=hidden?'rotate(180deg)':'rotate(0deg)';}
 function renderLog(){
