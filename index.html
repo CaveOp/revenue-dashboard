@@ -351,6 +351,15 @@ function addCustomUnit(){const input=document.getElementById('custom-unit-input'
 function removeCustomUnit(name){saveCustom(getCustom().filter(u=>u!==name));renderCustomList();updateSettingsCount();renderAll();}
 function renderCustomList(){document.getElementById('custom-unit-list').innerHTML=getCustom().map(u=>`<div class="settings-custom-item"><span>${u}</span><button class="settings-custom-remove" onclick="removeCustomUnit('${u.replace(/'/g,"\\'")}')">&#215;</button></div>`).join('');}
 async function fetchTab(tab){const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});if(!r.ok)throw new Error(`Cannot load ${tab} (${r.status})`);return(await r.json()).values||[];}
+async function fetchAllTabs(tabs){
+  const params=tabs.map(t=>'ranges='+encodeURIComponent(t)).join('&');
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchGet?majorDimension=ROWS&${params}`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  if(!r.ok)throw new Error(`Batch fetch failed (${r.status})`);
+  const json=await r.json();
+  const out={};
+  (json.valueRanges||[]).forEach((vr,i)=>{out[tabs[i]]=vr.values||[];});
+  return out;
+}
 async function deleteSheetRow(rowIndex){
   // rowIndex is 0-based from the sheet data array (so sheet row = rowIndex+1, but we need the actual sheet row number)
   // We need the sheetId first
@@ -370,13 +379,21 @@ function pBool(s){const v=String(s).trim().toLowerCase();return v==='true'||v===
 function fmt$(n){return '$'+Math.round(n).toLocaleString('en-US');}
 async function loadAll(){
   try{
-    const[sr,pr]=await Promise.all([fetchTab(STAYS_TAB),fetchTab(PACE_TAB)]);
-    staysData=toRows(sr).map(r=>{const bo=pBool(r['BookedOnline']),dc=pBool(r['DirectConnect']);return{res:r['Res#']||r['Res'],nightDate:pDate(r['NightDate']),accommodation:r['Accommodation'],nightRevenue:pMoney(r['NightRevenue']),bookedOnline:bo,directConnect:dc,reservedOn:pDate(r['ReservedOn']),channel:getChannel(bo,dc),nightCount:parseInt(r['NightCount'])||1};}).filter(r=>r.nightDate);
-    paceData=toRows(pr).map(r=>({yearGroup:r['YearGroup'],nightDate:pDate(r['NightDate']),rate:pMoney(r['Rate']),unit:r['Unit']})).filter(r=>r.nightDate&&r.yearGroup);
-    try{logData=toRows(await fetchTab(LOG_TAB));}catch(e){logData=[];}
-    try{discountsData=toRows(await fetchTab(DISCOUNTS_TAB)).map(r=>({res:r['Res#']||r['Res'],date:pDate(r['Date']),details:(r['Details']||'').replace(/^Package:\s*/i,'').trim(),amount:pMoney(r['Amount'])})).filter(r=>r.date&&r.amount>0&&r.details);}catch(e){discountsData=[];}
-    try{snapshotData=toRows(await fetchTab(SNAPSHOTS_TAB));}catch(e){snapshotData=[];}
-    buildFilters();renderAll();renderLog();renderSnapshots();renderOutstanding();
+    const tabs=await fetchAllTabs([STAYS_TAB,PACE_TAB,LOG_TAB,DISCOUNTS_TAB,SNAPSHOTS_TAB,IMPORT_TAB]);
+    staysData=toRows(tabs[STAYS_TAB]).map(r=>{const bo=pBool(r['BookedOnline']),dc=pBool(r['DirectConnect']);return{res:r['Res#']||r['Res'],nightDate:pDate(r['NightDate']),accommodation:r['Accommodation'],nightRevenue:pMoney(r['NightRevenue']),bookedOnline:bo,directConnect:dc,reservedOn:pDate(r['ReservedOn']),channel:getChannel(bo,dc),nightCount:parseInt(r['NightCount'])||1};}).filter(r=>r.nightDate);
+    paceData=toRows(tabs[PACE_TAB]).map(r=>({yearGroup:r['YearGroup'],nightDate:pDate(r['NightDate']),rate:pMoney(r['Rate']),unit:r['Unit']})).filter(r=>r.nightDate&&r.yearGroup);
+    try{logData=toRows(tabs[LOG_TAB]);}catch(e){logData=[];}
+    try{discountsData=toRows(tabs[DISCOUNTS_TAB]).map(r=>({res:r['Res#']||r['Res'],date:pDate(r['Date']),details:(r['Details']||'').replace(/^Package:\s*/i,'').trim(),amount:pMoney(r['Amount'])})).filter(r=>r.date&&r.amount>0&&r.details);}catch(e){discountsData=[];}
+    try{snapshotData=toRows(tabs[SNAPSHOTS_TAB]);}catch(e){snapshotData=[];}
+    buildFilters();renderAll();renderLog();renderSnapshots();
+    // Process partials from already-loaded STAYS_IMPORT data
+    try{
+      const rows=toRows(tabs[IMPORT_TAB]);
+      const partials=rows.filter(r=>{const a=pMoney(r['amount']||r['Amount']),p=pMoney(r['Paid']||r['paid']);return a>0&&p>0&&p<a;}).map(r=>({res:r['Res#']||r['Res'],unit:r['Accommodation'],amount:pMoney(r['amount']||r['Amount']),paid:pMoney(r['Paid']||r['paid'])})).sort((a,b)=>(b.amount-b.paid)-(a.amount-a.paid));
+      const alertEl=document.getElementById('partial-alert');
+      if(partials.length>0){alertEl.style.display='flex';document.getElementById('partial-alert-text').textContent=partials.length+' reservation'+(partials.length>1?'s':'')+' with partial payments';document.getElementById('partial-tbody').innerHTML=partials.map(r=>`<tr><td style="padding-left:18px">${r.res}</td><td class="name-col">${r.unit}</td><td class="right">${fmt$(r.amount)}</td><td class="right">${fmt$(r.paid)}</td><td class="right" style="color:var(--terra);font-weight:600;padding-right:18px">${fmt$(r.amount-r.paid)}</td></tr>`).join('');}
+      else alertEl.style.display='none';
+    }catch(e){document.getElementById('partial-alert').style.display='none';}
     showDash();
     document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }catch(e){showErr('Error loading data: '+e.message);showDash();}
@@ -511,15 +528,6 @@ function renderDiscounts(){
   const byLabel={};disc.forEach(r=>{if(!byLabel[r.details])byLabel[r.details]={amount:0,res:new Set()};byLabel[r.details].amount+=r.amount;byLabel[r.details].res.add(r.res);});
   const sorted=Object.entries(byLabel).sort((a,b)=>b[1].amount-a[1].amount),maxAmt=sorted.length>0?sorted[0][1].amount:1;
   document.getElementById('disc-tbody').innerHTML=sorted.map(([label,d])=>{const avg=d.res.size>0?d.amount/d.res.size:0,barPct=maxAmt>0?(d.amount/maxAmt)*100:0;return`<tr><td style="color:var(--text);font-weight:500">${label}</td><td class="right">${fmt$(d.amount)}</td><td><div style="display:flex;align-items:center;gap:8px;padding:0 8px;"><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${barPct}%;background:var(--terra);border-radius:2px;"></div></div></div></td><td class="right">${d.res.size}</td><td class="right">${fmt$(avg)}</td></tr>`;}).join('');
-}
-async function renderOutstanding(){
-  try{
-    const raw=await fetchTab(IMPORT_TAB),rows=toRows(raw);
-    const partials=rows.filter(r=>{const a=pMoney(r['amount']||r['Amount']),p=pMoney(r['Paid']||r['paid']);return a>0&&p>0&&p<a;}).map(r=>({res:r['Res#']||r['Res'],unit:r['Accommodation'],amount:pMoney(r['amount']||r['Amount']),paid:pMoney(r['Paid']||r['paid'])})).sort((a,b)=>(b.amount-b.paid)-(a.amount-a.paid));
-    const alert=document.getElementById('partial-alert');
-    if(partials.length>0){alert.style.display='flex';document.getElementById('partial-alert-text').textContent=partials.length+' reservation'+(partials.length>1?'s':'')+' with partial payments';document.getElementById('partial-tbody').innerHTML=partials.map(r=>`<tr><td style="padding-left:18px">${r.res}</td><td class="name-col">${r.unit}</td><td class="right">${fmt$(r.amount)}</td><td class="right">${fmt$(r.paid)}</td><td class="right" style="color:var(--terra);font-weight:600;padding-right:18px">${fmt$(r.amount-r.paid)}</td></tr>`).join('');}
-    else alert.style.display='none';
-  }catch(e){document.getElementById('partial-alert').style.display='none';}
 }
 function togglePartials(){partialsVisible=!partialsVisible;document.getElementById('partial-detail').style.display=partialsVisible?'block':'none';document.querySelector('.partial-toggle').textContent=partialsVisible?'Hide details':'View details';}
 function renderPace(){
