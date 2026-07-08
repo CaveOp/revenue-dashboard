@@ -237,6 +237,18 @@ tr.unit-row.hidden{display:none;}
         </div>
       </div>
     </div>
+    <div class="panel full" id="retail-panel" style="display:none">
+      <div class="panel-header"><span class="panel-title">Retail &amp; Resort Fees</span><span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)" id="retail-period-label"></span></div>
+      <div class="panel-body">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;">
+          <div style="background:var(--amber-bg);border:1px solid rgba(184,124,42,0.2);border-radius:12px;padding:18px 20px;"><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--amber);margin-bottom:8px;">Resort Fee Revenue</div><div style="font-size:28px;font-weight:700;color:var(--text);" id="retail-resort-total">—</div></div>
+          <div style="background:var(--purple-bg);border:1px solid rgba(107,91,140,0.2);border-radius:12px;padding:18px 20px;"><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">Retail / Other Revenue</div><div style="font-size:28px;font-weight:700;color:var(--text);" id="retail-other-total">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;"><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Combined Total</div><div style="font-size:28px;font-weight:700;color:var(--text);" id="retail-combined-total">—</div></div>
+        </div>
+        <div class="chart-wrap" style="height:220px;margin-bottom:20px"><canvas id="chart-retail"></canvas></div>
+        <table class="data-table"><thead><tr><th>Month</th><th class="right">Resort Fee</th><th class="right">Retail / Other</th><th class="right">Total</th><th class="right">Line Items</th></tr></thead><tbody id="retail-tbody"></tbody></table>
+      </div>
+    </div>
     <div class="panel full" id="discounts-panel" style="display:none">
       <div class="panel-header"><span class="panel-title">Discounts &amp; Packages</span><span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)" id="disc-period-label"></span></div>
       <div class="panel-body">
@@ -289,7 +301,7 @@ tr.unit-row.hidden{display:none;}
 <script>
 const CLIENT_ID='535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
 const SHEET_ID='18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
-const STAYS_TAB='STAYS_CLEAN',PACE_TAB='PACE_CLEAN',LOG_TAB='IMPORT_LOG',IMPORT_TAB='STAYS_IMPORT',DISCOUNTS_TAB='DISCOUNTS_CLEAN',SNAPSHOTS_TAB='SNAPSHOTS';
+const STAYS_TAB='STAYS_CLEAN',PACE_TAB='PACE_CLEAN',LOG_TAB='IMPORT_LOG',IMPORT_TAB='STAYS_IMPORT',DISCOUNTS_TAB='DISCOUNTS_CLEAN',SNAPSHOTS_TAB='SNAPSHOTS',RETAIL_TAB='RETAIL_MONTHLY';
 const TOTAL_DOORS=56,SCOPE='https://www.googleapis.com/auth/spreadsheets';
 const MONTH_ORDER=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CATEGORIES={'Modern Cabins':['Lookout Cabin - with Private Hot Tub','Modern Cabin (Alder) with Private Hot Tub','Modern Cabin (Aspen) with Private Hot Tub','Modern Cabin (Banyan) with Private Hot Tub','Modern Cabin (Blue Spruce) with Private Hot Tub','Modern Cabin (Elm)','Modern Cabin (Hawthorne)','Modern Cabin (Maple) with Private Hot Tub','Modern Cabin (Oak) with Private Hot Tub','Modern Cabin (Olive)','Modern Cabin (Pine)','Modern Cabin (REDWOOD) with Private Hot Tub','Modern Cabin (Rosewood) with Private Hot Tub','Modern Cabin (Sequoia)','Modern Cabin (Sugar Maple)','Modern Cabin (Walnut)'],'Rustic Cabins':['Cabin 02','Cabin 03','Cabin 04','Cabin 05','Cabin 06','Cabin 07','Cabin 08','Cabin 09','Cabin 10','Cabin 11','Cabin 12','Cabin 15','Cabin 16','Cabin 17'],'Tiny Homes':['Tiny Home (Beech) with Private Hot Tub','Tiny Home (Birch)','Tiny Home (Cedar)','Tiny Home (Dogwood)','Tiny Home (Honey Locust)','Tiny Home (Koa)','Tiny Home (Sage)'],'Airstreams':['Airstream (Buckeye)','Airstream (Cherry)','Airstream (Chestnut)','Airstream (Cottonwood)','Airstream (Eucalyptus)','Airstream (Magnolia)','Airstream (Redbud)','Airstream (White Oak)','Airstream (Willow)'],'Hotel Rooms':['01- King Bed','02- King Bed','03- King Bed','04- King Bed','05- King Bed','06- Double Queen Beds','07- Double Queen Beds','08- Double Queen Beds','09- Double Queen Beds','10- Double Queen Beds']};
@@ -297,9 +309,9 @@ const CAT_COLORS={'Modern Cabins':'#4a5e6d','Rustic Cabins':'#3a7d5c','Tiny Home
 function getCat(n){const nl=(n||'').toLowerCase();for(const[cat,units]of Object.entries(CATEGORIES)){if(units.some(u=>u.toLowerCase()===nl))return cat;}return 'Other';}
 function getChannel(bo,dc){return bo?'Direct':dc?'OTA':'Phone/Manual';}
 let tokenClient,accessToken;
-let staysData=[],paceData=[],logData=[],discountsData=[],snapshotData=[];
+let staysData=[],paceData=[],logData=[],discountsData=[],snapshotData=[],retailMonthlyData=[];
 let activeFilter='';
-let revChart,chChart,paceChart,bwChart,catChart;
+let revChart,chChart,paceChart,bwChart,catChart,retailChart;
 let partialsVisible=false;
 function loadGSI(){return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});}
 async function signIn(){
@@ -312,11 +324,11 @@ async function signIn(){
 }
 function signOut(){
   if(accessToken)google.accounts.oauth2.revoke(accessToken);
-  accessToken=null;staysData=[];paceData=[];logData=[];discountsData=[];snapshotData=[];activeFilter='';
+  accessToken=null;staysData=[];paceData=[];logData=[];discountsData=[];snapshotData=[];retailMonthlyData=[];activeFilter='';
   document.getElementById('dashboard').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
-  [revChart,chChart,paceChart,bwChart,catChart].forEach(c=>{if(c)c.destroy();});
-  revChart=chChart=paceChart=bwChart=catChart=null;
+  [revChart,chChart,paceChart,bwChart,catChart,retailChart].forEach(c=>{if(c)c.destroy();});
+  revChart=chChart=paceChart=bwChart=catChart=retailChart=null;
 }
 function storageKey(){return 'cs_blocked_'+(activeFilter||'all');}
 function customKey(){return 'cs_custom_'+(activeFilter||'all');}
@@ -385,6 +397,7 @@ async function loadAll(){
     try{logData=toRows(tabs[LOG_TAB]);}catch(e){logData=[];}
     try{discountsData=toRows(tabs[DISCOUNTS_TAB]).map(r=>({res:r['Res#']||r['Res'],date:pDate(r['Date']),details:(r['Details']||'').replace(/^Package:\s*/i,'').trim(),amount:pMoney(r['Amount'])})).filter(r=>r.date&&r.amount>0&&r.details);}catch(e){discountsData=[];}
     try{snapshotData=toRows(tabs[SNAPSHOTS_TAB]);}catch(e){snapshotData=[];}
+    try{retailMonthlyData=toRows(await fetchTab(RETAIL_TAB)).map(r=>({month:r['Month'],resortFee:pMoney(r['ResortFeeRevenue']),other:pMoney(r['RetailOtherRevenue']),total:pMoney(r['TotalRevenue']),lineItems:parseInt(r['LineItems'])||0})).filter(r=>r.month);}catch(e){retailMonthlyData=[];}
     buildFilters();renderAll();renderLog();renderSnapshots();
     // Process partials from already-loaded STAYS_IMPORT data
     try{
@@ -413,7 +426,7 @@ function yoyBadge(curr,prior,fmt){if(!prior)return '';const diff=curr-prior,pct=
 function mkBtn(label,val,active){const b=document.createElement('button');b.className='filter-btn'+(active?' active':'');b.textContent=label;b.onclick=()=>{activeFilter=val;document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderAll();};return b;}
 function filtered(){if(!activeFilter)return staysData;return staysData.filter(r=>r.nightDate.toLocaleString('en-US',{month:'short',year:'numeric'})===activeFilter);}
 function getFilteredDiscounts(){if(!activeFilter)return discountsData;return discountsData.filter(r=>r.date&&r.date.toLocaleString('en-US',{month:'short',year:'numeric'})===activeFilter);}
-function renderAll(){const rows=filtered();renderScores(rows);renderCats(rows);renderRevChart(rows);renderChChart(rows);renderUnits(rows);renderBW(rows);renderCatChart(rows);renderDiscounts();renderPace();}
+function renderAll(){const rows=filtered();renderScores(rows);renderCats(rows);renderRevChart(rows);renderChChart(rows);renderUnits(rows);renderBW(rows);renderCatChart(rows);renderDiscounts();renderPace();renderRetail();}
 function renderScores(rows){
   const grossRev=rows.reduce((s,r)=>s+r.nightRevenue,0),n=rows.length;
   let days=1;if(n>0){const t=rows.map(r=>r.nightDate.getTime());days=Math.round((Math.max(...t)-Math.min(...t))/86400000)+1;}
@@ -528,6 +541,26 @@ function renderDiscounts(){
   const byLabel={};disc.forEach(r=>{if(!byLabel[r.details])byLabel[r.details]={amount:0,res:new Set()};byLabel[r.details].amount+=r.amount;byLabel[r.details].res.add(r.res);});
   const sorted=Object.entries(byLabel).sort((a,b)=>b[1].amount-a[1].amount),maxAmt=sorted.length>0?sorted[0][1].amount:1;
   document.getElementById('disc-tbody').innerHTML=sorted.map(([label,d])=>{const avg=d.res.size>0?d.amount/d.res.size:0,barPct=maxAmt>0?(d.amount/maxAmt)*100:0;return`<tr><td style="color:var(--text);font-weight:500">${label}</td><td class="right">${fmt$(d.amount)}</td><td><div style="display:flex;align-items:center;gap:8px;padding:0 8px;"><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${barPct}%;background:var(--terra);border-radius:2px;"></div></div></div></td><td class="right">${d.res.size}</td><td class="right">${fmt$(avg)}</td></tr>`;}).join('');
+}
+function renderRetail(){
+  const panel=document.getElementById('retail-panel');
+  if(!retailMonthlyData||!retailMonthlyData.length){panel.style.display='none';return;}
+  panel.style.display='block';
+  document.getElementById('retail-period-label').textContent=activeFilter||'';
+  const cur=retailMonthlyData.find(r=>r.month===activeFilter);
+  document.getElementById('retail-resort-total').textContent=fmt$(cur?cur.resortFee:0);
+  document.getElementById('retail-other-total').textContent=fmt$(cur?cur.other:0);
+  document.getElementById('retail-combined-total').textContent=fmt$(cur?cur.total:0);
+  const sorted=[...retailMonthlyData].sort((a,b)=>new Date(a.month)-new Date(b.month));
+  const labels=sorted.map(r=>r.month),resortVals=sorted.map(r=>Math.round(r.resortFee)),otherVals=sorted.map(r=>Math.round(r.other));
+  if(retailChart){retailChart.destroy();retailChart=null;}
+  if(labels.length){
+    retailChart=new Chart(document.getElementById('chart-retail').getContext('2d'),{type:'bar',data:{labels,datasets:[
+      {label:'Resort Fee',data:resortVals,backgroundColor:'rgba(184,124,42,0.8)',borderColor:'rgba(184,124,42,1)',borderWidth:1,borderRadius:5},
+      {label:'Retail / Other',data:otherVals,backgroundColor:'rgba(107,91,140,0.75)',borderColor:'rgba(107,91,140,1)',borderWidth:1,borderRadius:5}
+    ]},options:bOpts({plugins:{legend:{display:true,position:'top',labels:{color:'#4a5568',font:{family:'Raleway',size:12,weight:'600'},boxWidth:12,padding:20}}},scales:{x:{...xS(),stacked:true},y:{...yS(),stacked:true}}})});
+  }
+  document.getElementById('retail-tbody').innerHTML=sorted.map(r=>`<tr><td style="color:var(--text);font-weight:500">${r.month}</td><td class="right">${fmt$(r.resortFee)}</td><td class="right">${fmt$(r.other)}</td><td class="right" style="font-weight:600">${fmt$(r.total)}</td><td class="right">${r.lineItems}</td></tr>`).join('');
 }
 function togglePartials(){partialsVisible=!partialsVisible;document.getElementById('partial-detail').style.display=partialsVisible?'block':'none';document.querySelector('.partial-toggle').textContent=partialsVisible?'Hide details':'View details';}
 function renderPace(){
