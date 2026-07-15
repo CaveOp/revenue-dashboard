@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cave Springs — Stay Import (TEST)</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f2ee;--surface:#fff;--surface2:#f9f7f4;
+  --border:#e8e2da;--border2:#d6cec3;
+  --slate:#4a5e6d;--slate2:#3a4d5c;--slate3:#6a7e8d;
+  --terra:#c4572a;--terra2:#a8451f;--terra-bg:#faf0eb;
+  --green:#3a7d5c;--green-bg:#edf6f1;
+  --amber:#b87c2a;--amber-bg:#fdf5e8;
+  --text:#1a2530;--text2:#4a5568;--text3:#8a9bb0;
+  --sans:'Raleway',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;}
+.test-banner{background:var(--amber);color:#fff;text-align:center;padding:10px 16px;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;}
+.wrap{max-width:860px;margin:0 auto;padding:32px 20px 80px;}
+h1{font-size:18px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--slate);margin-bottom:4px;}
+.sub{font-size:13px;color:var(--text3);margin-bottom:28px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:24px 26px;margin-bottom:18px;}
+.card h2{font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:14px;}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--slate);color:#fff;border:none;border-radius:8px;padding:11px 22px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.btn:hover{background:var(--slate2);}
+.btn:disabled{opacity:0.45;cursor:not-allowed;}
+.btn.confirm{background:var(--green);}
+.btn.ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}
+.btn.ghost:hover{color:var(--slate);border-color:var(--slate3);}
+.status{font-size:13px;color:var(--text2);margin-top:12px;}
+.err{background:var(--terra-bg);border:1px solid rgba(196,87,42,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--terra2);margin-top:14px;white-space:pre-wrap;}
+.ok{background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--green);margin-top:14px;white-space:pre-wrap;}
+.warn{background:var(--amber);border-radius:8px;padding:12px 16px;font-size:13px;color:#fff;margin-top:14px;white-space:pre-wrap;}
+table.cmp{width:100%;border-collapse:collapse;margin-top:8px;}
+table.cmp th{text-align:left;padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2);}
+table.cmp td{padding:9px 12px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border);}
+table.cmp td.num{text-align:right;font-weight:600;color:var(--text);}
+table.cmp tr:last-child td{border-bottom:none;}
+.mode-row{display:flex;gap:18px;margin:14px 0;flex-wrap:wrap;}
+.mode-row label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);cursor:pointer;}
+input[type=file]{font-family:var(--sans);font-size:13px;}
+.hidden{display:none;}
+.privacy{font-size:12px;color:var(--text3);margin-top:14px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="test-banner">Test mode — this page writes ONLY to the COPY spreadsheet, never the real one</div>
+<div class="wrap">
+  <h1>Stay Report Import</h1>
+  <div class="sub">Cave Springs Resort · Revenue Dashboard · importer test page</div>
+
+  <div class="card" id="step-auth">
+    <h2>Step 1 — Sign in</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Sign in with the Google account that has access to the copy spreadsheet.</p>
+    <button class="btn" onclick="signIn()">Sign in with Google</button>
+    <div class="status" id="auth-status"></div>
+  </div>
+
+  <div class="card hidden" id="step-file">
+    <h2>Step 2 — Choose the ResNexus stay-date CSV export</h2>
+    <input type="file" id="csv-file" accept=".csv,text/csv">
+    <div class="mode-row">
+      <label><input type="radio" name="mode" value="replace" checked> Replace all existing stay data (recommended — matches your current fresh-reimport routine)</label>
+      <label><input type="radio" name="mode" value="add"> Add to existing data (skips reservations already in the sheet)</label>
+    </div>
+    <button class="btn" onclick="analyzeFile()">Analyze file</button>
+    <div class="status" id="file-status"></div>
+    <div class="privacy">Privacy: only these columns are read from the file — Res#, Date, Accommodation, Amount, Paid, BookedOnline, DirectConnect, ReservedOn. Every other column (names, emails, phones, anything else) is ignored and never leaves this computer.</div>
+  </div>
+
+  <div class="card hidden" id="step-preview">
+    <h2>Step 3 — Preview (nothing has been written yet)</h2>
+    <div id="preview-body"></div>
+    <div style="margin-top:18px;display:flex;gap:12px;">
+      <button class="btn confirm" id="confirm-btn" onclick="confirmImport()">Confirm — write to copy sheet</button>
+      <button class="btn ghost" onclick="cancelPreview()">Cancel</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="step-result">
+    <h2>Step 4 — Result</h2>
+    <div id="result-body"></div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────
+// SHEET_ID points at the COPY of the revenue sheet for safe testing.
+const CLIENT_ID='535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
+const SHEET_ID='1XMFKYEj5ZhUcXEBylr_ZFG_gt6hx-gitqt3DxCFd5ag';
+const SCOPE='https://www.googleapis.com/auth/spreadsheets';
+const ACTIVE_DOORS=56;
+const STAYS_TAB='STAYS_CLEAN',IMPORT_TAB='STAYS_IMPORT',LOG_TAB='IMPORT_LOG',SNAPSHOTS_TAB='SNAPSHOTS';
+const CLEAN_HEADER=['Res#','NightDate','Accommodation','NightRevenue','BookedOnline','DirectConnect','ReservedOn','Channel','SourceDateText','NightCount'];
+const IMPORT_HEADER=['Res#','Date','Accommodation','Amount','Paid','BookedOnline','DirectConnect','ReservedOn'];
+const SNAP_HEADER=['SnapshotDate','Scope','Period','Revenue','Nights','ADR','RevPAR','Occupancy','Reservations','LOS','ModernCabins','RusticCabins','TinyHomes','Airstreams','HotelRooms','Direct','OTA','PhoneManual'];
+const LOG_HEADER=['ImportDate','ReportType','RowsAdded','Revenue','ADR','RevPAR','Occupancy','Reservations','Period','Notes'];
+
+const CATS={'Modern Cabins':['Lookout Cabin - with Private Hot Tub','Modern Cabin (Alder) with Private Hot Tub','Modern Cabin (Aspen) with Private Hot Tub','Modern Cabin (Banyan) with Private Hot Tub','Modern Cabin (Blue Spruce) with Private Hot Tub','Modern Cabin (Elm)','Modern Cabin (Hawthorne)','Modern Cabin (Maple) with Private Hot Tub','Modern Cabin (Oak) with Private Hot Tub','Modern Cabin (Olive)','Modern Cabin (Pine)','Modern Cabin (REDWOOD) with Private Hot Tub','Modern Cabin (Rosewood) with Private Hot Tub','Modern Cabin (Sequoia)','Modern Cabin (Sugar Maple)','Modern Cabin (Walnut)'],'Rustic Cabins':['Cabin 02','Cabin 03','Cabin 04','Cabin 05','Cabin 06','Cabin 07','Cabin 08','Cabin 09','Cabin 10','Cabin 11','Cabin 12','Cabin 15','Cabin 16','Cabin 17'],'Tiny Homes':['Tiny Home (Beech) with Private Hot Tub','Tiny Home (Birch)','Tiny Home (Cedar)','Tiny Home (Dogwood)','Tiny Home (Honey Locust)','Tiny Home (Koa)','Tiny Home (Sage)'],'Airstreams':['Airstream (Buckeye)','Airstream (Cherry)','Airstream (Chestnut)','Airstream (Cottonwood)','Airstream (Eucalyptus)','Airstream (Magnolia)','Airstream (Redbud)','Airstream (White Oak)','Airstream (Willow)'],'Hotel Rooms':['01- King Bed','02- King Bed','03- King Bed','04- King Bed','05- King Bed','06- Double Queen Beds','07- Double Queen Beds','08- Double Queen Beds','09- Double Queen Beds','10- Double Queen Beds']};
+function getCat(n){const nl=(n||'').toLowerCase();for(const[cat,units]of Object.entries(CATS)){if(units.some(u=>u.toLowerCase()===nl))return cat;}return 'Other';}
+
+// ── UTILITIES — ported line-for-line from the Apps Script v8 ────────
+function cleanDateText(value){
+  if(value===null||value===undefined||value==='')return '';
+  return String(value)
+    .replace(/ | | /g,' ')
+    .replace(/[–—−]/g,'-')
+    .replace(/\s*-\s*/g,'-')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function normalizeDateKey(value){return cleanDateText(value);}
+function parseFlexDate(value){
+  if(value===null||value===undefined||value==='')return null;
+  const text=cleanDateText(value);
+  if(!text)return null;
+  const m=text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m)return new Date(Number(m[3]),Number(m[1])-1,Number(m[2]));
+  const parsed=new Date(text);
+  if(!isNaN(parsed))return new Date(parsed.getFullYear(),parsed.getMonth(),parsed.getDate());
+  return null;
+}
+function expandDates(dateText){
+  const text=cleanDateText(dateText);
+  if(!text)return [];
+  if(!text.includes('-')){const d=parseFlexDate(text);return d?[d]:[];}
+  const parts=text.split(/\s*-\s*/);
+  if(parts.length!==2)return [];
+  let startText=parts[0];
+  const endText=parts[1];
+  const end=parseFlexDate(endText);
+  if(!end)return [];
+  if(!/\d{4}$/.test(startText))startText=startText+'/'+end.getFullYear();
+  const start=parseFlexDate(startText);
+  if(!start)return [];
+  const diffDays=Math.round((end-start)/86400000);
+  if(diffDays<0||diffDays>365)return [];
+  const nights=[];
+  let current=new Date(start.getFullYear(),start.getMonth(),start.getDate());
+  const endTime=end.getTime();
+  while(current.getTime()<=endTime){
+    nights.push(new Date(current.getFullYear(),current.getMonth(),current.getDate()));
+    current.setDate(current.getDate()+1);
+    if(nights.length>365)break;
+  }
+  return nights;
+}
+function toNumber(value){
+  if(value===null||value===undefined||value===''||value==='--')return 0;
+  return Number(String(value).replace(/[$,]/g,'').trim())||0;
+}
+function normBool(value){const v=String(value).trim().toLowerCase();return v==='true'||v==='yes'||v==='1'||v==='x';}
+function findIdx(headers,names){
+  for(const name of names){const i=headers.indexOf(name);if(i!==-1)return i;}
+  const norm=headers.map(h=>h.toLowerCase().replace(/[^a-z0-9]/g,''));
+  for(const name of names){const i=norm.indexOf(name.toLowerCase().replace(/[^a-z0-9]/g,''));if(i!==-1)return i;}
+  return -1;
+}
+function fmtDate(d){return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
+function fmtDateLong(d){return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function fmt$(n){return '$'+Math.round(n).toLocaleString('en-US');}
+function nowStamp(){const d=new Date();return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleString('en-US',{hour:'numeric',minute:'2-digit'});}
+
+// ── CSV PARSER (handles quoted fields, commas and newlines in quotes) ──
+function parseCSV(text){
+  const rows=[];let row=[];let cur='';let inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){if(text[i+1]==='"'){cur+='"';i++;}else inQ=false;}
+      else cur+=c;
+    }else{
+      if(c==='"')inQ=true;
+      else if(c===','){row.push(cur);cur='';}
+      else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}
+      else if(c==='\r'){/* skip */}
+      else cur+=c;
+    }
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+
+// ── SHEETS API HELPERS ──────────────────────────────────────────────
+let accessToken=null;
+async function api(url,opts){
+  const r=await fetch(url,Object.assign({headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'}},opts||{}));
+  if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error&&j.error.message?j.error.message:msg;}catch(e){}throw new Error(msg);}
+  return r.json();
+}
+async function getTab(tab){
+  const j=await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(tab)+'?majorDimension=ROWS');
+  return j.values||[];
+}
+async function clearTab(tab){
+  return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(tab)+':clear',{method:'POST',body:'{}'});
+}
+async function putValues(tab,values){
+  return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(tab)+'!A1?valueInputOption=USER_ENTERED',
+    {method:'PUT',body:JSON.stringify({values:values})});
+}
+async function appendValues(tab,values){
+  return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(tab)+':append?valueInputOption=USER_ENTERED',
+    {method:'POST',body:JSON.stringify({values:values})});
+}
+
+// ── SIGN IN ─────────────────────────────────────────────────────────
+function loadGSI(){return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});}
+async function signIn(){
+  await loadGSI();
+  const tc=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:async(resp)=>{
+    if(resp.error){setText('auth-status','Sign-in failed: '+resp.error);return;}
+    accessToken=resp.access_token;
+    setText('auth-status','Signed in. Checking access to the copy sheet…');
+    try{
+      await getTab(STAYS_TAB);
+      setText('auth-status','Connected to the copy spreadsheet ✓');
+      show('step-file');
+    }catch(e){
+      setText('auth-status','Signed in, but the copy sheet could not be read: '+e.message+'\nMake sure this Google account has access to the copy.');
+    }
+  }});
+  tc.requestAccessToken({prompt:'consent'});
+}
+function setText(id,t){document.getElementById(id).textContent=t;}
+function show(id){document.getElementById(id).classList.remove('hidden');}
+function hide(id){document.getElementById(id).classList.add('hidden');}
+
+// ── ANALYZE FILE (ported from processStays, plus header-row scan) ───
+let pending=null; // holds the parsed import awaiting confirmation
+
+const AL={
+  res:['Res#','Reservation','ReservationID','Reservation ID'],
+  date:['Date','Stay Date','StayDate'],
+  accom:['Accommodation','Unit','Room','Accommodations'],
+  amount:['Amount','Revenue','Accommodation Revenue','amount'],
+  paid:['Paid','paid'],
+  bookedOnline:['BookedOnline','Booked Online'],
+  directConnect:['DirectConnect','Direct Connect'],
+  reservedOn:['ReservedOn','Reserved On','Booked On']
+};
+
+async function analyzeFile(){
+  const fileInput=document.getElementById('csv-file');
+  hide('step-preview');hide('step-result');
+  if(!fileInput.files||!fileInput.files.length){setText('file-status','Choose a CSV file first.');return;}
+  setText('file-status','Reading file…');
+  let text;
+  try{text=await fileInput.files[0].text();}
+  catch(e){setText('file-status','Could not read the file: '+e.message);return;}
+  const rows=parseCSV(text);
+  if(rows.length<2){setText('file-status','The file appears to be empty.');return;}
+
+  // Find the header row — ResNexus exports sometimes have title rows first
+  let headerRow=-1,idx=null;
+  for(let r=0;r<Math.min(rows.length,10);r++){
+    const H=rows[r].map(h=>String(h).trim());
+    const test={
+      res:findIdx(H,AL.res),date:findIdx(H,AL.date),accom:findIdx(H,AL.accom),
+      amount:findIdx(H,AL.amount),paid:findIdx(H,AL.paid),
+      bookedOnline:findIdx(H,AL.bookedOnline),directConnect:findIdx(H,AL.directConnect),
+      reservedOn:findIdx(H,AL.reservedOn)
+    };
+    if(test.res!==-1&&test.date!==-1&&test.accom!==-1&&test.amount!==-1){headerRow=r;idx=test;break;}
+  }
+  if(headerRow===-1){setText('file-status','Could not find the expected columns (Res#, Date, Accommodation, Amount). Is this the stay-date report export?');return;}
+  const missing=[];
+  if(idx.bookedOnline===-1)missing.push('BookedOnline');
+  if(idx.directConnect===-1)missing.push('DirectConnect');
+  if(idx.reservedOn===-1)missing.push('ReservedOn');
+  if(missing.length){setText('file-status','Missing required column(s): '+missing.join(', '));return;}
+
+  const mode=document.querySelector('input[name=mode]:checked').value;
+  setText('file-status','Loading current sheet data for comparison…');
+
+  let existingRaw;
+  try{existingRaw=await getTab(STAYS_TAB);}
+  catch(e){setText('file-status','Could not load '+STAYS_TAB+': '+e.message);return;}
+  const existingRows=existingRaw.length>1?existingRaw.slice(1):[];
+
+  // In "add" mode, build existing fingerprints exactly like the Apps Script:
+  // Res# + Accommodation + SourceDateText (columns 0, 2, 8 of STAYS_CLEAN)
+  const existingKeys=new Set();
+  if(mode==='add'){
+    for(const r of existingRows){
+      if(r[0])existingKeys.add(String(r[0]).trim()+'|'+String(r[2]||'').trim()+'|'+normalizeDateKey(r[8]));
+    }
+  }
+
+  // Transform the file — same rules as processStays
+  const newRows=[];const importRows=[];
+  let newResCount=0,skippedExisting=0,skippedBad=0,fileRevenue=0;
+  const seen=new Set(mode==='add'?existingKeys:[]);
+  for(let i=headerRow+1;i<rows.length;i++){
+    const row=rows[i];
+    const res=String(row[idx.res]||'').trim();
+    const dateText=cleanDateText(row[idx.date]);
+    const accom=String(row[idx.accom]||'').trim();
+    const amount=toNumber(row[idx.amount]);
+    const paid=idx.paid!==-1?toNumber(row[idx.paid]):0;
+    const bookedOnline=normBool(row[idx.bookedOnline]);
+    const directConnect=normBool(row[idx.directConnect]);
+    const reservedOn=parseFlexDate(row[idx.reservedOn]);
+    if(!res||!dateText||!accom){skippedBad++;continue;}
+    if(amount===0)continue;
+    const key=res+'|'+accom+'|'+dateText;
+    if(seen.has(key)){skippedExisting++;continue;}
+    const nights=expandDates(dateText);
+    if(nights.length===0||nights.length>365){skippedBad++;continue;}
+    const nightRev=amount/nights.length;
+    const channel=bookedOnline?'Direct':directConnect?'OTA':'Phone/Manual';
+    for(const n of nights){
+      newRows.push([res,fmtDate(n),accom,nightRev,bookedOnline,directConnect,reservedOn?fmtDate(reservedOn):'',channel,"'"+dateText,nights.length]);
+    }
+    importRows.push([res,"'"+dateText,accom,amount,paid,bookedOnline,directConnect,reservedOn?fmtDate(reservedOn):'']);
+    seen.add(key);
+    newResCount++;
+    fileRevenue+=amount;
+  }
+
+  if(newRows.length===0){
+    setText('file-status',mode==='add'
+      ?'Nothing new to import — every reservation in this file is already in the sheet ('+skippedExisting+' skipped).'
+      :'No usable rows found in this file.');
+    return;
+  }
+
+  // Final dataset after import (in memory) for metrics + duplicate check
+  const finalRows=mode==='replace'?newRows.slice():existingRows.map(r=>[
+    r[0],r[1],r[2],toNumber(r[3]),normBool(r[4]),normBool(r[5]),r[6],r[7],normalizeDateKey(r[8]),parseInt(r[9])||1
+  ]).concat(newRows);
+
+  const currentMetrics=calcMetrics(existingRows);
+  const afterMetrics=calcMetrics(finalRows);
+  const dupWarnings=runDuplicateCheck(finalRows);
+
+  pending={mode,newRows,importRows,finalRows,newResCount,skippedExisting,skippedBad,fileRevenue,afterMetrics,existingCount:existingRows.length};
+
+  const rowsHtml=[
+    ['Reservations in file (usable)',newResCount.toLocaleString()],
+    ['Night rows to write',newRows.length.toLocaleString()],
+    ['File revenue total',fmt$(fileRevenue)],
+    ['Current sheet: night rows / revenue',existingRows.length.toLocaleString()+' / '+fmt$(currentMetrics.revenue)],
+    ['After import: night rows / revenue',finalRows.length.toLocaleString()+' / '+fmt$(afterMetrics.revenue)],
+    ['After import: ADR / Occupancy','$'+afterMetrics.adr.toFixed(0)+' / '+afterMetrics.occupancy.toFixed(1)+'%'],
+    ['Period covered',afterMetrics.period]
+  ];
+  if(mode==='add')rowsHtml.splice(3,0,['Skipped (already in sheet)',skippedExisting.toLocaleString()]);
+  if(skippedBad>0)rowsHtml.push(['Rows skipped (blank/invalid)',skippedBad.toLocaleString()]);
+
+  let html='<table class="cmp"><tbody>'+rowsHtml.map(r=>'<tr><td>'+r[0]+'</td><td class="num">'+r[1]+'</td></tr>').join('')+'</tbody></table>';
+  html+='<p style="font-size:13px;color:var(--text2);margin-top:14px;">'+(mode==='replace'
+    ?'Confirming will <strong>erase all '+existingRows.length.toLocaleString()+' existing stay rows</strong> in the copy sheet and replace them with this file’s data — the same thing your current delete-and-reimport routine does.'
+    :'Confirming will add the new rows to the existing data. Reservations already present are skipped.')+'</p>';
+  if(dupWarnings.length)html+='<div class="warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
+  document.getElementById('preview-body').innerHTML=html;
+  setText('file-status','');
+  show('step-preview');
+}
+
+function cancelPreview(){pending=null;hide('step-preview');setText('file-status','Cancelled — nothing was written.');}
+
+// ── METRICS (ported from calcMetrics) — rows are STAYS_CLEAN-shaped ──
+function calcMetrics(rows){
+  let totalRevenue=0,totalNights=0,minDate=null,maxDate=null;
+  const uniqueRes=new Set();
+  for(const r of rows){
+    if(!r[0])continue;
+    totalRevenue+=toNumber(r[3]);
+    totalNights++;
+    uniqueRes.add(String(r[0]).trim());
+    const d=parseFlexDate(r[1]);
+    if(d){if(!minDate||d<minDate)minDate=d;if(!maxDate||d>maxDate)maxDate=d;}
+  }
+  const days=minDate&&maxDate?Math.round((maxDate-minDate)/86400000)+1:1;
+  const adr=totalNights>0?totalRevenue/totalNights:0;
+  const revpar=totalRevenue/(ACTIVE_DOORS*days);
+  const occupancy=(totalNights/(ACTIVE_DOORS*days))*100;
+  const period=minDate&&maxDate?fmtDateLong(minDate)+' – '+fmtDateLong(maxDate):'';
+  return {revenue:Math.round(totalRevenue),adr,revpar,occupancy,reservations:uniqueRes.size,period};
+}
+
+// ── DUPLICATE CHECK (ported from runDuplicateCheck) ─────────────────
+function runDuplicateCheck(rows){
+  const nightKeys={},dupNights=new Set();
+  const nightKeyToSrc={},srcMismatches=[];
+  rows.forEach((r,i)=>{
+    if(!r[0])return;
+    const resAccom=String(r[0]).trim()+'|'+String(r[2]||'').trim();
+    const nightKey=resAccom+'|'+normalizeDateKey(r[1]);
+    if(nightKeys[nightKey]!==undefined)dupNights.add(nightKey);else nightKeys[nightKey]=i;
+    const src=normalizeDateKey(r[8]);
+    if(!nightKeyToSrc[nightKey])nightKeyToSrc[nightKey]=src;
+    else if(nightKeyToSrc[nightKey]!==src)srcMismatches.push(nightKey+' → '+nightKeyToSrc[nightKey]+' vs '+src);
+  });
+  const warnings=[];
+  if(dupNights.size>0){
+    warnings.push('• '+dupNights.size+' exact duplicate night row(s): same Res# + Unit + Date appears more than once.');
+    [...dupNights].slice(0,5).forEach(k=>warnings.push('  – '+k));
+    if(dupNights.size>5)warnings.push('  … and '+(dupNights.size-5)+' more');
+  }
+  if(srcMismatches.length>0){
+    warnings.push('• '+srcMismatches.length+' reservation(s) with conflicting stay-date text (dedup bypass risk):');
+    srcMismatches.slice(0,5).forEach(m=>warnings.push('  – '+m));
+    if(srcMismatches.length>5)warnings.push('  … and '+(srcMismatches.length-5)+' more');
+  }
+  return warnings;
+}
+
+// ── SNAPSHOT (ported from saveSnapshot/computeScope) ────────────────
+function computeScope(rows){
+  let rev=0,nights=0,minD=null,maxD=null;
+  const res=new Set();const resForLOS={};
+  const cats={'Modern Cabins':0,'Rustic Cabins':0,'Tiny Homes':0,'Airstreams':0,'Hotel Rooms':0};
+  const ch={Direct:0,OTA:0,PhoneManual:0};
+  rows.forEach(row=>{
+    if(!row[0])return;
+    const r=toNumber(row[3]);
+    const d=parseFlexDate(row[1]);
+    const resNo=String(row[0]).trim();
+    const accom=String(row[2]||'').trim();
+    const bo=String(row[4]).toLowerCase(),dc=String(row[5]).toLowerCase();
+    const nc=parseInt(row[9])||1;
+    rev+=r;nights++;res.add(resNo);
+    const losKey=resNo+'|'+accom;
+    if(!resForLOS[losKey])resForLOS[losKey]=nc;
+    if(d){if(!minD||d<minD)minD=d;if(!maxD||d>maxD)maxD=d;}
+    const cat=getCat(accom);
+    if(cats[cat]!==undefined)cats[cat]+=r;
+    const channel=(bo==='true'||bo==='x')?'Direct':(dc==='true'||dc==='x')?'OTA':'PhoneManual';
+    ch[channel]+=r;
+  });
+  const days=minD&&maxD?Math.round((maxD-minD)/86400000)+1:1;
+  const adr=nights>0?rev/nights:0;
+  const revpar=rev/(ACTIVE_DOORS*days);
+  const occ=(nights/(ACTIVE_DOORS*days))*100;
+  const losVals=Object.values(resForLOS);
+  const los=losVals.length>0?losVals.reduce((a,b)=>a+b,0)/losVals.length:0;
+  const period=minD&&maxD?minD.toLocaleString('en-US',{month:'short',day:'numeric'})+' – '+fmtDateLong(maxD):'';
+  return {rev,nights,adr,revpar,occ,res:res.size,los,period,
+    modern:cats['Modern Cabins'],rustic:cats['Rustic Cabins'],tiny:cats['Tiny Homes'],
+    airstream:cats['Airstreams'],hotel:cats['Hotel Rooms'],
+    direct:ch.Direct,ota:ch.OTA,phone:ch.PhoneManual};
+}
+function snapRow(scope,m){
+  const round2=n=>Math.round(n*100)/100;
+  return [nowStamp(),scope,m.period,Math.round(m.rev),m.nights,round2(m.adr),round2(m.revpar),round2(m.occ),m.res,round2(m.los),
+    Math.round(m.modern),Math.round(m.rustic),Math.round(m.tiny),Math.round(m.airstream),Math.round(m.hotel),
+    Math.round(m.direct),Math.round(m.ota),Math.round(m.phone)];
+}
+
+// ── CONFIRM: WRITE EVERYTHING ───────────────────────────────────────
+async function confirmImport(){
+  if(!pending)return;
+  const p=pending;
+  const btn=document.getElementById('confirm-btn');
+  btn.disabled=true;btn.textContent='Writing…';
+  const steps=[];
+  try{
+    if(p.mode==='replace'){
+      steps.push('Clearing '+STAYS_TAB);
+      await clearTab(STAYS_TAB);
+      steps.push('Writing '+p.newRows.length+' night rows');
+      await putValues(STAYS_TAB,[CLEAN_HEADER].concat(p.newRows));
+      steps.push('Rebuilding '+IMPORT_TAB+' (customer-data-free)');
+      await clearTab(IMPORT_TAB);
+      await putValues(IMPORT_TAB,[IMPORT_HEADER].concat(p.importRows));
+    }else{
+      steps.push('Appending '+p.newRows.length+' night rows to '+STAYS_TAB);
+      await appendValues(STAYS_TAB,p.newRows);
+      steps.push('Appending to '+IMPORT_TAB);
+      await appendValues(IMPORT_TAB,p.importRows);
+    }
+
+    // Import log — create header if the tab is empty
+    steps.push('Logging import');
+    let logRaw=[];
+    try{logRaw=await getTab(LOG_TAB);}catch(e){}
+    if(logRaw.length===0)await putValues(LOG_TAB,[LOG_HEADER]);
+    const m=p.afterMetrics;
+    await appendValues(LOG_TAB,[[nowStamp(),'STAYS (dashboard import)',p.newResCount,m.revenue,Math.round(m.adr),Math.round(m.revpar*100)/100,Math.round(m.occupancy*10)/10,m.reservations,m.period,p.mode]]);
+
+    // Snapshots — YTD + current month, same as the Apps Script
+    steps.push('Saving snapshots');
+    let snapRaw=[];
+    try{snapRaw=await getTab(SNAPSHOTS_TAB);}catch(e){}
+    if(snapRaw.length===0)await putValues(SNAPSHOTS_TAB,[SNAP_HEADER]);
+    const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
+    const ytdRows=p.finalRows.filter(r=>{const d=parseFlexDate(r[1]);return d&&d.getFullYear()===yr;});
+    const monthRows=p.finalRows.filter(r=>{const d=parseFlexDate(r[1]);return d&&d.getFullYear()===yr&&d.getMonth()===mo;});
+    const snaps=[];
+    if(ytdRows.length>0)snaps.push(snapRow('Range '+yr,computeScope(ytdRows)));
+    if(monthRows.length>0)snaps.push(snapRow('Month '+now.toLocaleString('en-US',{month:'short',year:'numeric'}),computeScope(monthRows)));
+    if(snaps.length)await appendValues(SNAPSHOTS_TAB,snaps);
+
+    hide('step-preview');
+    const dupWarnings=runDuplicateCheck(p.finalRows);
+    let html='<div class="ok">Import complete ✓\n'
+      +p.newResCount+' reservations ('+p.newRows.length+' night rows) written.\n'
+      +'Total revenue: '+fmt$(m.revenue)+'\n'
+      +'ADR: $'+m.adr.toFixed(0)+'\n'
+      +'Occupancy: '+m.occupancy.toFixed(1)+'%\n'
+      +'Period: '+m.period+'</div>';
+    html+='<p style="font-size:13px;color:var(--text2);margin-top:14px;">Now compare these numbers against your normal Apps Script process on the real sheet using the same CSV. If they match to the penny, this importer is verified.</p>';
+    if(dupWarnings.length)html+='<div class="warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
+    document.getElementById('result-body').innerHTML=html;
+    show('step-result');
+    pending=null;
+  }catch(e){
+    document.getElementById('result-body').innerHTML='<div class="err">Import failed at step: '+(steps[steps.length-1]||'start')+'\n'+e.message+'\n\nThe copy sheet may be partially written — that’s fine, it’s the copy. Fix the issue and run again in Replace mode.</div>';
+    show('step-result');
+  }finally{
+    btn.disabled=false;btn.textContent='Confirm — write to copy sheet';
+  }
+}
+</script>
+</body>
+</html>
