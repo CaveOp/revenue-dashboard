@@ -154,6 +154,23 @@ tr.unit-row.hidden{display:none;}
 .snap-delete-btn{font-size:10px;font-weight:700;letter-spacing:0.06em;color:var(--terra);background:none;border:1px solid rgba(196,87,42,0.25);border-radius:4px;padding:3px 8px;cursor:pointer;font-family:var(--sans);white-space:nowrap;}
 .snap-delete-btn:hover{background:var(--terra-bg);}
 .snap-deleting{opacity:0.4;pointer-events:none;}
+.import-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:300;}
+.import-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:640px;max-width:94vw;max-height:88vh;overflow-y:auto;background:var(--surface);border-radius:16px;box-shadow:var(--shadow2);z-index:301;padding:26px 28px;}
+.import-modal h3{font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--slate);margin-bottom:4px;}
+.import-modal .im-sub{font-size:12px;color:var(--text3);margin-bottom:18px;}
+.im-mode-row{display:flex;flex-direction:column;gap:8px;margin:14px 0;}
+.im-mode-row label{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text2);cursor:pointer;line-height:1.5;}
+.im-mode-row input{margin-top:3px;}
+.im-btn{display:inline-flex;align-items:center;gap:8px;background:var(--slate);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;}
+.im-btn:hover{background:var(--slate2);}
+.im-btn:disabled{opacity:0.45;cursor:not-allowed;}
+.im-btn.confirm{background:var(--green);}
+.im-btn.ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}
+.im-status{font-size:13px;color:var(--text2);margin-top:12px;}
+.im-err{background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-top:14px;white-space:pre-wrap;}
+.im-ok{background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--green);margin-top:14px;white-space:pre-wrap;}
+.im-warn{background:var(--amber-bg);border:1px solid rgba(184,124,42,0.3);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--amber);margin-top:14px;white-space:pre-wrap;}
+.im-privacy{font-size:11px;color:var(--text3);margin-top:14px;line-height:1.7;}
 </style>
 </head>
 <body>
@@ -189,12 +206,40 @@ tr.unit-row.hidden{display:none;}
     </div>
   </div>
 </div>
+<div class="import-overlay" id="import-overlay" onclick="closeImport()"></div>
+<div class="import-modal" id="import-modal">
+  <h3>Import Stay Report</h3>
+  <div class="im-sub">ResNexus stay-date CSV export — raw file, no cleanup needed</div>
+  <div id="im-step-file">
+    <input type="file" id="im-file" accept=".csv,text/csv">
+    <div class="im-mode-row">
+      <label><input type="radio" name="im-mode" value="replace" checked> <span><strong>Replace all stay data</strong> — erases current stay rows and rebuilds from this file (same as the delete-and-reimport routine)</span></label>
+      <label><input type="radio" name="im-mode" value="add"> <span><strong>Add to existing data</strong> — skips reservations already in the sheet</span></label>
+    </div>
+    <button class="im-btn" onclick="analyzeImport()">Analyze file</button>
+    <button class="im-btn ghost" onclick="closeImport()">Close</button>
+    <div class="im-status" id="im-file-status"></div>
+    <div class="im-privacy">Privacy: only Res#, Date, Accommodation, Amount, Paid, BookedOnline, DirectConnect and ReservedOn are read. All other columns — guest names, emails, phones — are ignored and never leave this computer.</div>
+  </div>
+  <div id="im-step-preview" style="display:none;margin-top:6px;">
+    <div id="im-preview-body"></div>
+    <div style="margin-top:16px;display:flex;gap:10px;">
+      <button class="im-btn confirm" id="im-confirm-btn" onclick="confirmImportWrite()">Confirm — write to sheet</button>
+      <button class="im-btn ghost" onclick="cancelImportPreview()">Cancel</button>
+    </div>
+  </div>
+  <div id="im-step-result" style="display:none;margin-top:6px;">
+    <div id="im-result-body"></div>
+    <div style="margin-top:16px;"><button class="im-btn" onclick="closeImport()">Done</button></div>
+  </div>
+</div>
 <div id="dashboard">
   <div class="header">
     <div><div class="header-title">Cave Springs</div><div class="header-sub">Revenue Dashboard · Dunsmuir, CA</div></div>
     <div class="header-right">
       <div class="last-updated" id="last-updated-text"></div>
       <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
+      <button class="hdr-btn" onclick="openImport()">&#8679; Import Stay CSV</button>
       <button class="hdr-btn" onclick="openSettings()">&#9881; Blocked Units</button>
       <button class="hdr-btn" onclick="signOut()">Sign out</button>
     </div>
@@ -634,6 +679,354 @@ function yS(){return{grid:{color:'rgba(232,226,218,0.8)'},ticks:{color:'#8a9bb0'
 function showErr(m){const e=document.getElementById('error-banner');e.textContent=m;e.style.display='block';}
 function showLoad(){document.getElementById('auth-screen').style.display='none';document.getElementById('loading-screen').style.display='flex';}
 function showDash(){document.getElementById('loading-screen').style.display='none';document.getElementById('dashboard').style.display='block';}
+
+// ─── STAY REPORT IMPORTER ────────────────────────────────────────────
+// Ported line-for-line from the Apps Script v8 processStays logic and
+// verified against it to the penny on a copy sheet before integration.
+// Reads only the columns it needs — guest data never leaves the browser.
+// The Apps Script menu remains available as a fallback.
+const IM_CLEAN_HEADER=['Res#','NightDate','Accommodation','NightRevenue','BookedOnline','DirectConnect','ReservedOn','Channel','SourceDateText','NightCount'];
+const IM_IMPORT_HEADER=['Res#','Date','Accommodation','Amount','Paid','BookedOnline','DirectConnect','ReservedOn'];
+const IM_SNAP_HEADER=['SnapshotDate','Scope','Period','Revenue','Nights','ADR','RevPAR','Occupancy','Reservations','LOS','ModernCabins','RusticCabins','TinyHomes','Airstreams','HotelRooms','Direct','OTA','PhoneManual'];
+const IM_LOG_HEADER=['ImportDate','ReportType','RowsAdded','Revenue','ADR','RevPAR','Occupancy','Reservations','Period','Notes'];
+const IM_AL={
+  res:['Res#','Reservation','ReservationID','Reservation ID'],
+  date:['Date','Stay Date','StayDate'],
+  accom:['Accommodation','Unit','Room','Accommodations'],
+  amount:['Amount','Revenue','Accommodation Revenue','amount'],
+  paid:['Paid','paid'],
+  bookedOnline:['BookedOnline','Booked Online'],
+  directConnect:['DirectConnect','Direct Connect'],
+  reservedOn:['ReservedOn','Reserved On','Booked On']
+};
+function imCleanDateText(value){
+  if(value===null||value===undefined||value==='')return '';
+  return String(value).replace(/ | | /g,' ').replace(/[–—−]/g,'-').replace(/\s*-\s*/g,'-').replace(/\s+/g,' ').trim();
+}
+function imParseFlexDate(value){
+  if(value===null||value===undefined||value==='')return null;
+  const text=imCleanDateText(value);
+  if(!text)return null;
+  const m=text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m)return new Date(Number(m[3]),Number(m[1])-1,Number(m[2]));
+  const parsed=new Date(text);
+  if(!isNaN(parsed))return new Date(parsed.getFullYear(),parsed.getMonth(),parsed.getDate());
+  return null;
+}
+function imExpandDates(dateText){
+  const text=imCleanDateText(dateText);
+  if(!text)return [];
+  if(!text.includes('-')){const d=imParseFlexDate(text);return d?[d]:[];}
+  const parts=text.split(/\s*-\s*/);
+  if(parts.length!==2)return [];
+  let startText=parts[0];
+  const end=imParseFlexDate(parts[1]);
+  if(!end)return [];
+  if(!/\d{4}$/.test(startText))startText=startText+'/'+end.getFullYear();
+  const start=imParseFlexDate(startText);
+  if(!start)return [];
+  const diffDays=Math.round((end-start)/86400000);
+  if(diffDays<0||diffDays>365)return [];
+  const nights=[];
+  let current=new Date(start.getFullYear(),start.getMonth(),start.getDate());
+  while(current.getTime()<=end.getTime()){
+    nights.push(new Date(current.getFullYear(),current.getMonth(),current.getDate()));
+    current.setDate(current.getDate()+1);
+    if(nights.length>365)break;
+  }
+  return nights;
+}
+function imToNumber(value){
+  if(value===null||value===undefined||value===''||value==='--')return 0;
+  return Number(String(value).replace(/[$,]/g,'').trim())||0;
+}
+function imFindIdx(headers,names){
+  for(const name of names){const i=headers.indexOf(name);if(i!==-1)return i;}
+  const norm=headers.map(h=>h.toLowerCase().replace(/[^a-z0-9]/g,''));
+  for(const name of names){const i=norm.indexOf(name.toLowerCase().replace(/[^a-z0-9]/g,''));if(i!==-1)return i;}
+  return -1;
+}
+function imFmtDate(d){return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
+function imFmtDateLong(d){return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function imNowStamp(){const d=new Date();return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleString('en-US',{hour:'numeric',minute:'2-digit'});}
+function imParseCSV(text){
+  const rows=[];let row=[];let cur='';let inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){if(text[i+1]==='"'){cur+='"';i++;}else inQ=false;}
+      else cur+=c;
+    }else{
+      if(c==='"')inQ=true;
+      else if(c===','){row.push(cur);cur='';}
+      else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}
+      else if(c==='\r'){}
+      else cur+=c;
+    }
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+async function imApi(url,opts){
+  const r=await fetch(url,Object.assign({headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'}},opts||{}));
+  if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=(j.error&&j.error.message)?j.error.message:msg;}catch(e){}
+    if(r.status===401)msg+=' — your sign-in may have expired. Close this dialog, sign out and back in, then retry.';
+    throw new Error(msg);}
+  return r.json();
+}
+async function imClearTab(tab){return imApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:clear`,{method:'POST',body:'{}'});}
+async function imPutValues(tab,values){return imApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}!A1?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values})});}
+async function imAppendValues(tab,values){return imApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:append?valueInputOption=USER_ENTERED`,{method:'POST',body:JSON.stringify({values})});}
+function imCalcMetrics(rows){
+  let totalRevenue=0,totalNights=0,minDate=null,maxDate=null;
+  const uniqueRes=new Set();
+  for(const r of rows){
+    if(!r[0])continue;
+    totalRevenue+=imToNumber(r[3]);
+    totalNights++;
+    uniqueRes.add(String(r[0]).trim());
+    const d=imParseFlexDate(r[1]);
+    if(d){if(!minDate||d<minDate)minDate=d;if(!maxDate||d>maxDate)maxDate=d;}
+  }
+  const days=minDate&&maxDate?Math.round((maxDate-minDate)/86400000)+1:1;
+  const adr=totalNights>0?totalRevenue/totalNights:0;
+  const revpar=totalRevenue/(TOTAL_DOORS*days);
+  const occupancy=(totalNights/(TOTAL_DOORS*days))*100;
+  const period=minDate&&maxDate?imFmtDateLong(minDate)+' – '+imFmtDateLong(maxDate):'';
+  return {revenue:Math.round(totalRevenue),adr,revpar,occupancy,reservations:uniqueRes.size,period};
+}
+function imDuplicateCheck(rows){
+  const nightKeys={},dupNights=new Set(),nightKeyToSrc={},srcMismatches=[];
+  rows.forEach((r,i)=>{
+    if(!r[0])return;
+    const nightKey=String(r[0]).trim()+'|'+String(r[2]||'').trim()+'|'+imCleanDateText(r[1]);
+    if(nightKeys[nightKey]!==undefined)dupNights.add(nightKey);else nightKeys[nightKey]=i;
+    const src=imCleanDateText(r[8]);
+    if(!nightKeyToSrc[nightKey])nightKeyToSrc[nightKey]=src;
+    else if(nightKeyToSrc[nightKey]!==src)srcMismatches.push(nightKey);
+  });
+  const warnings=[];
+  if(dupNights.size>0){
+    warnings.push('• '+dupNights.size+' duplicate night row(s): same Res# + Unit + Date appears more than once.');
+    [...dupNights].slice(0,5).forEach(k=>warnings.push('  – '+k));
+  }
+  if(srcMismatches.length>0){
+    warnings.push('• '+srcMismatches.length+' reservation(s) with conflicting stay-date text.');
+    srcMismatches.slice(0,5).forEach(m=>warnings.push('  – '+m));
+  }
+  return warnings;
+}
+function imComputeScope(rows){
+  let rev=0,nights=0,minD=null,maxD=null;
+  const res=new Set(),resForLOS={};
+  const cats={'Modern Cabins':0,'Rustic Cabins':0,'Tiny Homes':0,'Airstreams':0,'Hotel Rooms':0};
+  const ch={Direct:0,OTA:0,PhoneManual:0};
+  rows.forEach(row=>{
+    if(!row[0])return;
+    const r=imToNumber(row[3]);
+    const d=imParseFlexDate(row[1]);
+    const resNo=String(row[0]).trim(),accom=String(row[2]||'').trim();
+    const bo=String(row[4]).toLowerCase(),dc=String(row[5]).toLowerCase();
+    const nc=parseInt(row[9])||1;
+    rev+=r;nights++;res.add(resNo);
+    const losKey=resNo+'|'+accom;
+    if(!resForLOS[losKey])resForLOS[losKey]=nc;
+    if(d){if(!minD||d<minD)minD=d;if(!maxD||d>maxD)maxD=d;}
+    const cat=getCat(accom);
+    if(cats[cat]!==undefined)cats[cat]+=r;
+    const channel=(bo==='true'||bo==='x')?'Direct':(dc==='true'||dc==='x')?'OTA':'PhoneManual';
+    ch[channel]+=r;
+  });
+  const days=minD&&maxD?Math.round((maxD-minD)/86400000)+1:1;
+  const losVals=Object.values(resForLOS);
+  return {rev,nights,adr:nights>0?rev/nights:0,revpar:rev/(TOTAL_DOORS*days),occ:(nights/(TOTAL_DOORS*days))*100,
+    res:res.size,los:losVals.length>0?losVals.reduce((a,b)=>a+b,0)/losVals.length:0,
+    period:minD&&maxD?minD.toLocaleString('en-US',{month:'short',day:'numeric'})+' – '+imFmtDateLong(maxD):'',
+    modern:cats['Modern Cabins'],rustic:cats['Rustic Cabins'],tiny:cats['Tiny Homes'],
+    airstream:cats['Airstreams'],hotel:cats['Hotel Rooms'],direct:ch.Direct,ota:ch.OTA,phone:ch.PhoneManual};
+}
+function imSnapRow(scope,m){
+  const round2=n=>Math.round(n*100)/100;
+  return [imNowStamp(),scope,m.period,Math.round(m.rev),m.nights,round2(m.adr),round2(m.revpar),round2(m.occ),m.res,round2(m.los),
+    Math.round(m.modern),Math.round(m.rustic),Math.round(m.tiny),Math.round(m.airstream),Math.round(m.hotel),
+    Math.round(m.direct),Math.round(m.ota),Math.round(m.phone)];
+}
+let imPending=null;
+function openImport(){
+  imPending=null;
+  document.getElementById('im-file').value='';
+  document.getElementById('im-file-status').textContent='';
+  document.getElementById('im-step-preview').style.display='none';
+  document.getElementById('im-step-result').style.display='none';
+  document.getElementById('import-overlay').style.display='block';
+  document.getElementById('import-modal').style.display='block';
+}
+function closeImport(){
+  imPending=null;
+  document.getElementById('import-overlay').style.display='none';
+  document.getElementById('import-modal').style.display='none';
+}
+function cancelImportPreview(){
+  imPending=null;
+  document.getElementById('im-step-preview').style.display='none';
+  document.getElementById('im-file-status').textContent='Cancelled — nothing was written.';
+}
+async function analyzeImport(){
+  const fileInput=document.getElementById('im-file');
+  const status=document.getElementById('im-file-status');
+  document.getElementById('im-step-preview').style.display='none';
+  document.getElementById('im-step-result').style.display='none';
+  if(!fileInput.files||!fileInput.files.length){status.textContent='Choose a CSV file first.';return;}
+  status.textContent='Reading file…';
+  let text;
+  try{text=await fileInput.files[0].text();}
+  catch(e){status.textContent='Could not read the file: '+e.message;return;}
+  const rows=imParseCSV(text);
+  if(rows.length<2){status.textContent='The file appears to be empty.';return;}
+  let headerRow=-1,idx=null;
+  for(let r=0;r<Math.min(rows.length,10);r++){
+    const H=rows[r].map(h=>String(h).trim());
+    const t={res:imFindIdx(H,IM_AL.res),date:imFindIdx(H,IM_AL.date),accom:imFindIdx(H,IM_AL.accom),amount:imFindIdx(H,IM_AL.amount),
+      paid:imFindIdx(H,IM_AL.paid),bookedOnline:imFindIdx(H,IM_AL.bookedOnline),directConnect:imFindIdx(H,IM_AL.directConnect),reservedOn:imFindIdx(H,IM_AL.reservedOn)};
+    if(t.res!==-1&&t.date!==-1&&t.accom!==-1&&t.amount!==-1){headerRow=r;idx=t;break;}
+  }
+  if(headerRow===-1){status.textContent='Could not find the expected columns (Res#, Date, Accommodation, Amount). Is this the stay-date report export?';return;}
+  const missing=[];
+  if(idx.bookedOnline===-1)missing.push('BookedOnline');
+  if(idx.directConnect===-1)missing.push('DirectConnect');
+  if(idx.reservedOn===-1)missing.push('ReservedOn');
+  if(missing.length){status.textContent='Missing required column(s): '+missing.join(', ');return;}
+  const mode=document.querySelector('input[name=im-mode]:checked').value;
+  status.textContent='Loading current sheet data for comparison…';
+  let existingRaw;
+  try{existingRaw=await fetchTab(STAYS_TAB);}
+  catch(e){status.textContent='Could not load '+STAYS_TAB+': '+e.message;return;}
+  const existingRows=existingRaw.length>1?existingRaw.slice(1):[];
+  const existingKeys=new Set();
+  if(mode==='add'){
+    for(const r of existingRows){
+      if(r[0])existingKeys.add(String(r[0]).trim()+'|'+String(r[2]||'').trim()+'|'+imCleanDateText(r[8]));
+    }
+  }
+  const newRows=[],importRows=[];
+  let newResCount=0,skippedExisting=0,skippedBad=0,fileRevenue=0;
+  const seen=new Set(mode==='add'?existingKeys:[]);
+  for(let i=headerRow+1;i<rows.length;i++){
+    const row=rows[i];
+    const res=String(row[idx.res]||'').trim();
+    const dateText=imCleanDateText(row[idx.date]);
+    const accom=String(row[idx.accom]||'').trim();
+    const amount=imToNumber(row[idx.amount]);
+    const paid=idx.paid!==-1?imToNumber(row[idx.paid]):0;
+    const bookedOnline=pBool(row[idx.bookedOnline]);
+    const directConnect=pBool(row[idx.directConnect]);
+    const reservedOn=imParseFlexDate(row[idx.reservedOn]);
+    if(!res||!dateText||!accom){skippedBad++;continue;}
+    if(amount===0)continue;
+    const key=res+'|'+accom+'|'+dateText;
+    if(seen.has(key)){skippedExisting++;continue;}
+    const nights=imExpandDates(dateText);
+    if(nights.length===0||nights.length>365){skippedBad++;continue;}
+    const nightRev=amount/nights.length;
+    const channel=bookedOnline?'Direct':directConnect?'OTA':'Phone/Manual';
+    for(const n of nights){
+      newRows.push([res,imFmtDate(n),accom,nightRev,bookedOnline,directConnect,reservedOn?imFmtDate(reservedOn):'',channel,"'"+dateText,nights.length]);
+    }
+    importRows.push([res,"'"+dateText,accom,amount,paid,bookedOnline,directConnect,reservedOn?imFmtDate(reservedOn):'']);
+    seen.add(key);newResCount++;fileRevenue+=amount;
+  }
+  if(newRows.length===0){
+    status.textContent=mode==='add'
+      ?'Nothing new to import — every reservation in this file is already in the sheet ('+skippedExisting+' skipped).'
+      :'No usable rows found in this file.';
+    return;
+  }
+  const finalRows=mode==='replace'?newRows.slice():existingRows.map(r=>[
+    r[0],r[1],r[2],imToNumber(r[3]),pBool(r[4]),pBool(r[5]),r[6],r[7],imCleanDateText(r[8]),parseInt(r[9])||1
+  ]).concat(newRows);
+  const currentMetrics=imCalcMetrics(existingRows);
+  const afterMetrics=imCalcMetrics(finalRows);
+  const dupWarnings=imDuplicateCheck(finalRows);
+  imPending={mode,newRows,importRows,finalRows,newResCount,skippedExisting,fileRevenue,afterMetrics,existingCount:existingRows.length};
+  const lines=[
+    ['Reservations in file (usable)',newResCount.toLocaleString()],
+    ['Night rows to write',newRows.length.toLocaleString()],
+    ['File revenue total',fmt$(fileRevenue)],
+    ['Current sheet: night rows / revenue',existingRows.length.toLocaleString()+' / '+fmt$(currentMetrics.revenue)],
+    ['After import: night rows / revenue',finalRows.length.toLocaleString()+' / '+fmt$(afterMetrics.revenue)],
+    ['After import: ADR / Occupancy','$'+afterMetrics.adr.toFixed(0)+' / '+afterMetrics.occupancy.toFixed(1)+'%'],
+    ['Period covered',afterMetrics.period]
+  ];
+  if(mode==='add')lines.splice(3,0,['Skipped (already in sheet)',skippedExisting.toLocaleString()]);
+  if(skippedBad>0)lines.push(['Rows skipped (blank/invalid)',skippedBad.toLocaleString()]);
+  let html='<table class="data-table"><tbody>'+lines.map(l=>'<tr><td>'+l[0]+'</td><td class="right" style="font-weight:600;color:var(--text)">'+l[1]+'</td></tr>').join('')+'</tbody></table>';
+  html+='<p style="font-size:13px;color:var(--text2);margin-top:14px;">'+(mode==='replace'
+    ?'Confirming will <strong>erase all '+existingRows.length.toLocaleString()+' existing stay rows</strong> and replace them with this file’s data.'
+    :'Confirming will add the new rows to the existing data.')+'</p>';
+  if(dupWarnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
+  document.getElementById('im-preview-body').innerHTML=html;
+  status.textContent='';
+  document.getElementById('im-step-preview').style.display='block';
+}
+async function confirmImportWrite(){
+  if(!imPending)return;
+  const p=imPending;
+  const btn=document.getElementById('im-confirm-btn');
+  btn.disabled=true;btn.textContent='Writing…';
+  let lastStep='start';
+  try{
+    if(p.mode==='replace'){
+      lastStep='clearing '+STAYS_TAB;
+      await imClearTab(STAYS_TAB);
+      lastStep='writing '+p.newRows.length+' night rows';
+      await imPutValues(STAYS_TAB,[IM_CLEAN_HEADER].concat(p.newRows));
+      lastStep='rebuilding '+IMPORT_TAB;
+      await imClearTab(IMPORT_TAB);
+      await imPutValues(IMPORT_TAB,[IM_IMPORT_HEADER].concat(p.importRows));
+    }else{
+      lastStep='appending to '+STAYS_TAB;
+      await imAppendValues(STAYS_TAB,p.newRows);
+      lastStep='appending to '+IMPORT_TAB;
+      await imAppendValues(IMPORT_TAB,p.importRows);
+    }
+    lastStep='logging import';
+    let logRaw=[];
+    try{logRaw=await fetchTab(LOG_TAB);}catch(e){}
+    if(logRaw.length===0)await imPutValues(LOG_TAB,[IM_LOG_HEADER]);
+    const m=p.afterMetrics;
+    await imAppendValues(LOG_TAB,[[imNowStamp(),'STAYS (dashboard import)',p.newResCount,m.revenue,Math.round(m.adr),Math.round(m.revpar*100)/100,Math.round(m.occupancy*10)/10,m.reservations,m.period,p.mode]]);
+    lastStep='saving snapshots';
+    let snapRaw=[];
+    try{snapRaw=await fetchTab(SNAPSHOTS_TAB);}catch(e){}
+    if(snapRaw.length===0)await imPutValues(SNAPSHOTS_TAB,[IM_SNAP_HEADER]);
+    const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
+    const ytdRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr;});
+    const monthRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr&&d.getMonth()===mo;});
+    const snaps=[];
+    if(ytdRows.length>0)snaps.push(imSnapRow('Range '+yr,imComputeScope(ytdRows)));
+    if(monthRows.length>0)snaps.push(imSnapRow('Month '+now.toLocaleString('en-US',{month:'short',year:'numeric'}),imComputeScope(monthRows)));
+    if(snaps.length)await imAppendValues(SNAPSHOTS_TAB,snaps);
+    document.getElementById('im-step-preview').style.display='none';
+    const dupWarnings=imDuplicateCheck(p.finalRows);
+    let html='<div class="im-ok">Import complete ✓\n'
+      +p.newResCount+' reservations ('+p.newRows.length+' night rows) written.\n'
+      +'Total revenue: '+fmt$(m.revenue)+'\n'
+      +'ADR: $'+m.adr.toFixed(0)+'\n'
+      +'Occupancy: '+m.occupancy.toFixed(1)+'%\n'
+      +'Period: '+m.period+'</div>';
+    if(dupWarnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
+    html+='<p style="font-size:12px;color:var(--text3);margin-top:12px;">Refreshing dashboard…</p>';
+    document.getElementById('im-result-body').innerHTML=html;
+    document.getElementById('im-step-result').style.display='block';
+    imPending=null;
+    try{await loadAll();}catch(e){}
+  }catch(e){
+    document.getElementById('im-result-body').innerHTML='<div class="im-err">Import failed while '+lastStep+':\n'+e.message+'\n\nThe sheet may be partially written. Re-run the import in Replace mode once the issue is fixed, or use the Apps Script menu (Revenue Tools) as a fallback.</div>';
+    document.getElementById('im-step-result').style.display='block';
+  }finally{
+    btn.disabled=false;btn.textContent='Confirm — write to sheet';
+  }
+}
 </script>
 </body>
 </html>
