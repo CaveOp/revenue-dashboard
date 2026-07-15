@@ -208,18 +208,25 @@ tr.unit-row.hidden{display:none;}
 </div>
 <div class="import-overlay" id="import-overlay" onclick="closeImport()"></div>
 <div class="import-modal" id="import-modal">
-  <h3>Import Stay Report</h3>
-  <div class="im-sub">ResNexus stay-date CSV export — raw file, no cleanup needed</div>
+  <h3>Import ResNexus Report</h3>
+  <div class="im-sub">Raw CSV export — no cleanup or deleting columns needed</div>
   <div id="im-step-file">
+    <div class="im-mode-row" style="margin-top:0;">
+      <label><input type="radio" name="im-type" value="stays" checked onchange="imTypeChanged()"> <span><strong>Stay report</strong> — nightly revenue, the main dashboard data</span></label>
+      <label><input type="radio" name="im-type" value="pace" onchange="imTypeChanged()"> <span><strong>Pace report</strong> — booking pace, year over year</span></label>
+      <label><input type="radio" name="im-type" value="discounts" onchange="imTypeChanged()"> <span><strong>Discounts report</strong> — packages &amp; discounts</span></label>
+      <label><input type="radio" name="im-type" value="retail" onchange="imTypeChanged()"> <span><strong>Retail report</strong> — resort fees &amp; retail items</span></label>
+    </div>
     <input type="file" id="im-file" accept=".csv,text/csv">
-    <div class="im-mode-row">
+    <div class="im-mode-row" id="im-mode-row">
       <label><input type="radio" name="im-mode" value="replace" checked> <span><strong>Replace all stay data</strong> — erases current stay rows and rebuilds from this file (same as the delete-and-reimport routine)</span></label>
       <label><input type="radio" name="im-mode" value="add"> <span><strong>Add to existing data</strong> — skips reservations already in the sheet</span></label>
     </div>
+    <div class="im-status" id="im-type-hint" style="display:none;margin-bottom:10px;"></div>
     <button class="im-btn" onclick="analyzeImport()">Analyze file</button>
     <button class="im-btn ghost" onclick="closeImport()">Close</button>
     <div class="im-status" id="im-file-status"></div>
-    <div class="im-privacy">Privacy: only Res#, Date, Accommodation, Amount, Paid, BookedOnline, DirectConnect and ReservedOn are read. All other columns — guest names, emails, phones — are ignored and never leave this computer.</div>
+    <div class="im-privacy">Privacy: only the columns each report needs (Res#, dates, unit, amounts, item names, booking flags) are read. All other columns — guest names, emails, phones — are ignored and never leave this computer.</div>
   </div>
   <div id="im-step-preview" style="display:none;margin-top:6px;">
     <div id="im-preview-body"></div>
@@ -239,7 +246,7 @@ tr.unit-row.hidden{display:none;}
     <div class="header-right">
       <div class="last-updated" id="last-updated-text"></div>
       <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
-      <button class="hdr-btn" onclick="openImport()">&#8679; Import Stay CSV</button>
+      <button class="hdr-btn" onclick="openImport()">&#8679; Import CSV</button>
       <button class="hdr-btn" onclick="openSettings()">&#9881; Blocked Units</button>
       <button class="hdr-btn" onclick="signOut()">Sign out</button>
     </div>
@@ -689,6 +696,13 @@ const IM_CLEAN_HEADER=['Res#','NightDate','Accommodation','NightRevenue','Booked
 const IM_IMPORT_HEADER=['Res#','Date','Accommodation','Amount','Paid','BookedOnline','DirectConnect','ReservedOn'];
 const IM_SNAP_HEADER=['SnapshotDate','Scope','Period','Revenue','Nights','ADR','RevPAR','Occupancy','Reservations','LOS','ModernCabins','RusticCabins','TinyHomes','Airstreams','HotelRooms','Direct','OTA','PhoneManual'];
 const IM_LOG_HEADER=['ImportDate','ReportType','RowsAdded','Revenue','ADR','RevPAR','Occupancy','Reservations','Period','Notes'];
+const IM_PACE_HEADER=['YearGroup','ReservedOn','NightDate','ReservationID','Rate','Capacity','Unit'];
+const IM_DISC_HEADER=['Res#','Date','Details','Amount'];
+const IM_RETAIL_CLEAN='RETAIL_CLEAN';
+const IM_RETAIL_HEADER=['Res#','Date','Item','RetailGroup','Quantity','Amount','Discounts','Total','Tax','Bucket'];
+const IM_RETAIL_MONTHLY_HEADER=['Month','ResortFeeRevenue','RetailOtherRevenue','TotalRevenue','LineItems'];
+const IM_DISC_AL={res:['Res#','Reservation'],date:['Date','Stay Date'],details:['Details','Description','Discount'],amount:['Amount','amount']};
+const IM_RETAIL_AL={res:['Res#','Reservation'],date:['Date'],item:['Item'],group:['Retail Group','RetailGroup'],qty:['Quantity','Qty'],amount:['Amount'],discount:['Discounts','Discount'],total:['Total'],tax:['Tax']};
 const IM_AL={
   res:['Res#','Reservation','ReservationID','Reservation ID'],
   date:['Date','Stay Date','StayDate'],
@@ -852,12 +866,23 @@ function imSnapRow(scope,m){
     Math.round(m.direct),Math.round(m.ota),Math.round(m.phone)];
 }
 let imPending=null;
+function imTypeChanged(){
+  const t=document.querySelector('input[name=im-type]:checked').value;
+  document.getElementById('im-mode-row').style.display=t==='stays'?'flex':'none';
+  const h=document.getElementById('im-type-hint');
+  if(t==='pace'){h.textContent='Pace imports replace all existing pace data each time — same as the Apps Script.';h.style.display='block';}
+  else if(t==='discounts'){h.textContent='Discount imports replace all existing discount data each time — same as the Apps Script.';h.style.display='block';}
+  else if(t==='retail'){h.textContent='Retail imports only add new line items — overlapping exports are expected and duplicates are skipped automatically.';h.style.display='block';}
+  else h.style.display='none';
+}
 function openImport(){
   imPending=null;
   document.getElementById('im-file').value='';
   document.getElementById('im-file-status').textContent='';
   document.getElementById('im-step-preview').style.display='none';
   document.getElementById('im-step-result').style.display='none';
+  document.querySelector('input[name=im-type][value=stays]').checked=true;
+  imTypeChanged();
   document.getElementById('import-overlay').style.display='block';
   document.getElementById('import-modal').style.display='block';
 }
@@ -883,6 +908,23 @@ async function analyzeImport(){
   catch(e){status.textContent='Could not read the file: '+e.message;return;}
   const rows=imParseCSV(text);
   if(rows.length<2){status.textContent='The file appears to be empty.';return;}
+  const type=document.querySelector('input[name=im-type]:checked').value;
+  try{
+    if(type==='stays')await imAnalyzeStays(rows,status);
+    else if(type==='pace')imAnalyzePace(rows,status);
+    else if(type==='discounts')imAnalyzeDiscounts(rows,status);
+    else if(type==='retail')await imAnalyzeRetail(rows,status);
+  }catch(e){status.textContent='Analyze failed: '+e.message;}
+}
+function imShowPreview(lines,note,warnings){
+  let html='<table class="data-table"><tbody>'+lines.map(l=>'<tr><td>'+l[0]+'</td><td class="right" style="font-weight:600;color:var(--text)">'+l[1]+'</td></tr>').join('')+'</tbody></table>';
+  html+='<p style="font-size:13px;color:var(--text2);margin-top:14px;">'+note+'</p>';
+  if(warnings&&warnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+warnings.join('\n')+'</div>';
+  document.getElementById('im-preview-body').innerHTML=html;
+  document.getElementById('im-file-status').textContent='';
+  document.getElementById('im-step-preview').style.display='block';
+}
+async function imAnalyzeStays(rows,status){
   let headerRow=-1,idx=null;
   for(let r=0;r<Math.min(rows.length,10);r++){
     const H=rows[r].map(h=>String(h).trim());
@@ -947,7 +989,7 @@ async function analyzeImport(){
   const currentMetrics=imCalcMetrics(existingRows);
   const afterMetrics=imCalcMetrics(finalRows);
   const dupWarnings=imDuplicateCheck(finalRows);
-  imPending={mode,newRows,importRows,finalRows,newResCount,skippedExisting,fileRevenue,afterMetrics,existingCount:existingRows.length};
+  imPending={type:'stays',mode,newRows,importRows,finalRows,newResCount,skippedExisting,fileRevenue,afterMetrics,existingCount:existingRows.length};
   const lines=[
     ['Reservations in file (usable)',newResCount.toLocaleString()],
     ['Night rows to write',newRows.length.toLocaleString()],
@@ -959,14 +1001,159 @@ async function analyzeImport(){
   ];
   if(mode==='add')lines.splice(3,0,['Skipped (already in sheet)',skippedExisting.toLocaleString()]);
   if(skippedBad>0)lines.push(['Rows skipped (blank/invalid)',skippedBad.toLocaleString()]);
-  let html='<table class="data-table"><tbody>'+lines.map(l=>'<tr><td>'+l[0]+'</td><td class="right" style="font-weight:600;color:var(--text)">'+l[1]+'</td></tr>').join('')+'</tbody></table>';
-  html+='<p style="font-size:13px;color:var(--text2);margin-top:14px;">'+(mode==='replace'
+  imShowPreview(lines,mode==='replace'
     ?'Confirming will <strong>erase all '+existingRows.length.toLocaleString()+' existing stay rows</strong> and replace them with this file’s data.'
-    :'Confirming will add the new rows to the existing data.')+'</p>';
-  if(dupWarnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
-  document.getElementById('im-preview-body').innerHTML=html;
-  status.textContent='';
-  document.getElementById('im-step-preview').style.display='block';
+    :'Confirming will add the new rows to the existing data.',dupWarnings);
+}
+function imAnalyzePace(rows,status){
+  const output=[];
+  let currentYear='';
+  const yearStats={};
+  for(let i=0;i<rows.length;i++){
+    const raw=rows[i];
+    const row=raw.map(v=>String(v).trim());
+    if(row.every(c=>c===''))continue;
+    const joined=row.join(' ').toLowerCase();
+    if(joined.includes('2025')&&!joined.includes('2026'))currentYear='2025';
+    if(joined.includes('2026'))currentYear='2026';
+    if(row[0]==='ReservedOn'||row[1]==='ReservationDates'||row[1]==='NightDate')continue;
+    if(row[0].toLowerCase()==='total'||(row[1]||'').toLowerCase()==='total')continue;
+    const reservedOn=imParseFlexDate(raw[0]);
+    const nightDate=imParseFlexDate(raw[1]);
+    const reservationID=raw[2]||'';
+    const rate=imToNumber(raw[3]);
+    const capacity=imToNumber(raw[4]);
+    const unit=String(raw[5]||raw[6]||'').trim();
+    if(!nightDate||!unit)continue;
+    output.push([currentYear,reservedOn?imFmtDate(reservedOn):'',imFmtDate(nightDate),reservationID,rate,capacity,unit]);
+    if(!yearStats[currentYear||'?'])yearStats[currentYear||'?']={rows:0,rate:0};
+    yearStats[currentYear||'?'].rows++;yearStats[currentYear||'?'].rate+=rate;
+  }
+  if(!output.length){status.textContent='No usable pace rows found. Is this the pace report export?';return;}
+  imPending={type:'pace',rows:output};
+  const lines=[['Rows to write',output.length.toLocaleString()]];
+  Object.keys(yearStats).sort().forEach(y=>lines.push([y+' — nights / revenue',yearStats[y].rows.toLocaleString()+' / '+fmt$(yearStats[y].rate)]));
+  imShowPreview(lines,'Confirming will <strong>replace all existing pace data</strong> with this file’s rows — same as the Apps Script routine.',[]);
+}
+function imAnalyzeDiscounts(rows,status){
+  let headerRow=-1,idx=null;
+  for(let r=0;r<Math.min(rows.length,10);r++){
+    const H=rows[r].map(h=>String(h).trim());
+    const t={res:imFindIdx(H,IM_DISC_AL.res),date:imFindIdx(H,IM_DISC_AL.date),details:imFindIdx(H,IM_DISC_AL.details),amount:imFindIdx(H,IM_DISC_AL.amount)};
+    if(t.res!==-1&&t.date!==-1&&t.details!==-1&&t.amount!==-1){headerRow=r;idx=t;break;}
+  }
+  if(headerRow===-1){status.textContent='Could not find the expected columns (Res#, Date, Details, Amount). Is this the discounts report export?';return;}
+  const output=[];
+  let total=0;
+  const packages=new Set();
+  for(let i=headerRow+1;i<rows.length;i++){
+    const row=rows[i];
+    const res=String(row[idx.res]||'').trim();
+    const details=String(row[idx.details]||'').trim();
+    const amount=imToNumber(row[idx.amount]);
+    if(!details||amount===0||!res)continue;
+    const date=imParseFlexDate(row[idx.date]);
+    if(!date)continue;
+    const cleanDetails=details.replace(/^Package:\s*/i,'').trim();
+    output.push([res,imFmtDate(date),cleanDetails,amount]);
+    total+=amount;packages.add(cleanDetails);
+  }
+  if(!output.length){status.textContent='No usable discount rows found in this file.';return;}
+  imPending={type:'discounts',rows:output,total};
+  imShowPreview([
+    ['Discount rows to write',output.length.toLocaleString()],
+    ['Distinct packages / discounts',packages.size.toLocaleString()],
+    ['Total discounted',fmt$(total)]
+  ],'Confirming will <strong>replace all existing discount data</strong> with this file’s rows — same as the Apps Script routine.',[]);
+}
+function imRetailBucket(item){
+  const norm=String(item||'').toLowerCase().replace(/_/g,' ');
+  return norm.indexOf('resort fee')!==-1?'Resort Fee':'Retail/Other';
+}
+function imBuildRetailMonthly(allRows){
+  const months={};
+  let resortFeeTotal=0,otherTotal=0;
+  for(const row of allRows){
+    if(!row[0])continue;
+    const d=imParseFlexDate(row[1]);
+    if(!d)continue;
+    const total=imToNumber(row[7]);
+    const bucket=row[9];
+    const label=d.toLocaleString('en-US',{month:'short'})+' '+d.getFullYear();
+    const sortKey=d.getFullYear()*100+(d.getMonth()+1);
+    if(!months[label])months[label]={resort:0,other:0,count:0,sortKey};
+    if(bucket==='Resort Fee'){months[label].resort+=total;resortFeeTotal+=total;}
+    else{months[label].other+=total;otherTotal+=total;}
+    months[label].count++;
+  }
+  const round2=n=>Math.round(n*100)/100;
+  const monthlyRows=Object.keys(months).sort((a,b)=>months[a].sortKey-months[b].sortKey)
+    .map(label=>{const m=months[label];return [label,round2(m.resort),round2(m.other),round2(m.resort+m.other),m.count];});
+  return {monthlyRows,resortFeeTotal:Math.round(resortFeeTotal),otherTotal:Math.round(otherTotal)};
+}
+async function imAnalyzeRetail(rows,status){
+  let headerRow=-1,idx=null;
+  for(let r=0;r<Math.min(rows.length,10);r++){
+    const H=rows[r].map(h=>String(h).trim());
+    const t={res:imFindIdx(H,IM_RETAIL_AL.res),date:imFindIdx(H,IM_RETAIL_AL.date),item:imFindIdx(H,IM_RETAIL_AL.item),group:imFindIdx(H,IM_RETAIL_AL.group),qty:imFindIdx(H,IM_RETAIL_AL.qty),amount:imFindIdx(H,IM_RETAIL_AL.amount),discount:imFindIdx(H,IM_RETAIL_AL.discount),total:imFindIdx(H,IM_RETAIL_AL.total),tax:imFindIdx(H,IM_RETAIL_AL.tax)};
+    if(t.res!==-1&&t.date!==-1&&t.item!==-1&&(t.total!==-1||t.amount!==-1)){headerRow=r;idx=t;break;}
+  }
+  if(headerRow===-1){status.textContent='Could not find the expected columns (Res#, Date, Item, Total/Amount). Is this the retail report export?';return;}
+  status.textContent='Loading current retail data for duplicate check…';
+  let existingRaw=[];
+  try{existingRaw=await fetchTab(IM_RETAIL_CLEAN);}catch(e){existingRaw=[];}
+  const existingRows=existingRaw.length>1?existingRaw.slice(1):[];
+  // Key = Res# + Date + Item + Total, same as the Apps Script — re-pasting
+  // overlapping exports never duplicates revenue.
+  const existingKeys=new Set();
+  for(const r of existingRows){
+    if(!r[0])continue;
+    existingKeys.add(String(r[0]).trim()+'|'+imCleanDateText(r[1])+'|'+String(r[2]||'').trim()+'|'+imToNumber(r[7]));
+  }
+  const newRows=[];
+  let skippedDup=0,fileDataRows=0;
+  for(let i=headerRow+1;i<rows.length;i++){
+    const row=rows[i];
+    const res=String(row[idx.res]||'').trim();
+    const dateText=imCleanDateText(row[idx.date]);
+    const item=String(row[idx.item]||'').trim();
+    const group=idx.group!==-1?String(row[idx.group]||'').trim():'';
+    const qty=idx.qty!==-1?imToNumber(row[idx.qty]):1;
+    const amount=idx.amount!==-1?imToNumber(row[idx.amount]):0;
+    const discount=idx.discount!==-1?imToNumber(row[idx.discount]):0;
+    const total=idx.total!==-1?imToNumber(row[idx.total]):amount-discount;
+    const tax=idx.tax!==-1?imToNumber(row[idx.tax]):0;
+    if(!res||!dateText||!item)continue;
+    if(total===0)continue;
+    fileDataRows++;
+    const key=res+'|'+dateText+'|'+item+'|'+total;
+    if(existingKeys.has(key)){skippedDup++;continue;}
+    const nightDate=imParseFlexDate(dateText);
+    newRows.push([res,nightDate?imFmtDate(nightDate):'',item,group,qty,amount,discount,total,tax,imRetailBucket(item)]);
+    existingKeys.add(key);
+  }
+  const combined=existingRows.map(r=>[r[0],r[1],r[2],r[3],r[4],r[5],r[6],imToNumber(r[7]),r[8],r[9]]).concat(newRows);
+  const summary=imBuildRetailMonthly(combined);
+  imPending={type:'retail',newRows,skippedDup,monthlyRows:summary.monthlyRows,resortFeeTotal:summary.resortFeeTotal,otherTotal:summary.otherTotal,retailEmpty:existingRaw.length===0,zeroOverlap:skippedDup===0&&newRows.length===fileDataRows&&existingRows.length>0};
+  if(newRows.length===0){
+    status.textContent='Nothing new to import — all '+skippedDup+' line items in this file are already in the sheet.';
+    imPending=null;
+    return;
+  }
+  const lines=[
+    ['New line items to add',newRows.length.toLocaleString()],
+    ['Skipped (already imported)',skippedDup.toLocaleString()],
+    ['Resort fee revenue after import',fmt$(summary.resortFeeTotal)],
+    ['Retail / other revenue after import',fmt$(summary.otherTotal)]
+  ];
+  let note='Confirming will <strong>add only the new line items</strong> and rebuild the monthly retail summary. Existing rows are never touched.';
+  if(imPending.zeroOverlap)note+='<br><br>⚠️ None of these rows matched existing data — if you expected overlap with last week’s export, double-check you picked the right file.';
+  imShowPreview(lines,note,[]);
+}
+async function imEnsureLogHeader(){
+  let logRaw=[];
+  try{logRaw=await fetchTab(LOG_TAB);}catch(e){}
+  if(logRaw.length===0)await imPutValues(LOG_TAB,[IM_LOG_HEADER]);
 }
 async function confirmImportWrite(){
   if(!imPending)return;
@@ -975,53 +1162,86 @@ async function confirmImportWrite(){
   btn.disabled=true;btn.textContent='Writing…';
   let lastStep='start';
   try{
-    if(p.mode==='replace'){
-      lastStep='clearing '+STAYS_TAB;
-      await imClearTab(STAYS_TAB);
-      lastStep='writing '+p.newRows.length+' night rows';
-      await imPutValues(STAYS_TAB,[IM_CLEAN_HEADER].concat(p.newRows));
-      lastStep='rebuilding '+IMPORT_TAB;
-      await imClearTab(IMPORT_TAB);
-      await imPutValues(IMPORT_TAB,[IM_IMPORT_HEADER].concat(p.importRows));
-    }else{
-      lastStep='appending to '+STAYS_TAB;
-      await imAppendValues(STAYS_TAB,p.newRows);
-      lastStep='appending to '+IMPORT_TAB;
-      await imAppendValues(IMPORT_TAB,p.importRows);
+    let html='';
+    if(p.type==='stays'){
+      if(p.mode==='replace'){
+        lastStep='clearing '+STAYS_TAB;
+        await imClearTab(STAYS_TAB);
+        lastStep='writing '+p.newRows.length+' night rows';
+        await imPutValues(STAYS_TAB,[IM_CLEAN_HEADER].concat(p.newRows));
+        lastStep='rebuilding '+IMPORT_TAB;
+        await imClearTab(IMPORT_TAB);
+        await imPutValues(IMPORT_TAB,[IM_IMPORT_HEADER].concat(p.importRows));
+      }else{
+        lastStep='appending to '+STAYS_TAB;
+        await imAppendValues(STAYS_TAB,p.newRows);
+        lastStep='appending to '+IMPORT_TAB;
+        await imAppendValues(IMPORT_TAB,p.importRows);
+      }
+      lastStep='logging import';
+      await imEnsureLogHeader();
+      const m=p.afterMetrics;
+      await imAppendValues(LOG_TAB,[[imNowStamp(),'STAYS (dashboard import)',p.newResCount,m.revenue,Math.round(m.adr),Math.round(m.revpar*100)/100,Math.round(m.occupancy*10)/10,m.reservations,m.period,p.mode]]);
+      lastStep='saving snapshots';
+      let snapRaw=[];
+      try{snapRaw=await fetchTab(SNAPSHOTS_TAB);}catch(e){}
+      if(snapRaw.length===0)await imPutValues(SNAPSHOTS_TAB,[IM_SNAP_HEADER]);
+      const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
+      const ytdRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr;});
+      const monthRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr&&d.getMonth()===mo;});
+      const snaps=[];
+      if(ytdRows.length>0)snaps.push(imSnapRow('Range '+yr,imComputeScope(ytdRows)));
+      if(monthRows.length>0)snaps.push(imSnapRow('Month '+now.toLocaleString('en-US',{month:'short',year:'numeric'}),imComputeScope(monthRows)));
+      if(snaps.length)await imAppendValues(SNAPSHOTS_TAB,snaps);
+      const dupWarnings=imDuplicateCheck(p.finalRows);
+      html='<div class="im-ok">Stay import complete ✓\n'
+        +p.newResCount+' reservations ('+p.newRows.length+' night rows) written.\n'
+        +'Total revenue: '+fmt$(m.revenue)+'\n'
+        +'ADR: $'+m.adr.toFixed(0)+'\n'
+        +'Occupancy: '+m.occupancy.toFixed(1)+'%\n'
+        +'Period: '+m.period+'</div>';
+      if(dupWarnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
+    }else if(p.type==='pace'){
+      lastStep='replacing '+PACE_TAB;
+      await imClearTab(PACE_TAB);
+      await imPutValues(PACE_TAB,[IM_PACE_HEADER].concat(p.rows));
+      lastStep='logging import';
+      await imEnsureLogHeader();
+      await imAppendValues(LOG_TAB,[[imNowStamp(),'PACE (dashboard import)',p.rows.length,'','','','','','','replace']]);
+      html='<div class="im-ok">Pace report processed ✓\n'+p.rows.length+' rows loaded.</div>';
+    }else if(p.type==='discounts'){
+      lastStep='replacing '+DISCOUNTS_TAB;
+      await imClearTab(DISCOUNTS_TAB);
+      await imPutValues(DISCOUNTS_TAB,[IM_DISC_HEADER].concat(p.rows));
+      lastStep='logging import';
+      await imEnsureLogHeader();
+      await imAppendValues(LOG_TAB,[[imNowStamp(),'DISCOUNTS (dashboard import)',p.rows.length,'','','','','','','replace']]);
+      html='<div class="im-ok">Discounts report processed ✓\n'+p.rows.length+' rows loaded.\nTotal discounted: '+fmt$(p.total)+'</div>';
+    }else if(p.type==='retail'){
+      lastStep='appending to '+IM_RETAIL_CLEAN;
+      if(p.retailEmpty)await imPutValues(IM_RETAIL_CLEAN,[IM_RETAIL_HEADER]);
+      if(p.newRows.length)await imAppendValues(IM_RETAIL_CLEAN,p.newRows);
+      lastStep='rebuilding '+RETAIL_TAB;
+      await imClearTab(RETAIL_TAB);
+      await imPutValues(RETAIL_TAB,[IM_RETAIL_MONTHLY_HEADER].concat(p.monthlyRows));
+      lastStep='logging import';
+      await imEnsureLogHeader();
+      await imAppendValues(LOG_TAB,[[imNowStamp(),'RETAIL (dashboard import)',p.newRows.length,'','','','','','','add']]);
+      html='<div class="im-ok">Retail report processed ✓\n'
+        +p.newRows.length+' new line item(s) added.\n'
+        +p.skippedDup+' row(s) skipped as already-imported.\n\n'
+        +'Resort fee revenue: '+fmt$(p.resortFeeTotal)+'\n'
+        +'Retail/Other revenue: '+fmt$(p.otherTotal)+'</div>';
+      if(p.zeroOverlap)html+='<div class="im-warn">Note: none of these rows matched existing data — if you expected overlap with last week’s export, double-check you picked the right file.</div>';
     }
-    lastStep='logging import';
-    let logRaw=[];
-    try{logRaw=await fetchTab(LOG_TAB);}catch(e){}
-    if(logRaw.length===0)await imPutValues(LOG_TAB,[IM_LOG_HEADER]);
-    const m=p.afterMetrics;
-    await imAppendValues(LOG_TAB,[[imNowStamp(),'STAYS (dashboard import)',p.newResCount,m.revenue,Math.round(m.adr),Math.round(m.revpar*100)/100,Math.round(m.occupancy*10)/10,m.reservations,m.period,p.mode]]);
-    lastStep='saving snapshots';
-    let snapRaw=[];
-    try{snapRaw=await fetchTab(SNAPSHOTS_TAB);}catch(e){}
-    if(snapRaw.length===0)await imPutValues(SNAPSHOTS_TAB,[IM_SNAP_HEADER]);
-    const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
-    const ytdRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr;});
-    const monthRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr&&d.getMonth()===mo;});
-    const snaps=[];
-    if(ytdRows.length>0)snaps.push(imSnapRow('Range '+yr,imComputeScope(ytdRows)));
-    if(monthRows.length>0)snaps.push(imSnapRow('Month '+now.toLocaleString('en-US',{month:'short',year:'numeric'}),imComputeScope(monthRows)));
-    if(snaps.length)await imAppendValues(SNAPSHOTS_TAB,snaps);
     document.getElementById('im-step-preview').style.display='none';
-    const dupWarnings=imDuplicateCheck(p.finalRows);
-    let html='<div class="im-ok">Import complete ✓\n'
-      +p.newResCount+' reservations ('+p.newRows.length+' night rows) written.\n'
-      +'Total revenue: '+fmt$(m.revenue)+'\n'
-      +'ADR: $'+m.adr.toFixed(0)+'\n'
-      +'Occupancy: '+m.occupancy.toFixed(1)+'%\n'
-      +'Period: '+m.period+'</div>';
-    if(dupWarnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
     html+='<p style="font-size:12px;color:var(--text3);margin-top:12px;">Refreshing dashboard…</p>';
     document.getElementById('im-result-body').innerHTML=html;
     document.getElementById('im-step-result').style.display='block';
     imPending=null;
     try{await loadAll();}catch(e){}
   }catch(e){
-    document.getElementById('im-result-body').innerHTML='<div class="im-err">Import failed while '+lastStep+':\n'+e.message+'\n\nThe sheet may be partially written. Re-run the import in Replace mode once the issue is fixed, or use the Apps Script menu (Revenue Tools) as a fallback.</div>';
+    document.getElementById('im-result-body').innerHTML='<div class="im-err">Import failed while '+lastStep+':\n'+e.message+'\n\nThe sheet may be partially written. Re-run the import once the issue is fixed (stays/pace/discounts imports fully rebuild their data, so re-running cleans up any partial write), or use the Apps Script menu (Revenue Tools) as a fallback.</div>';
     document.getElementById('im-step-result').style.display='block';
   }finally{
     btn.disabled=false;btn.textContent='Confirm — write to sheet';
