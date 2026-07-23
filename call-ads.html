@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cave Springs — Call Ads</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f2ee;--surface:#fff;--surface2:#f9f7f4;
+  --border:#e8e2da;--border2:#d6cec3;
+  --slate:#4a5e6d;--slate2:#3a4d5c;--slate3:#6a7e8d;--slate-bg:#eef2f5;
+  --terra:#c4572a;--terra2:#a8451f;--terra-bg:#faf0eb;
+  --green:#3a7d5c;--green-bg:#edf6f1;
+  --amber:#b87c2a;--amber-bg:#fdf5e8;
+  --purple:#6b5b8c;--purple-bg:#f2f0f7;
+  --text:#1a2530;--text2:#4a5568;--text3:#8a9bb0;
+  --sans:'Raleway',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+  --shadow2:0 2px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.06);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* AUTH */
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+.auth-card{background:var(--surface);border-radius:20px;box-shadow:var(--shadow2);padding:60px 56px;text-align:center;max-width:460px;width:90%;}
+.auth-logo-title{font-size:22px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--slate);}
+.auth-logo-sub{font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--text3);}
+.auth-divider{width:40px;height:2px;background:var(--terra);margin:20px auto 28px;}
+.auth-desc{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.7;}
+.auth-btn{display:inline-flex;align-items:center;gap:10px;background:var(--slate);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.auth-btn:hover{background:var(--slate2);}
+
+/* LOADING */
+#loading-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;}
+.spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--slate);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:12px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;}
+
+#dashboard{display:none;}
+
+/* HEADER */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;}
+.header-title{font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
+.header-sub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.last-updated{font-size:12px;color:var(--text3);}
+.hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
+.hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
+
+/* NAV */
+.nav-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;height:44px;gap:4px;}
+.nav-tab{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:0 16px;height:44px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;}
+.nav-tab:hover{color:var(--slate);}
+.nav-tab.active{color:var(--slate);border-bottom-color:var(--slate);}
+
+/* FILTER BAR */
+.filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;gap:10px;min-height:52px;flex-wrap:wrap;}
+.filter-label{font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-right:4px;}
+.filter-select,.filter-date{font-family:var(--sans);font-size:13px;color:var(--text);background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;cursor:pointer;}
+.filter-sep{width:1px;height:24px;background:var(--border2);margin:0 6px;}
+.filter-btn{font-size:11px;font-weight:600;font-family:var(--sans);color:var(--text3);background:transparent;border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;}
+.filter-btn:hover{border-color:var(--slate3);color:var(--slate);}
+.filter-note{font-size:11px;color:var(--text3);margin-left:auto;}
+
+/* CONTENT */
+.content{padding:32px 40px;max-width:1600px;margin:0 auto;}
+.error-banner{display:none;background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-bottom:20px;}
+.info-banner{background:var(--slate-bg);border:1px solid var(--border2);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.7;}
+.info-banner strong{color:var(--slate);}
+
+/* SCORECARDS */
+.scorecards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;}
+.scorecard{border-radius:16px;padding:22px 24px;box-shadow:var(--shadow);border:1px solid var(--border);background:var(--surface);position:relative;overflow:hidden;}
+.scorecard::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--slate);}
+.scorecard.calls::after{background:var(--slate);}
+.scorecard.conv::after{background:var(--green);}
+.scorecard.exist::after{background:var(--amber);}
+.scorecard.rev::after{background:var(--terra);}
+.scorecard-label{font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:10px;color:var(--text3);}
+.scorecard-value{font-size:30px;font-weight:700;letter-spacing:-0.01em;color:var(--text);}
+.scorecard-meta{font-size:12px;color:var(--text3);margin-top:6px;}
+.scorecard-sub{font-size:12px;color:var(--text2);margin-top:4px;}
+
+/* PANELS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px;}
+.panel-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.panel-title{font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);}
+.panel-sub{font-size:11px;color:var(--text3);}
+.panel-body{padding:22px 24px;}
+.chart-wrap{position:relative;}
+
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{text-align:left;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:12px 14px;border-bottom:1px solid var(--border);}
+.data-table td{padding:12px 14px;border-bottom:1px solid var(--surface2);}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table .right{text-align:right;}
+.data-table tr:hover td{background:var(--surface2);}
+.pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;}
+.pill.g{background:var(--green-bg);color:var(--green);}
+.pill.a{background:var(--amber-bg);color:var(--amber);}
+.empty-state{text-align:center;color:var(--text3);font-size:13px;padding:40px 20px;}
+
+/* SPEND BOX */
+.spend-box{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.spend-input{font-family:var(--sans);font-size:14px;width:130px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;}
+.spend-metric{font-size:13px;color:var(--text2);}
+.spend-metric b{color:var(--text);font-size:16px;font-weight:700;}
+
+/* MODAL */
+.import-overlay{display:none;position:fixed;inset:0;background:rgba(26,37,48,0.4);z-index:200;}
+.import-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border-radius:18px;box-shadow:var(--shadow2);width:92%;max-width:620px;max-height:88vh;overflow-y:auto;z-index:201;padding:32px 34px;}
+.import-modal h3{font-size:16px;font-weight:700;letter-spacing:0.04em;color:var(--slate);margin-bottom:6px;}
+.im-desc{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.7;}
+.im-field{margin-bottom:16px;}
+.im-field label{display:block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.im-field input[type=file]{font-family:var(--sans);font-size:13px;width:100%;padding:10px;border:1px dashed var(--border2);border-radius:8px;background:var(--surface2);}
+.im-btn{font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 20px;border-radius:9px;border:none;cursor:pointer;background:var(--slate);color:#fff;}
+.im-btn:hover{background:var(--slate2);}
+.im-btn.ghost{background:transparent;color:var(--text3);border:1px solid var(--border2);}
+.im-btn.ghost:hover{color:var(--slate);border-color:var(--slate3);}
+.im-btn.confirm{background:var(--green);}
+.im-btn.confirm:hover{background:#2f6b4d;}
+.im-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.im-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
+.im-status{font-size:13px;color:var(--text2);margin-top:12px;min-height:20px;}
+.im-err{background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-top:14px;white-space:pre-wrap;}
+.im-ok{background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--green);margin-top:14px;white-space:pre-wrap;}
+.im-warn{background:var(--amber-bg);border:1px solid rgba(184,124,42,0.3);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--amber);margin-top:14px;white-space:pre-wrap;}
+.im-preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:16px;}
+.im-stat{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);}
+.im-stat:last-child{border-bottom:none;}
+.im-stat b{font-weight:700;color:var(--text);}
+.im-privacy{font-size:11px;color:var(--text3);margin-top:16px;line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
+</style>
+</head>
+<body>
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo-title">Cave Springs</div>
+    <div class="auth-logo-sub">Hotel · Cabins · Airstreams</div>
+    <div class="auth-divider"></div>
+    <div class="auth-desc">Call Ads Performance — sign in with your Cave Springs Google account to continue</div>
+    <button class="auth-btn" onclick="signIn()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/></svg>
+      Sign in with Google
+    </button>
+  </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Loading call ads</div></div>
+
+<!-- IMPORT MODAL -->
+<div class="import-overlay" id="import-overlay" onclick="closeImport()"></div>
+<div class="import-modal" id="import-modal">
+  <h3>Import Call Ads Data</h3>
+  <div class="im-desc">Choose two files: the <b>call log</b> from your ad agency, and a <b>ResNexus reservations export</b> (any report that lists Res# with phone numbers). Phone numbers are matched here in your browser to find which calls became reservations — only the reservation number and non-personal call details are saved. Names and phone numbers are never written to the sheet.</div>
+
+  <div class="im-field">
+    <label>1 · Ad agency call log (CSV)</label>
+    <input type="file" id="im-calls" accept=".csv,text/csv">
+  </div>
+  <div class="im-field">
+    <label>2 · ResNexus reservations export (CSV)</label>
+    <input type="file" id="im-res" accept=".csv,text/csv">
+  </div>
+
+  <div class="im-row">
+    <button class="im-btn" id="im-analyze-btn" onclick="analyzeImport()">Match &amp; preview</button>
+    <button class="im-btn ghost" onclick="closeImport()">Close</button>
+  </div>
+  <div class="im-status" id="im-status"></div>
+
+  <div id="im-preview-wrap" style="display:none;">
+    <div class="im-preview" id="im-preview"></div>
+    <div class="im-row" style="margin-top:16px;">
+      <button class="im-btn confirm" id="im-confirm-btn" onclick="confirmImport()">Confirm — save to sheet</button>
+      <button class="im-btn ghost" onclick="cancelPreview()">Cancel</button>
+    </div>
+  </div>
+
+  <div id="im-result" style="display:none;"></div>
+
+  <div class="im-privacy">Privacy: this page reads the caller number from the call log and the phone columns from the reservations export only to match them in your browser. What gets saved to the sheet for each call is: date, campaign, call type, status, duration, area code, and the matched reservation number (if any). No names, no full phone numbers, no emails ever leave this computer.</div>
+</div>
+
+<div id="dashboard">
+  <div class="header">
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Call Ads Performance · Dunsmuir, CA</div></div>
+    <div class="header-right">
+      <div class="last-updated" id="last-updated-text"></div>
+      <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
+      <button class="hdr-btn" onclick="openImport()">&#8679; Import Call Data</button>
+      <button class="hdr-btn" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <a class="nav-tab" href="index.html">Revenue</a>
+    <a class="nav-tab" href="housekeeping.html">Housekeeping</a>
+    <a class="nav-tab active" href="call-ads.html">Call Ads</a>
+  </div>
+
+  <div class="filter-bar" id="filter-bar">
+    <span class="filter-label">Period</span>
+    <select class="filter-select" id="period-select" onchange="onPeriodChange()"></select>
+    <span class="filter-sep"></span>
+    <span class="filter-label">Custom</span>
+    <input type="date" class="filter-date" id="date-from" onchange="onCustomChange()">
+    <span style="color:var(--text3);">–</span>
+    <input type="date" class="filter-date" id="date-to" onchange="onCustomChange()">
+    <button class="filter-btn" onclick="clearCustom()">Clear</button>
+    <span class="filter-note" id="filter-note"></span>
+  </div>
+
+  <div class="content">
+    <div class="error-banner" id="error-banner"></div>
+    <div class="info-banner" id="empty-info" style="display:none;">
+      No call ads data yet. Click <strong>Import Call Data</strong> above and choose your ad agency call log plus a ResNexus reservations export to get started.
+    </div>
+
+    <div id="report-area">
+      <div class="scorecards">
+        <div class="scorecard calls">
+          <div class="scorecard-label">Ad Calls</div>
+          <div class="scorecard-value" id="sc-calls">—</div>
+          <div class="scorecard-meta" id="sc-calls-meta"></div>
+        </div>
+        <div class="scorecard conv">
+          <div class="scorecard-label">Conversions</div>
+          <div class="scorecard-value" id="sc-conv">—</div>
+          <div class="scorecard-meta">booked on/after the call</div>
+          <div class="scorecard-sub" id="sc-conv-rate"></div>
+        </div>
+        <div class="scorecard exist">
+          <div class="scorecard-label">Existing Guests</div>
+          <div class="scorecard-value" id="sc-exist">—</div>
+          <div class="scorecard-meta">already booked before calling</div>
+        </div>
+        <div class="scorecard rev">
+          <div class="scorecard-label">Attributed Revenue</div>
+          <div class="scorecard-value" id="sc-rev">—</div>
+          <div class="scorecard-meta">stay revenue from conversions</div>
+          <div class="scorecard-sub" id="sc-rev-percall"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Ad Spend &amp; Return</span>
+          <span class="panel-sub">optional — saved on this computer only</span>
+        </div>
+        <div class="panel-body">
+          <div class="spend-box">
+            <span class="scorecard-label" style="margin:0;">Ad spend for this view</span>
+            <input type="number" class="spend-input" id="spend-input" placeholder="$0" oninput="onSpendChange()">
+            <span class="spend-metric" id="spend-cpa"></span>
+            <span class="spend-metric" id="spend-roas"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-header"><span class="panel-title">Calls Over Time</span></div>
+          <div class="panel-body"><div class="chart-wrap" style="height:250px"><canvas id="chart-time"></canvas></div></div>
+        </div>
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-header"><span class="panel-title">Conversions by Campaign</span></div>
+          <div class="panel-body"><div class="chart-wrap" style="height:250px"><canvas id="chart-campaign"></canvas></div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Campaign Breakdown</span><span class="panel-sub" id="campaign-sub"></span></div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Campaign</th>
+            <th class="right">Calls</th>
+            <th class="right">Answered</th>
+            <th class="right">Missed</th>
+            <th class="right">Conversions</th>
+            <th class="right">Existing</th>
+            <th class="right">Conv. Rate</th>
+            <th class="right">Attributed Rev.</th>
+          </tr></thead>
+          <tbody id="campaign-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Converting Reservations</span><span class="panel-sub" id="conv-sub"></span></div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Res#</th>
+            <th>Campaign</th>
+            <th>Call Date</th>
+            <th>Booked On</th>
+            <th>Type</th>
+            <th class="right">Stay Revenue</th>
+          </tr></thead>
+          <tbody id="conv-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLIENT_ID = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
+const SHEET_ID  = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
+const CALLS_TAB = 'AD_CALLS_CLEAN';
+const STAYS_TAB = 'STAYS_CLEAN';
+const LOG_TAB   = 'IMPORT_LOG';
+const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
+const CALLS_HEADER = ['CallDateTime','ReportPeriod','Campaign','CallSource','CallType','Status','Duration','AreaCode','MatchedRes'];
+
+let tokenClient, accessToken;
+let callsData = [], staysByRes = {};
+let activePeriod = 'ALL', customFrom = null, customTo = null;
+let timeChart, campaignChart;
+
+/* ---------- Auth ---------- */
+function loadGSI(){return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});}
+async function signIn(){
+  await loadGSI();
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:async(resp)=>{
+    if(resp.error){showErr('Sign-in failed: '+resp.error);return;}
+    accessToken=resp.access_token;showLoad();await loadAll();
+  }});
+  tokenClient.requestAccessToken({prompt:'consent'});
+}
+function signOut(){
+  if(accessToken)google.accounts.oauth2.revoke(accessToken);
+  accessToken=null;callsData=[];staysByRes={};
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  [timeChart,campaignChart].forEach(c=>{if(c)c.destroy();});
+  timeChart=campaignChart=null;
+}
+function showLoad(){document.getElementById('auth-screen').style.display='none';document.getElementById('loading-screen').style.display='flex';}
+function showDash(){document.getElementById('loading-screen').style.display='none';document.getElementById('dashboard').style.display='block';}
+function showErr(msg){const b=document.getElementById('error-banner');b.style.display='block';b.textContent=msg;}
+
+/* ---------- Sheet helpers ---------- */
+async function sheetsApi(url,opts){
+  const r=await fetch(url,Object.assign({headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'}},opts||{}));
+  if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=(j.error&&j.error.message)?j.error.message:msg;}catch(e){}
+    if(r.status===401)msg+=' — your sign-in may have expired. Sign out and back in, then retry.';
+    throw new Error(msg);}
+  return r.json();
+}
+async function fetchTab(tab){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  if(r.status===400)return [];               // tab does not exist yet
+  if(!r.ok)throw new Error(`Cannot load ${tab} (${r.status})`);
+  return (await r.json()).values||[];
+}
+async function listSheetTitles(){
+  const j=await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`);
+  return (j.sheets||[]).map(s=>s.properties.title);
+}
+async function ensureTab(tab){
+  const titles=await listSheetTitles();
+  if(titles.includes(tab))return;
+  await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:tab}}}]})});
+}
+async function clearTab(tab){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:clear`,{method:'POST',body:'{}'});}
+async function putValues(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}!A1?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values})});}
+async function appendValues(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:append?valueInputOption=USER_ENTERED`,{method:'POST',body:JSON.stringify({values})});}
+
+function toRows(raw){if(!raw||raw.length<2)return[];const H=raw[0].map(h=>String(h).trim());return raw.slice(1).map(row=>{const o={};H.forEach((h,i)=>o[h]=(row[i]||'').trim());return o;});}
+function pMoney(s){return parseFloat(String(s||0).replace(/[$,]/g,''))||0;}
+function fmt$(n){return '$'+Math.round(n).toLocaleString('en-US');}
+function pct(n){return (n*100).toFixed(0)+'%';}
+
+/* ---------- Date parsing ---------- */
+function parseDateLoose(s){
+  if(!s)return null;
+  let t=String(s).trim();
+  const m=t.match(/([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})/);      // "Jun 17, 2026"
+  if(m){const d=new Date(m[1]+' '+m[2]+', '+m[3]);if(!isNaN(d))return startOfDay(d);}
+  const s2=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);              // "5/14/2026"
+  if(s2){let y=Number(s2[3]);if(y<100)y+=2000;return new Date(y,Number(s2[1])-1,Number(s2[2]));}
+  const d=new Date(t);
+  return isNaN(d)?null:startOfDay(d);
+}
+function startOfDay(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+function fmtDay(d){return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';}
+function toISO(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+/* ---------- Phone normalise ---------- */
+function normPhone(s){
+  let d=String(s||'').replace(/\D/g,'');
+  if(d.length>10)d=d.slice(-10);            // drop country code / extras, keep last 10
+  return d.length===10?d:'';
+}
+
+/* ---------- CSV parse ---------- */
+function parseCSV(text){
+  const rows=[];let row=[],cur='',inQ=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(inQ){if(c==='"'){if(text[i+1]==='"'){cur+='"';i++;}else inQ=false;}else cur+=c;}
+    else{if(c==='"')inQ=true;else if(c===','){row.push(cur);cur='';}
+      else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}
+      else if(c==='\r'){}else cur+=c;}
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+function findIdx(headers,names){
+  const norm=headers.map(h=>String(h).toLowerCase().replace(/[^a-z0-9]/g,''));
+  for(const name of names){const key=name.toLowerCase().replace(/[^a-z0-9]/g,'');const i=norm.indexOf(key);if(i!==-1)return i;}
+  return -1;
+}
+
+/* ---------- Call log parsing ---------- */
+const CALL_ALIASES={
+  time:['Start time','StartTime','Call time','Date','Call Date','Timestamp'],
+  duration:['Duration (seconds)','Duration','Call duration','Duration seconds'],
+  countryCode:['Caller country code','Country code'],
+  areaCode:['Caller area code','Area code'],
+  phone:['Caller phone number','Phone number','Caller number','Phone','Number','From'],
+  status:['Status','Call status'],
+  source:['Call source','Source'],
+  type:['Call type','Type'],
+  campaign:['Campaign','Campaign name','Ad campaign']
+};
+function parseCallLog(rows){
+  // find header row (search first 15 rows)
+  let hIdx=-1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    if(findIdx(rows[i],CALL_ALIASES.phone)!==-1 && findIdx(rows[i],CALL_ALIASES.time)!==-1){hIdx=i;break;}
+  }
+  if(hIdx===-1){for(let i=0;i<Math.min(rows.length,15);i++){if(findIdx(rows[i],CALL_ALIASES.phone)!==-1){hIdx=i;break;}}}
+  if(hIdx===-1)throw new Error('Could not find the call log columns (need a caller phone number column). Is this the ad agency call log?');
+  const H=rows[hIdx];
+  const ix={};for(const k in CALL_ALIASES)ix[k]=findIdx(H,CALL_ALIASES[k]);
+  // reporting period from preamble rows
+  let period='';
+  for(let i=0;i<hIdx;i++){
+    const joined=rows[i].join(' ');
+    const m=joined.match(/([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})\s*[-–—to]+\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})/);
+    if(m){const a=parseDateLoose(m[1]),b=parseDateLoose(m[2]);if(a&&b){period=fmtDay(a)+' – '+fmtDay(b);break;}}
+  }
+  const calls=[];
+  for(let i=hIdx+1;i<rows.length;i++){
+    const r=rows[i];
+    const rawPhone=ix.phone>=0?r[ix.phone]:'';
+    let phone=normPhone(rawPhone);
+    if(!phone && ix.areaCode>=0){phone=normPhone(String(r[ix.areaCode]||'')+String(rawPhone||''));}
+    const date=parseDateLoose(ix.time>=0?r[ix.time]:'');
+    if(!phone && !date)continue;
+    calls.push({
+      phone,
+      date,
+      duration:ix.duration>=0?(parseInt(String(r[ix.duration]).replace(/\D/g,''))||0):0,
+      areaCode:ix.areaCode>=0?String(r[ix.areaCode]||'').replace(/\D/g,''):(phone?phone.slice(0,3):''),
+      status:ix.status>=0?String(r[ix.status]||'').trim():'',
+      source:ix.source>=0?String(r[ix.source]||'').trim():'',
+      type:ix.type>=0?String(r[ix.type]||'').trim():'',
+      campaign:ix.campaign>=0?String(r[ix.campaign]||'').trim():'(no campaign)'
+    });
+  }
+  // fallback period from call dates
+  if(!period){const ds=calls.map(c=>c.date).filter(Boolean).sort((a,b)=>a-b);if(ds.length)period=fmtDay(ds[0])+' – '+fmtDay(ds[ds.length-1]);}
+  return {calls,period};
+}
+
+/* ---------- Reservations parsing (browser only, never stored) ---------- */
+const RES_ALIASES={res:['Res#','Res','Reservation','Reservation #','Reservation Number','Confirmation','Confirmation #']};
+function parseReservations(rows){
+  let hIdx=-1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const hasRes=findIdx(rows[i],RES_ALIASES.res)!==-1;
+    const hasPhone=rows[i].some(c=>/phone|cell|mobile/i.test(String(c)));
+    if(hasRes&&hasPhone){hIdx=i;break;}
+  }
+  if(hIdx===-1){for(let i=0;i<Math.min(rows.length,15);i++){if(findIdx(rows[i],RES_ALIASES.res)!==-1){hIdx=i;break;}}}
+  if(hIdx===-1)throw new Error('Could not find the reservations columns (need a Res# column). Is this a ResNexus reservations export?');
+  const H=rows[hIdx];
+  const resIx=findIdx(H,RES_ALIASES.res);
+  const phoneCols=[];H.forEach((h,i)=>{if(/phone|cell|mobile/i.test(String(h)))phoneCols.push(i);});
+  const map={};                              // normalizedPhone -> Set(Res#)
+  let resCount=0;
+  for(let i=hIdx+1;i<rows.length;i++){
+    const r=rows[i];const res=String(r[resIx]||'').trim();if(!res)continue;resCount++;
+    phoneCols.forEach(ci=>{const p=normPhone(r[ci]);if(p){(map[p]=map[p]||new Set()).add(res);}});
+  }
+  return {map,resCount,phoneColCount:phoneCols.length};
+}
+
+/* ---------- Import flow ---------- */
+let pendingImport=null;
+function openImport(){
+  pendingImport=null;
+  document.getElementById('im-calls').value='';
+  document.getElementById('im-res').value='';
+  document.getElementById('im-status').textContent='';
+  document.getElementById('im-preview-wrap').style.display='none';
+  document.getElementById('im-result').style.display='none';
+  document.getElementById('import-overlay').style.display='block';
+  document.getElementById('import-modal').style.display='block';
+}
+function closeImport(){pendingImport=null;document.getElementById('import-overlay').style.display='none';document.getElementById('import-modal').style.display='none';}
+function cancelPreview(){pendingImport=null;document.getElementById('im-preview-wrap').style.display='none';document.getElementById('im-status').textContent='Cancelled — nothing was saved.';}
+
+async function analyzeImport(){
+  const status=document.getElementById('im-status');
+  document.getElementById('im-preview-wrap').style.display='none';
+  document.getElementById('im-result').style.display='none';
+  const cf=document.getElementById('im-calls').files[0];
+  const rf=document.getElementById('im-res').files[0];
+  if(!cf){status.textContent='Choose the ad agency call log file first.';return;}
+  if(!rf){status.textContent='Choose the ResNexus reservations export too.';return;}
+  status.textContent='Reading files…';
+  try{
+    const callRows=parseCSV(await cf.text());
+    const resRows=parseCSV(await rf.text());
+    const {calls,period}=parseCallLog(callRows);
+    const {map,resCount,phoneColCount}=parseReservations(resRows);
+    if(!calls.length){status.textContent='No calls found in the call log.';return;}
+    // match
+    let matchedCalls=0;
+    calls.forEach(c=>{
+      const set=c.phone?map[c.phone]:null;
+      c.matched=set?[...set]:[];
+      if(c.matched.length)matchedCalls++;
+    });
+    const matchedRes=new Set();calls.forEach(c=>c.matched.forEach(r=>matchedRes.add(r)));
+    pendingImport={calls,period};
+    // preview
+    const p=document.getElementById('im-preview');
+    p.innerHTML=
+      `<div class="im-stat"><span>Reporting period</span><b>${period||'—'}</b></div>`+
+      `<div class="im-stat"><span>Calls in log</span><b>${calls.length}</b></div>`+
+      `<div class="im-stat"><span>Reservations scanned</span><b>${resCount} (${phoneColCount} phone column${phoneColCount===1?'':'s'})</b></div>`+
+      `<div class="im-stat"><span>Calls matched to a reservation</span><b>${matchedCalls} (${pct(calls.length?matchedCalls/calls.length:0)})</b></div>`+
+      `<div class="im-stat"><span>Distinct reservations matched</span><b>${matchedRes.size}</b></div>`;
+    document.getElementById('im-preview-wrap').style.display='block';
+    status.textContent='Matched in your browser. Review below, then save. Saving replaces all existing call ads data (re-import fresh each time).';
+  }catch(e){status.textContent='';document.getElementById('im-result').style.display='block';document.getElementById('im-result').innerHTML='<div class="im-err">Could not read the files:\n'+e.message+'</div>';}
+}
+
+async function confirmImport(){
+  if(!pendingImport)return;
+  const btn=document.getElementById('im-confirm-btn');btn.disabled=true;
+  const status=document.getElementById('im-status');
+  const result=document.getElementById('im-result');result.style.display='none';
+  let step='starting';
+  try{
+    const {calls,period}=pendingImport;
+    const rows=calls.map(c=>[
+      c.date?toISO(c.date):'',
+      period,
+      c.campaign||'',
+      c.source||'',
+      c.type||'',
+      c.status||'',
+      c.duration||0,
+      c.areaCode||'',
+      c.matched&&c.matched.length?c.matched.join(';'):''
+    ]);
+    step='creating the '+CALLS_TAB+' tab if needed';status.textContent='Saving… ('+step+')';
+    await ensureTab(CALLS_TAB);
+    step='clearing old data';status.textContent='Saving… ('+step+')';
+    await clearTab(CALLS_TAB);
+    step='writing rows';status.textContent='Saving… ('+step+')';
+    await putValues(CALLS_TAB,[CALLS_HEADER].concat(rows));
+    const matchedCalls=calls.filter(c=>c.matched&&c.matched.length).length;
+    const matchedRes=new Set();calls.forEach(c=>(c.matched||[]).forEach(r=>matchedRes.add(r)));
+    try{await appendValues(LOG_TAB,[[nowStamp(),'CALL ADS',calls.length,'','','','',matchedRes.size,period,'matched '+matchedCalls+' of '+calls.length+' calls']]);}catch(e){}
+    result.style.display='block';
+    result.innerHTML='<div class="im-ok">Saved '+calls.length+' calls. '+matchedCalls+' matched to '+matchedRes.size+' reservation'+(matchedRes.size===1?'':'s')+'. Reloading…</div>';
+    setTimeout(async()=>{closeImport();showLoad();await loadAll();},1200);
+  }catch(e){
+    result.style.display='block';
+    result.innerHTML='<div class="im-err">Save failed while '+step+':\n'+e.message+'\n\nNothing partial should remain — the data is replaced in one write. Fix the issue and re-import.</div>';
+    btn.disabled=false;
+  }
+}
+function nowStamp(){const d=new Date();return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleString('en-US',{hour:'numeric',minute:'2-digit'});}
+
+/* ---------- Load & render ---------- */
+async function loadAll(){
+  try{
+    const [callRaw,stayRaw]=await Promise.all([fetchTab(CALLS_TAB),fetchTab(STAYS_TAB)]);
+    // stays: sum revenue + earliest ReservedOn per Res#
+    staysByRes={};
+    toRows(stayRaw).forEach(r=>{
+      const res=String(r['Res#']||r['Res']||'').trim();if(!res)return;
+      const rev=pMoney(r['NightRevenue']);
+      const ro=parseDateLoose(r['ReservedOn']);
+      if(!staysByRes[res])staysByRes[res]={revenue:0,reservedOn:null};
+      staysByRes[res].revenue+=rev;
+      if(ro&&(!staysByRes[res].reservedOn||ro<staysByRes[res].reservedOn))staysByRes[res].reservedOn=ro;
+    });
+    callsData=toRows(callRaw).map(r=>({
+      date:parseDateLoose(r['CallDateTime']),
+      period:r['ReportPeriod']||'',
+      campaign:r['Campaign']||'(no campaign)',
+      type:r['CallType']||'',
+      status:r['Status']||'',
+      duration:parseInt(r['Duration'])||0,
+      areaCode:r['AreaCode']||'',
+      matched:(r['MatchedRes']||'').split(';').map(s=>s.trim()).filter(Boolean)
+    }));
+    buildPeriods();
+    render();
+    document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    showDash();
+  }catch(e){showErr('Error loading data: '+e.message);showDash();}
+}
+
+function buildPeriods(){
+  const sel=document.getElementById('period-select');
+  const periods=[...new Set(callsData.map(c=>c.period).filter(Boolean))];
+  periods.sort((a,b)=>{const da=parseDateLoose(a.split('–')[0]),db=parseDateLoose(b.split('–')[0]);return (da&&db)?da-db:0;});
+  sel.innerHTML='<option value="ALL">All periods</option>'+periods.map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
+  activePeriod=periods.length?periods[periods.length-1]:'ALL';
+  sel.value=activePeriod;
+}
+function onPeriodChange(){activePeriod=document.getElementById('period-select').value;customFrom=customTo=null;document.getElementById('date-from').value='';document.getElementById('date-to').value='';render();}
+function onCustomChange(){
+  const f=document.getElementById('date-from').value,t=document.getElementById('date-to').value;
+  customFrom=f?parseDateLoose(f):null;customTo=t?parseDateLoose(t):null;
+  render();
+}
+function clearCustom(){customFrom=customTo=null;document.getElementById('date-from').value='';document.getElementById('date-to').value='';render();}
+
+function periodBounds(){
+  // returns [from,to] as day Dates, or null for open
+  if(customFrom||customTo)return [customFrom,customTo];
+  if(activePeriod==='ALL')return [null,null];
+  const parts=activePeriod.split('–');
+  return [parseDateLoose(parts[0]),parseDateLoose(parts[1]||parts[0])];
+}
+function inView(c){
+  if(customFrom||customTo){
+    if(!c.date)return false;
+    if(customFrom&&c.date<customFrom)return false;
+    if(customTo&&c.date>customTo)return false;
+    return true;
+  }
+  if(activePeriod==='ALL')return true;
+  return c.period===activePeriod;
+}
+
+function classify(res,callDate){
+  const s=staysByRes[res];
+  if(!s||!s.reservedOn)return {bucket:'unknown',revenue:s?s.revenue:0,reservedOn:s?s.reservedOn:null};
+  const booked=(callDate&&s.reservedOn>=callDate)?'conv':'exist';
+  return {bucket:booked,revenue:s.revenue,reservedOn:s.reservedOn};
+}
+
+function render(){
+  const isEmpty=callsData.length===0;
+  document.getElementById('empty-info').style.display=isEmpty?'block':'none';
+  document.getElementById('report-area').style.display=isEmpty?'none':'block';
+  if(isEmpty)return;
+
+  const calls=callsData.filter(inView);
+  const answered=calls.filter(c=>/receiv|answer|complet/i.test(c.status)).length;
+  const missed=calls.length-answered;
+
+  // reservation-level attribution: earliest matching call date per Res#
+  const resFirstCall={};
+  calls.forEach(c=>{if(!c.date)return;c.matched.forEach(res=>{if(!resFirstCall[res]||c.date<resFirstCall[res].date)resFirstCall[res]={date:c.date,campaign:c.campaign};});});
+
+  let convCount=0,existCount=0,unknownCount=0,convRev=0,existRev=0;
+  const convRows=[];
+  Object.keys(resFirstCall).forEach(res=>{
+    const fc=resFirstCall[res];
+    const cl=classify(res,fc.date);
+    if(cl.bucket==='conv'){convCount++;convRev+=cl.revenue;convRows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:cl.reservedOn,revenue:cl.revenue,type:'Conversion'});}
+    else if(cl.bucket==='exist'){existCount++;existRev+=cl.revenue;convRows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:cl.reservedOn,revenue:cl.revenue,type:'Existing guest'});}
+    else {unknownCount++;convRows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:null,revenue:cl.revenue,type:'No stay data'});}
+  });
+
+  // scorecards
+  document.getElementById('sc-calls').textContent=calls.length;
+  document.getElementById('sc-calls-meta').textContent=answered+' answered · '+missed+' missed';
+  document.getElementById('sc-conv').textContent=convCount;
+  document.getElementById('sc-conv-rate').textContent=calls.length?pct(convCount/calls.length)+' of calls converted':'';
+  document.getElementById('sc-exist').textContent=existCount;
+  document.getElementById('sc-rev').textContent=fmt$(convRev);
+  document.getElementById('sc-rev-percall').textContent=calls.length?fmt$(convRev/calls.length)+' per call':'';
+
+  // filter note
+  const [f,t]=periodBounds();
+  let note='';
+  if(customFrom||customTo)note='Custom range'+(f?' from '+fmtDay(f):'')+(t?' to '+fmtDay(t):'');
+  else if(activePeriod==='ALL')note='All imported calls';
+  else note='Agency reporting period';
+  if(unknownCount)note+=' · '+unknownCount+' matched reservation'+(unknownCount===1?'':'s')+' not yet in stays data';
+  document.getElementById('filter-note').textContent=note;
+
+  renderSpend(convCount,convRev);
+  renderCampaignTable(calls);
+  renderConvTable(convRows);
+  renderTimeChart(calls);
+  renderCampaignChart(calls);
+}
+
+/* spend / ROI (localStorage per period) */
+function spendKey(){if(customFrom||customTo)return 'cs_adspend_custom';return 'cs_adspend_'+activePeriod;}
+function onSpendChange(){try{localStorage.setItem(spendKey(),document.getElementById('spend-input').value||'');}catch(e){}render();}
+function renderSpend(convCount,convRev){
+  let saved='';try{saved=localStorage.getItem(spendKey())||'';}catch(e){}
+  const inp=document.getElementById('spend-input');
+  if(document.activeElement!==inp)inp.value=saved;
+  const spend=pMoney(saved);
+  const cpaEl=document.getElementById('spend-cpa'),roasEl=document.getElementById('spend-roas');
+  if(spend>0){
+    cpaEl.innerHTML=convCount>0?'Cost per conversion <b>'+fmt$(spend/convCount)+'</b>':'Cost per conversion <b>—</b>';
+    roasEl.innerHTML='Return on ad spend <b>'+(spend>0?(convRev/spend).toFixed(1)+'×':'—')+'</b>';
+  }else{cpaEl.textContent='Enter your ad spend to see cost per conversion and ROAS.';roasEl.textContent='';}
+}
+
+function renderCampaignTable(calls){
+  const by={};
+  calls.forEach(c=>{const k=c.campaign||'(no campaign)';if(!by[k])by[k]={calls:0,answered:0,missed:0,convRes:new Set(),existRes:new Set(),rev:0};
+    by[k].calls++;
+    if(/receiv|answer|complet/i.test(c.status))by[k].answered++;else by[k].missed++;});
+  // attribute reservations to the campaign of their earliest matching call
+  const resFirstCall={};
+  calls.forEach(c=>{if(!c.date)return;c.matched.forEach(res=>{if(!resFirstCall[res]||c.date<resFirstCall[res].date)resFirstCall[res]={date:c.date,campaign:c.campaign};});});
+  Object.keys(resFirstCall).forEach(res=>{
+    const fc=resFirstCall[res];const k=fc.campaign||'(no campaign)';if(!by[k])return;
+    const cl=classify(res,fc.date);
+    if(cl.bucket==='conv'){by[k].convRes.add(res);by[k].rev+=cl.revenue;}
+    else if(cl.bucket==='exist'){by[k].existRes.add(res);}
+  });
+  const keys=Object.keys(by).sort((a,b)=>by[b].calls-by[a].calls);
+  const tb=document.getElementById('campaign-tbody');
+  if(!keys.length){tb.innerHTML='<tr><td colspan="8" class="empty-state">No calls in this view</td></tr>';document.getElementById('campaign-sub').textContent='';return;}
+  document.getElementById('campaign-sub').textContent=keys.length+' campaign'+(keys.length===1?'':'s');
+  tb.innerHTML=keys.map(k=>{const d=by[k];const conv=d.convRes.size;
+    return `<tr><td><b>${esc(k)}</b></td><td class="right">${d.calls}</td><td class="right">${d.answered}</td><td class="right">${d.missed}</td>`+
+      `<td class="right"><span class="pill g">${conv}</span></td><td class="right">${d.existRes.size?'<span class="pill a">'+d.existRes.size+'</span>':'0'}</td>`+
+      `<td class="right">${pct(d.calls?conv/d.calls:0)}</td><td class="right"><b>${fmt$(d.rev)}</b></td></tr>`;
+  }).join('');
+}
+
+function renderConvTable(rows){
+  rows.sort((a,b)=>(b.callDate||0)-(a.callDate||0));
+  const tb=document.getElementById('conv-tbody');
+  const shown=rows.filter(r=>r.type!=='Existing guest');   // lead with conversions + unknowns
+  const list=shown.length?shown:rows;
+  if(!list.length){tb.innerHTML='<tr><td colspan="6" class="empty-state">No matched reservations in this view</td></tr>';document.getElementById('conv-sub').textContent='';return;}
+  document.getElementById('conv-sub').textContent=rows.filter(r=>r.type==='Conversion').length+' conversions · '+rows.filter(r=>r.type==='Existing guest').length+' existing';
+  tb.innerHTML=list.map(r=>{
+    const pill=r.type==='Conversion'?'<span class="pill g">Conversion</span>':r.type==='Existing guest'?'<span class="pill a">Existing</span>':'<span class="pill a">No stay data</span>';
+    return `<tr><td><b>${esc(r.res)}</b></td><td>${esc(r.campaign)}</td><td>${fmtDay(r.callDate)}</td><td>${fmtDay(r.reservedOn)}</td><td>${pill}</td><td class="right"><b>${fmt$(r.revenue)}</b></td></tr>`;
+  }).join('');
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---------- Charts ---------- */
+function renderTimeChart(calls){
+  const by={};calls.forEach(c=>{if(!c.date)return;const k=toISO(c.date);by[k]=(by[k]||0)+1;});
+  const labels=Object.keys(by).sort();
+  const data=labels.map(k=>by[k]);
+  const disp=labels.map(k=>{const d=parseDateLoose(k);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});});
+  if(timeChart)timeChart.destroy();
+  timeChart=new Chart(document.getElementById('chart-time'),{type:'line',data:{labels:disp,datasets:[{label:'Calls',data,borderColor:'#4a5e6d',backgroundColor:'rgba(74,94,109,0.1)',fill:true,tension:0.3,pointRadius:2}]},options:chartOpts(true)});
+}
+function renderCampaignChart(calls){
+  const resFirstCall={};
+  calls.forEach(c=>{if(!c.date)return;c.matched.forEach(res=>{if(!resFirstCall[res]||c.date<resFirstCall[res].date)resFirstCall[res]={date:c.date,campaign:c.campaign};});});
+  const conv={},exist={};
+  Object.keys(resFirstCall).forEach(res=>{const fc=resFirstCall[res];const cl=classify(res,fc.date);const k=fc.campaign||'(no campaign)';if(cl.bucket==='conv')conv[k]=(conv[k]||0)+1;else if(cl.bucket==='exist')exist[k]=(exist[k]||0)+1;});
+  const labels=[...new Set([...Object.keys(conv),...Object.keys(exist)])];
+  if(campaignChart)campaignChart.destroy();
+  campaignChart=new Chart(document.getElementById('chart-campaign'),{type:'bar',data:{labels,datasets:[
+    {label:'Conversions',data:labels.map(k=>conv[k]||0),backgroundColor:'#3a7d5c'},
+    {label:'Existing guests',data:labels.map(k=>exist[k]||0),backgroundColor:'#b87c2a'}
+  ]},options:chartOpts(false,true)});
+}
+function chartOpts(hideLegend,stacked){
+  return {responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:!hideLegend,position:'bottom',labels:{font:{family:'Raleway',size:11},usePointStyle:true,boxWidth:8}}},
+    scales:{x:{stacked:!!stacked,grid:{display:false},ticks:{font:{family:'Raleway',size:10},color:'#8a9bb0'}},
+      y:{stacked:!!stacked,beginAtZero:true,grid:{color:'#f0ece6'},ticks:{font:{family:'Raleway',size:10},color:'#8a9bb0',precision:0}}}};
+}
+</script>
+</body>
+</html>
