@@ -319,8 +319,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
           <thead><tr>
             <th>Campaign</th>
             <th class="right">Calls</th>
-            <th class="right">Answered</th>
-            <th class="right">Missed</th>
             <th class="right">Conversions</th>
             <th class="right">Existing</th>
             <th class="right">Conv. Rate</th>
@@ -967,7 +965,6 @@ function firstCallByRes(calls){
   return out;
 }
 function computeMetrics(calls){
-  const answered=calls.filter(c=>/receiv|answer|complet/i.test(c.status)).length;
   const resFirstCall=firstCallByRes(calls);
   let convCount=0,existCount=0,unknownCount=0,convRev=0;
   const rows=[];
@@ -978,7 +975,7 @@ function computeMetrics(calls){
     else if(cl.bucket==='exist'){existCount++;rows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:cl.reservedOn,revenue:cl.revenue,type:'Existing guest'});}
     else {unknownCount++;rows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:null,revenue:cl.revenue,type:'No stay data'});}
   });
-  return {calls:calls.length,answered,missed:calls.length-answered,convCount,existCount,unknownCount,convRev,rows};
+  return {calls:calls.length,convCount,existCount,unknownCount,convRev,rows};
 }
 
 function render(){
@@ -992,7 +989,7 @@ function render(){
 
   // scorecards
   document.getElementById('sc-calls').textContent=m.calls;
-  document.getElementById('sc-calls-meta').textContent=m.answered+' answered · '+m.missed+' missed';
+  document.getElementById('sc-calls-meta').textContent=m.calls?'across '+new Set(calls.map(c=>c.campaign)).size+' campaign'+(new Set(calls.map(c=>c.campaign)).size===1?'':'s'):'';
   document.getElementById('sc-conv').textContent=m.convCount;
   document.getElementById('sc-conv-rate').textContent=m.calls?pct(m.convCount/m.calls)+' of calls converted':'';
   document.getElementById('sc-exist').textContent=m.existCount;
@@ -1035,7 +1032,8 @@ function renderDeltas(cur){
   if(idx<1){clear();return;}
   const prevP=knownPeriods[idx-1];
   const prev=computeMetrics(callsData.filter(c=>c.period===prevP.label));
-  const label=prevP.start?prevP.start.toLocaleDateString('en-US',{month:'short',year:'2-digit'}):'previous';
+  // full year — "May 26" reads as a day of the month on a page full of dates
+  const label=prevP.start?prevP.start.toLocaleDateString('en-US',{month:'short',year:'numeric'}):'previous period';
   const num=n=>String(Math.round(n));
   setDelta('sc-calls-delta',cur.calls,prev.calls,num,label);
   setDelta('sc-conv-delta',cur.convCount,prev.convCount,num,label);
@@ -1110,9 +1108,8 @@ function renderSpend(convCount,convRev,unknownCount){
 
 function renderCampaignTable(calls){
   const by={};
-  calls.forEach(c=>{const k=c.campaign||'(no campaign)';if(!by[k])by[k]={calls:0,answered:0,missed:0,convRes:new Set(),existRes:new Set(),rev:0};
-    by[k].calls++;
-    if(/receiv|answer|complet/i.test(c.status))by[k].answered++;else by[k].missed++;});
+  calls.forEach(c=>{const k=c.campaign||'(no campaign)';if(!by[k])by[k]={calls:0,convRes:new Set(),existRes:new Set(),rev:0};
+    by[k].calls++;});
   // attribute reservations to the campaign of their earliest matching call
   const resFirstCall=firstCallByRes(calls);
   Object.keys(resFirstCall).forEach(res=>{
@@ -1123,10 +1120,10 @@ function renderCampaignTable(calls){
   });
   const keys=Object.keys(by).sort((a,b)=>by[b].calls-by[a].calls);
   const tb=document.getElementById('campaign-tbody');
-  if(!keys.length){tb.innerHTML='<tr><td colspan="8" class="empty-state">No calls in this view</td></tr>';document.getElementById('campaign-sub').textContent='';return;}
+  if(!keys.length){tb.innerHTML='<tr><td colspan="6" class="empty-state">No calls in this view</td></tr>';document.getElementById('campaign-sub').textContent='';return;}
   document.getElementById('campaign-sub').textContent=keys.length+' campaign'+(keys.length===1?'':'s');
   tb.innerHTML=keys.map(k=>{const d=by[k];const conv=d.convRes.size;
-    return `<tr><td><b>${esc(k)}</b></td><td class="right">${d.calls}</td><td class="right">${d.answered}</td><td class="right">${d.missed}</td>`+
+    return `<tr><td><b>${esc(k)}</b></td><td class="right">${d.calls}</td>`+
       `<td class="right"><span class="pill g">${conv}</span></td><td class="right">${d.existRes.size?'<span class="pill a">'+d.existRes.size+'</span>':'0'}</td>`+
       `<td class="right">${pct(d.calls?conv/d.calls:0)}</td><td class="right"><b>${fmt$(d.rev)}</b></td></tr>`;
   }).join('');
@@ -1153,16 +1150,26 @@ function renderTimeChart(calls){
   // Years of daily points are unreadable — widen the bucket as history grows.
   const span=dates.length?daysBetween(dates[0],dates[dates.length-1])+1:0;
   const bucket=span>400?'month':span>92?'week':'day';
+  const bucketOf=d=>bucket==='month'?new Date(d.getFullYear(),d.getMonth(),1):bucket==='week'?startOfWeek(d):startOfDay(d);
   const by={};
-  dates.forEach(d=>{
-    const b=bucket==='month'?new Date(d.getFullYear(),d.getMonth(),1):bucket==='week'?startOfWeek(d):d;
-    const k=toISO(b);by[k]=(by[k]||0)+1;
-  });
-  const keys=Object.keys(by).sort();
-  const data=keys.map(k=>by[k]);
+  dates.forEach(d=>{const k=toISO(bucketOf(d));by[k]=(by[k]||0)+1;});
+  // Walk the whole span so days with no calls plot as zero. Charting only the days
+  // that had calls squeezes the gaps out and makes quiet stretches look busy.
+  const keys=[];
+  if(dates.length){
+    const last=toISO(bucketOf(dates[dates.length-1]));
+    let cur=bucketOf(dates[0]);
+    for(let guard=0;guard<2000;guard++){
+      const k=toISO(cur);keys.push(k);
+      if(k===last)break;
+      cur=bucket==='month'?new Date(cur.getFullYear(),cur.getMonth()+1,1)
+         :new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+(bucket==='week'?7:1));
+    }
+  }
+  const data=keys.map(k=>by[k]||0);
   const disp=keys.map(k=>{
     const d=parseDateLoose(k);
-    if(bucket==='month')return d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    if(bucket==='month')return d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
     const s=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
     return bucket==='week'?'wk '+s:s;
   });
