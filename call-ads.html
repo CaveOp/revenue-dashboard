@@ -117,6 +117,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .spend-metric b.loss{color:var(--terra);}
 .spend-metric b.thin{color:var(--amber);}
 .spend-metric b.good{color:var(--green);}
+.spend-campaigns{display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+.spend-camp{display:flex;align-items:center;gap:9px;}
+.spend-camp-name{font-size:12px;color:var(--text2);}
+.spend-input.sm{width:106px;padding:6px 10px;font-size:13px;}
+.table-scroll{overflow-x:auto;}
 .spend-note{font-size:12px;color:var(--text3);margin-top:12px;line-height:1.6;}
 .spend-note .warn{color:var(--amber);font-weight:600;}
 .spend-note .bad{color:var(--terra);font-weight:600;}
@@ -298,6 +303,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
             <span class="spend-metric" id="spend-cpa"></span>
             <span class="spend-metric" id="spend-roas"></span>
           </div>
+          <div class="spend-campaigns" id="spend-campaigns"></div>
           <div class="spend-note" id="spend-note"></div>
         </div>
       </div>
@@ -315,17 +321,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
       <div class="panel">
         <div class="panel-header"><span class="panel-title">Campaign Breakdown</span><span class="panel-sub" id="campaign-sub"></span></div>
-        <table class="data-table">
-          <thead><tr>
-            <th>Campaign</th>
-            <th class="right">Calls</th>
-            <th class="right">Conversions</th>
-            <th class="right">Existing</th>
-            <th class="right">Conv. Rate</th>
-            <th class="right">Attributed Rev.</th>
-          </tr></thead>
-          <tbody id="campaign-tbody"></tbody>
-        </table>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr>
+              <th>Campaign</th>
+              <th class="right">Spend</th>
+              <th class="right">Calls</th>
+              <th class="right">Cost / Call</th>
+              <th class="right">Conversions</th>
+              <th class="right">Cost / Conv.</th>
+              <th class="right">Existing</th>
+              <th class="right">Conv. Rate</th>
+              <th class="right">Attributed Rev.</th>
+              <th class="right">ROAS</th>
+            </tr></thead>
+            <tbody id="campaign-tbody"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="panel">
@@ -1006,8 +1018,9 @@ function render(){
   if(m.unknownCount)note+=' · '+m.unknownCount+' matched reservation'+(m.unknownCount===1?'':'s')+' not yet in stays data';
   document.getElementById('filter-note').textContent=note;
 
-  renderSpend(m.convCount,m.convRev,m.unknownCount);
-  renderCampaignTable(calls);
+  const spendInfo=currentSpend(calls);
+  renderSpend(m.convCount,m.convRev,m.unknownCount,spendInfo);
+  renderCampaignTable(calls,spendInfo);
   renderConvTable(m.rows);
   renderTimeChart(calls);
   renderCampaignChart(calls);
@@ -1050,35 +1063,89 @@ function spendKey(){
   if(customFrom||customTo)return 'cs_adspend_range_'+(customFrom?toISO(customFrom):'')+'_'+(customTo?toISO(customTo):'');
   return spendKeyFor(activePeriod);
 }
+function campaignSpendKey(base,campaign){return base+'::'+campaign;}
 function readSpend(key){let v='';try{v=localStorage.getItem(key)||'';}catch(e){}return pMoney(v);}
 function isSummedView(){return !(customFrom||customTo)&&activePeriod==='ALL';}
+function campaignsIn(calls){return [...new Set(calls.map(c=>c.campaign||'(no campaign)'))].sort();}
+
+// Per-campaign figures win when any are entered; otherwise fall back to the single
+// period total, which is all the agency reports today.
+function spendFor(base,campaigns){
+  const byCampaign={};let sum=0,filled=0;
+  campaigns.forEach(c=>{const v=readSpend(campaignSpendKey(base,c));if(v>0){byCampaign[c]=v;sum+=v;filled++;}});
+  if(filled)return {total:sum,byCampaign,filled,perCampaign:true};
+  return {total:readSpend(base),byCampaign:{},filled:0,perCampaign:false};
+}
+// "All periods" adds up each period's spend rather than holding a figure of its own.
 function summedSpend(){
-  let total=0,n=0;
-  knownPeriods.forEach(p=>{const v=readSpend(spendKeyFor(p.label));if(v>0){total+=v;n++;}});
-  return {total,n};
+  let total=0,n=0;const byCampaign={};let anyPerCampaign=false;
+  knownPeriods.forEach(p=>{
+    const pc=callsData.filter(c=>c.period===p.label);
+    const s=spendFor(spendKeyFor(p.label),campaignsIn(pc));
+    if(s.total>0){
+      total+=s.total;n++;
+      if(s.perCampaign)anyPerCampaign=true;
+      Object.keys(s.byCampaign).forEach(k=>byCampaign[k]=(byCampaign[k]||0)+s.byCampaign[k]);
+    }
+  });
+  return {total,n,byCampaign,perCampaign:anyPerCampaign};
+}
+function currentSpend(calls){
+  const campaigns=campaignsIn(calls);
+  if(isSummedView()){const s=summedSpend();return {total:s.total,byCampaign:s.byCampaign,periods:s.n,perCampaign:s.perCampaign,campaigns,summed:true};}
+  const base=spendKey();
+  const s=spendFor(base,campaigns);
+  return {total:s.total,byCampaign:s.byCampaign,filled:s.filled,perCampaign:s.perCampaign,campaigns,base,summed:false};
 }
 function onSpendChange(){
   if(isSummedView())return;                  // summed view is derived, never written
   try{localStorage.setItem(spendKey(),document.getElementById('spend-input').value||'');}catch(e){}
   render();
 }
-function renderSpend(convCount,convRev,unknownCount){
+let spendCampaignList=[],spendInputsSig='';
+function onCampaignSpendChange(inp){
+  const c=spendCampaignList[Number(inp.dataset.ci)];
+  if(c===undefined)return;
+  try{localStorage.setItem(campaignSpendKey(spendKey(),c),inp.value||'');}catch(e){}
+  render();
+}
+// Rebuilt only when the campaign set changes, so typing does not blow away focus.
+function renderCampaignSpendInputs(info){
+  const wrap=document.getElementById('spend-campaigns');
+  if(info.summed||!info.campaigns.length){wrap.innerHTML='';wrap.style.display='none';spendInputsSig='';return;}
+  wrap.style.display='flex';
+  const sig=info.base+'|'+info.campaigns.join('|');
+  if(sig!==spendInputsSig){
+    spendCampaignList=info.campaigns;
+    wrap.innerHTML=info.campaigns.map((c,i)=>{
+      const v=readSpend(campaignSpendKey(info.base,c));
+      return '<div class="spend-camp"><span class="spend-camp-name">'+esc(c)+'</span>'+
+        '<input type="number" class="spend-input sm" data-ci="'+i+'" placeholder="$0" value="'+(v>0?Math.round(v):'')+'" oninput="onCampaignSpendChange(this)"></div>';
+    }).join('');
+    spendInputsSig=sig;
+  }else{
+    wrap.querySelectorAll('input[data-ci]').forEach(inp=>{
+      if(document.activeElement===inp)return;
+      const v=readSpend(campaignSpendKey(info.base,spendCampaignList[Number(inp.dataset.ci)]));
+      inp.value=v>0?Math.round(v):'';
+    });
+  }
+}
+function renderSpend(convCount,convRev,unknownCount,info){
   const inp=document.getElementById('spend-input');
   const cpaEl=document.getElementById('spend-cpa'),roasEl=document.getElementById('spend-roas');
   const note=document.getElementById('spend-note'),lbl=document.getElementById('spend-label');
-  let spend=0,summedFrom=0;
-  if(isSummedView()){
-    const s=summedSpend();spend=s.total;summedFrom=s.n;
-    inp.disabled=true;
+  const spend=info.total;
+  const derived=info.summed||info.perCampaign;   // a sum, so not typed directly
+  inp.disabled=derived;
+  if(derived){
     inp.value=spend>0?Math.round(spend):'';
-    lbl.textContent='Total ad spend (summed)';
+    lbl.textContent=info.summed?'Total ad spend (summed)':'Total ad spend (per campaign below)';
   }else{
-    inp.disabled=false;
-    let saved='';try{saved=localStorage.getItem(spendKey())||'';}catch(e){}
-    if(document.activeElement!==inp)inp.value=saved;
-    spend=pMoney(saved);
+    if(document.activeElement!==inp){let saved='';try{saved=localStorage.getItem(spendKey())||'';}catch(e){}inp.value=saved;}
     lbl.textContent=(customFrom||customTo)?'Ad spend for this date range':'Ad spend for this period';
   }
+  renderCampaignSpendInputs(info);
 
   if(spend>0){
     cpaEl.innerHTML=convCount>0?'Cost per conversion <b>'+fmt$(spend/convCount)+'</b>':'Cost per conversion <b>—</b>';
@@ -1091,12 +1158,18 @@ function renderSpend(convCount,convRev,unknownCount){
   }
 
   const parts=[];
-  if(isSummedView()){
-    const blank=knownPeriods.length-summedFrom;
-    parts.push(summedFrom
-      ? 'Summed from '+summedFrom+' period'+(summedFrom===1?'':'s')+' with spend entered'+
+  if(info.summed){
+    const blank=knownPeriods.length-(info.periods||0);
+    parts.push(info.periods
+      ? 'Summed from '+info.periods+' period'+(info.periods===1?'':'s')+' with spend entered'+
         (blank?'. <span class="warn">'+blank+' period'+(blank===1?' has':'s have')+' no spend recorded, so this total is low.</span>':'.')
       : 'No spend recorded yet. Pick a single period above to enter it — this view adds those figures up.');
+  }else if(info.perCampaign){
+    const blank=info.campaigns.length-info.filled;
+    parts.push('Total is the sum of the campaign figures below'+
+      (blank?'. <span class="warn">'+blank+' campaign'+(blank===1?' has':'s have')+' no spend entered, so this total is low.</span>':'.'));
+  }else if(info.campaigns.length>1&&spend>0){
+    parts.push('This is a blended figure across '+info.campaigns.length+' campaigns. Enter spend per campaign below to see which one is carrying the result.');
   }
   if(unknownCount)parts.push('<span class="warn">'+unknownCount+' matched reservation'+(unknownCount===1?' is':'s are')+
     ' missing from stays data, so conversions are undercounted here — cost per conversion reads higher and return reads lower than it should.</span>');
@@ -1106,7 +1179,7 @@ function renderSpend(convCount,convRev,unknownCount){
   note.innerHTML=parts.join('<br>');
 }
 
-function renderCampaignTable(calls){
+function renderCampaignTable(calls,spendInfo){
   const by={};
   calls.forEach(c=>{const k=c.campaign||'(no campaign)';if(!by[k])by[k]={calls:0,convRes:new Set(),existRes:new Set(),rev:0};
     by[k].calls++;});
@@ -1120,12 +1193,28 @@ function renderCampaignTable(calls){
   });
   const keys=Object.keys(by).sort((a,b)=>by[b].calls-by[a].calls);
   const tb=document.getElementById('campaign-tbody');
-  if(!keys.length){tb.innerHTML='<tr><td colspan="6" class="empty-state">No calls in this view</td></tr>';document.getElementById('campaign-sub').textContent='';return;}
-  document.getElementById('campaign-sub').textContent=keys.length+' campaign'+(keys.length===1?'':'s');
-  tb.innerHTML=keys.map(k=>{const d=by[k];const conv=d.convRes.size;
-    return `<tr><td><b>${esc(k)}</b></td><td class="right">${d.calls}</td>`+
-      `<td class="right"><span class="pill g">${conv}</span></td><td class="right">${d.existRes.size?'<span class="pill a">'+d.existRes.size+'</span>':'0'}</td>`+
-      `<td class="right">${pct(d.calls?conv/d.calls:0)}</td><td class="right"><b>${fmt$(d.rev)}</b></td></tr>`;
+  if(!keys.length){tb.innerHTML='<tr><td colspan="10" class="empty-state">No calls in this view</td></tr>';document.getElementById('campaign-sub').textContent='';return;}
+  const spendBy=(spendInfo&&spendInfo.byCampaign)||{};
+  const anySpend=Object.keys(spendBy).length>0;
+  document.getElementById('campaign-sub').textContent=keys.length+' campaign'+(keys.length===1?'':'s')+
+    (anySpend?'':' · enter spend per campaign to see cost and return');
+  tb.innerHTML=keys.map(k=>{
+    const d=by[k],conv=d.convRes.size,spend=spendBy[k]||0;
+    const dash='<span style="color:var(--text3)">—</span>';
+    let costCall=dash,costConv=dash,roas=dash,spendCell=dash;
+    if(spend>0){
+      spendCell='<b>'+fmt$(spend)+'</b>';
+      costCall=d.calls?fmt$(spend/d.calls):dash;
+      costConv=conv?fmt$(spend/conv):dash;
+      const r=d.rev/spend;
+      roas='<b class="'+(r<1?'loss':r<2?'thin':'good')+'">'+r.toFixed(1)+'×</b>';
+    }
+    return `<tr><td><b>${esc(k)}</b></td><td class="right">${spendCell}</td><td class="right">${d.calls}</td>`+
+      `<td class="right">${costCall}</td>`+
+      `<td class="right"><span class="pill g">${conv}</span></td><td class="right">${costConv}</td>`+
+      `<td class="right">${d.existRes.size?'<span class="pill a">'+d.existRes.size+'</span>':'0'}</td>`+
+      `<td class="right">${pct(d.calls?conv/d.calls:0)}</td><td class="right"><b>${fmt$(d.rev)}</b></td>`+
+      `<td class="right">${roas}</td></tr>`;
   }).join('');
 }
 
