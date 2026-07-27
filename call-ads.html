@@ -83,6 +83,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .scorecard-value{font-size:30px;font-weight:700;letter-spacing:-0.01em;color:var(--text);}
 .scorecard-meta{font-size:12px;color:var(--text3);margin-top:6px;}
 .scorecard-sub{font-size:12px;color:var(--text2);margin-top:4px;}
+.scorecard-delta{font-size:12px;font-weight:600;margin-top:6px;min-height:18px;}
+.scorecard-delta.up{color:var(--green);}
+.scorecard-delta.down{color:var(--terra);}
+.scorecard-delta.flat{color:var(--text3);}
 
 /* PANELS */
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
@@ -136,6 +140,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .im-stat:last-child{border-bottom:none;}
 .im-stat b{font-weight:700;color:var(--text);}
 .im-privacy{font-size:11px;color:var(--text3);margin-top:16px;line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
+.im-modes{display:flex;flex-direction:column;gap:8px;}
+.im-mode{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border:1px solid var(--border2);border-radius:9px;cursor:pointer;}
+.im-mode:hover{border-color:var(--slate3);}
+.im-mode.sel{border-color:var(--slate);background:var(--slate-bg);}
+.im-mode input{margin-top:4px;cursor:pointer;}
+.im-mode-t{font-size:13px;font-weight:600;color:var(--text);}
+.im-mode-d{font-size:12px;color:var(--text3);line-height:1.5;margin-top:2px;}
 </style>
 </head>
 <body>
@@ -168,6 +179,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
     <label>2 · ResNexus reservations export (CSV)</label>
     <input type="file" id="im-res" accept=".csv,text/csv">
   </div>
+  <div class="im-field">
+    <label>3 · How should this be saved?</label>
+    <div class="im-modes" id="im-modes">
+      <label class="im-mode sel" data-mode="add">
+        <input type="radio" name="im-mode" value="add" checked onchange="onModeChange()">
+        <span><span class="im-mode-t">Add to history</span><span class="im-mode-d">Keeps every period already saved and adds this one. Calls already in the sheet are skipped, so re-running the same file is safe.</span></span>
+      </label>
+      <label class="im-mode" data-mode="period">
+        <input type="radio" name="im-mode" value="period" onchange="onModeChange()">
+        <span><span class="im-mode-t">Replace this period only</span><span class="im-mode-d">Removes the saved calls that fall inside this file's date range, then saves this file. Use when the agency sends a corrected report.</span></span>
+      </label>
+      <label class="im-mode" data-mode="all">
+        <input type="radio" name="im-mode" value="all" onchange="onModeChange()">
+        <span><span class="im-mode-t">Replace everything</span><span class="im-mode-d">Erases all saved call history and starts over from this file alone.</span></span>
+      </label>
+    </div>
+  </div>
 
   <div class="im-row">
     <button class="im-btn" id="im-analyze-btn" onclick="analyzeImport()">Match &amp; preview</button>
@@ -185,7 +213,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
   <div id="im-result" style="display:none;"></div>
 
-  <div class="im-privacy">Privacy: this page reads the caller number from the call log and the phone columns from the reservations export only to match them in your browser. What gets saved to the sheet for each call is: date, campaign, call type, status, duration, area code, and the matched reservation number (if any). No names, no full phone numbers, no emails ever leave this computer.</div>
+  <div class="im-privacy">Privacy: this page reads the caller number from the call log and the phone columns from the reservations export only to match them in your browser. What gets saved to the sheet for each call is: date and time, reporting period, campaign, call source and type, status, duration, area code, and the matched reservation number (if any). No names, no full phone numbers, no emails ever leave this computer.</div>
 </div>
 
 <div id="dashboard">
@@ -228,23 +256,27 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
           <div class="scorecard-label">Ad Calls</div>
           <div class="scorecard-value" id="sc-calls">—</div>
           <div class="scorecard-meta" id="sc-calls-meta"></div>
+          <div class="scorecard-delta" id="sc-calls-delta"></div>
         </div>
         <div class="scorecard conv">
           <div class="scorecard-label">Conversions</div>
           <div class="scorecard-value" id="sc-conv">—</div>
           <div class="scorecard-meta">booked on/after the call</div>
           <div class="scorecard-sub" id="sc-conv-rate"></div>
+          <div class="scorecard-delta" id="sc-conv-delta"></div>
         </div>
         <div class="scorecard exist">
           <div class="scorecard-label">Existing Guests</div>
           <div class="scorecard-value" id="sc-exist">—</div>
           <div class="scorecard-meta">already booked before calling</div>
+          <div class="scorecard-delta" id="sc-exist-delta"></div>
         </div>
         <div class="scorecard rev">
           <div class="scorecard-label">Attributed Revenue</div>
           <div class="scorecard-value" id="sc-rev">—</div>
           <div class="scorecard-meta">stay revenue from conversions</div>
           <div class="scorecard-sub" id="sc-rev-percall"></div>
+          <div class="scorecard-delta" id="sc-rev-delta"></div>
         </div>
       </div>
 
@@ -265,7 +297,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
       <div class="grid-2">
         <div class="panel" style="margin-bottom:0;">
-          <div class="panel-header"><span class="panel-title">Calls Over Time</span></div>
+          <div class="panel-header"><span class="panel-title">Calls Over Time</span><span class="panel-sub" id="time-sub"></span></div>
           <div class="panel-body"><div class="chart-wrap" style="height:250px"><canvas id="chart-time"></canvas></div></div>
         </div>
         <div class="panel" style="margin-bottom:0;">
@@ -316,11 +348,12 @@ const CALLS_TAB = 'AD_CALLS_CLEAN';
 const STAYS_TAB = 'STAYS_CLEAN';
 const LOG_TAB   = 'IMPORT_LOG';
 const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
-const CALLS_HEADER = ['CallDateTime','ReportPeriod','Campaign','CallSource','CallType','Status','Duration','AreaCode','MatchedRes'];
+const CALLS_HEADER = ['CallDateTime','ReportPeriod','PeriodStart','PeriodEnd','Campaign','CallSource','CallType','Status','Duration','AreaCode','MatchedRes'];
 
 let tokenClient, accessToken;
 let callsData = [], staysByRes = {};
 let activePeriod = 'ALL', customFrom = null, customTo = null;
+let knownPeriods = [];                       // [{label,start,end}] oldest → newest
 let timeChart, campaignChart;
 
 /* ---------- Auth ---------- */
@@ -368,29 +401,79 @@ async function ensureTab(tab){
   if(titles.includes(tab))return;
   await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:tab}}}]})});
 }
-async function clearTab(tab){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:clear`,{method:'POST',body:'{}'});}
 async function putValues(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}!A1?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values})});}
 async function appendValues(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:append?valueInputOption=USER_ENTERED`,{method:'POST',body:JSON.stringify({values})});}
 
-function toRows(raw){if(!raw||raw.length<2)return[];const H=raw[0].map(h=>String(h).trim());return raw.slice(1).map(row=>{const o={};H.forEach((h,i)=>o[h]=(row[i]||'').trim());return o;});}
+function cell(v){return String(v==null?'':v).trim();}
+function toRows(raw){
+  if(!raw||raw.length<2)return[];
+  const H=raw[0].map(h=>String(h).trim());
+  return raw.slice(1)
+    .filter(row=>row.some(c=>cell(c)!==''))   // skip blank padding rows
+    .map(row=>{const o={};H.forEach((h,i)=>o[h]=cell(row[i]));return o;});
+}
 function pMoney(s){return parseFloat(String(s||0).replace(/[$,]/g,''))||0;}
 function fmt$(n){return '$'+Math.round(n).toLocaleString('en-US');}
 function pct(n){return (n*100).toFixed(0)+'%';}
 
-/* ---------- Date parsing ---------- */
-function parseDateLoose(s){
-  if(!s)return null;
-  let t=String(s).trim();
-  const m=t.match(/([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})/);      // "Jun 17, 2026"
-  if(m){const d=new Date(m[1]+' '+m[2]+', '+m[3]);if(!isNaN(d))return startOfDay(d);}
-  const s2=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);              // "5/14/2026"
-  if(s2){let y=Number(s2[3]);if(y<100)y+=2000;return new Date(y,Number(s2[1])-1,Number(s2[2]));}
-  const d=new Date(t);
-  return isNaN(d)?null:startOfDay(d);
+/* ---------- Date parsing ----------
+   Everything is built by hand from local Y/M/D parts. Handing a bare "2026-06-17"
+   to new Date() parses it as UTC, which lands on the previous day west of Greenwich
+   and silently shifts every call back a day. Never do that here. */
+function p2(n){return String(n).padStart(2,'0');}
+function applyTime(d,src){
+  if(!d||!src)return d;
+  const m=String(src).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp])?[Mm]?/);
+  if(!m)return d;
+  let h=Number(m[1]);const mi=Number(m[2]),se=Number(m[3]||0);
+  const ap=m[4]?m[4].toLowerCase():'';
+  if(ap==='p'&&h<12)h+=12;
+  if(ap==='a'&&h===12)h=0;
+  if(h>23||mi>59)return d;
+  d.setHours(h,mi,se,0);
+  return d;
 }
+// Full timestamp when the source carries one; midnight otherwise.
+function parseDateTimeLoose(s){
+  if(!s)return null;
+  const t=String(s).trim();
+  if(!t)return null;
+  let m=t.match(/([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})/);        // "Jun 17, 2026"
+  if(m){const d=new Date(m[1]+' '+m[2]+', '+m[3]);if(!isNaN(d))return applyTime(startOfDay(d),t);}
+  m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);                      // "5/14/2026"
+  if(m){let y=Number(m[3]);if(y<100)y+=2000;return applyTime(new Date(y,Number(m[1])-1,Number(m[2])),t);}
+  m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);                          // "2026-06-17", "2026-06-17T15:45"
+  if(m)return applyTime(new Date(Number(m[1]),Number(m[2])-1,Number(m[3])),t);
+  const d=new Date(t);
+  return isNaN(d)?null:d;
+}
+function parseDateLoose(s){const d=parseDateTimeLoose(s);return d?startOfDay(d):null;}
+function hasTimePart(s){return /\d{1,2}:\d{2}/.test(String(s||''));}
 function startOfDay(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
 function fmtDay(d){return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';}
-function toISO(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function toISO(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+// Written to the sheet. M/D/YYYY matches what the revenue importer writes and
+// round-trips through parseDateLoose without a timezone shift.
+function fmtStamp(d,withTime){
+  if(!d)return '';
+  const base=(d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();
+  if(!withTime)return base;
+  let h=d.getHours();const ap=h>=12?'PM':'AM';h=h%12;if(h===0)h=12;
+  return base+' '+h+':'+p2(d.getMinutes())+' '+ap;
+}
+// Locale-independent identity for dedup — never depends on how Sheets rendered the cell.
+function keyStamp(d,withTime){
+  if(!d)return '';
+  const base=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+  return withTime?base+'T'+p2(d.getHours())+':'+p2(d.getMinutes()):base;
+}
+function periodLabel(a,b){return (a&&b)?fmtDay(a)+' – '+fmtDay(b):'';}
+function parsePeriodLabel(label){
+  const parts=String(label||'').split(/\s+[–—-]\s+/);
+  if(parts.length>=2)return [parseDateLoose(parts[0]),parseDateLoose(parts[1])];
+  return [null,null];
+}
+function daysBetween(a,b){return Math.round((startOfDay(b)-startOfDay(a))/86400000);}
 
 /* ---------- Phone normalise ---------- */
 function normPhone(s){
@@ -440,11 +523,11 @@ function parseCallLog(rows){
   const H=rows[hIdx];
   const ix={};for(const k in CALL_ALIASES)ix[k]=findIdx(H,CALL_ALIASES[k]);
   // reporting period from preamble rows
-  let period='';
+  let pStart=null,pEnd=null;
   for(let i=0;i<hIdx;i++){
     const joined=rows[i].join(' ');
     const m=joined.match(/([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})\s*[-–—to]+\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})/);
-    if(m){const a=parseDateLoose(m[1]),b=parseDateLoose(m[2]);if(a&&b){period=fmtDay(a)+' – '+fmtDay(b);break;}}
+    if(m){const a=parseDateLoose(m[1]),b=parseDateLoose(m[2]);if(a&&b){pStart=a;pEnd=b;break;}}
   }
   const calls=[];
   for(let i=hIdx+1;i<rows.length;i++){
@@ -452,22 +535,27 @@ function parseCallLog(rows){
     const rawPhone=ix.phone>=0?r[ix.phone]:'';
     let phone=normPhone(rawPhone);
     if(!phone && ix.areaCode>=0){phone=normPhone(String(r[ix.areaCode]||'')+String(rawPhone||''));}
-    const date=parseDateLoose(ix.time>=0?r[ix.time]:'');
-    if(!phone && !date)continue;
+    const rawTime=ix.time>=0?r[ix.time]:'';
+    const dateTime=parseDateTimeLoose(rawTime);
+    if(!phone && !dateTime)continue;
     calls.push({
       phone,
-      date,
+      dateTime,
+      date:dateTime?startOfDay(dateTime):null,
+      hasTime:!!dateTime&&hasTimePart(rawTime),
       duration:ix.duration>=0?(parseInt(String(r[ix.duration]).replace(/\D/g,''))||0):0,
       areaCode:ix.areaCode>=0?String(r[ix.areaCode]||'').replace(/\D/g,''):(phone?phone.slice(0,3):''),
       status:ix.status>=0?String(r[ix.status]||'').trim():'',
       source:ix.source>=0?String(r[ix.source]||'').trim():'',
       type:ix.type>=0?String(r[ix.type]||'').trim():'',
-      campaign:ix.campaign>=0?String(r[ix.campaign]||'').trim():'(no campaign)'
+      campaign:ix.campaign>=0?String(r[ix.campaign]||'').trim()||'(no campaign)':'(no campaign)'
     });
   }
-  // fallback period from call dates
-  if(!period){const ds=calls.map(c=>c.date).filter(Boolean).sort((a,b)=>a-b);if(ds.length)period=fmtDay(ds[0])+' – '+fmtDay(ds[ds.length-1]);}
-  return {calls,period};
+  // actual span of the calls in the file, independent of what the preamble claims
+  const ds=calls.map(c=>c.date).filter(Boolean).sort((a,b)=>a-b);
+  const dataStart=ds.length?ds[0]:null, dataEnd=ds.length?ds[ds.length-1]:null;
+  if(!pStart||!pEnd){pStart=dataStart;pEnd=dataEnd;}
+  return {calls,periodStart:pStart,periodEnd:pEnd,dataStart,dataEnd,period:periodLabel(pStart,pEnd)};
 }
 
 /* ---------- Reservations parsing (browser only, never stored) ---------- */
@@ -493,10 +581,118 @@ function parseReservations(rows){
   return {map,resCount,phoneColCount:phoneCols.length};
 }
 
+/* ---------- Stored history: read, key, merge ---------- */
+// Rows already in AD_CALLS_CLEAN, parsed into the same shape parseCallLog produces.
+// Legacy rows (written before PeriodStart/PeriodEnd existed) get their bounds
+// recovered from the ReportPeriod label, and the label re-normalised so two
+// spellings of the same range collapse into one period.
+function parseStoredCalls(raw){
+  return toRows(raw).map(r=>{
+    const stamp=r['CallDateTime']||'';
+    const dt=parseDateTimeLoose(stamp);
+    let ps=parseDateLoose(r['PeriodStart']||'');
+    let pe=parseDateLoose(r['PeriodEnd']||'');
+    let label=(r['ReportPeriod']||'').trim();
+    if(!ps||!pe){const b=parsePeriodLabel(label);ps=ps||b[0];pe=pe||b[1];}
+    if(ps&&pe)label=periodLabel(ps,pe);
+    return {
+      dateTime:dt,
+      date:dt?startOfDay(dt):null,
+      hasTime:hasTimePart(stamp),
+      period:label,periodStart:ps,periodEnd:pe,
+      campaign:(r['Campaign']||'').trim()||'(no campaign)',
+      source:(r['CallSource']||'').trim(),
+      type:(r['CallType']||'').trim(),
+      status:(r['Status']||'').trim(),
+      duration:parseInt(String(r['Duration']||'').replace(/\D/g,''))||0,
+      areaCode:(r['AreaCode']||'').trim(),
+      matched:String(r['MatchedRes']||'').split(';').map(s=>s.trim()).filter(Boolean)
+    };
+  });
+}
+function callToRow(c){
+  return [
+    c.dateTime?fmtStamp(c.dateTime,c.hasTime):'',
+    c.period||'',
+    c.periodStart?fmtStamp(c.periodStart,false):'',
+    c.periodEnd?fmtStamp(c.periodEnd,false):'',
+    c.campaign||'',
+    c.source||'',
+    c.type||'',
+    c.status||'',
+    c.duration||0,
+    c.areaCode||'',
+    (c.matched&&c.matched.length)?c.matched.join(';'):''
+  ];
+}
+// The phone number is deliberately never stored, so identity comes from the rest of
+// the row. The trailing occurrence counter keeps genuinely repeated identical rows
+// (same second, same campaign, same duration) from collapsing into one, while still
+// making a re-import of the very same file dedup exactly.
+function callKey(c,counts){
+  const base=[
+    keyStamp(c.dateTime,c.hasTime),
+    (c.campaign||'').toLowerCase(),
+    (c.source||'').toLowerCase(),
+    (c.type||'').toLowerCase(),
+    (c.status||'').toLowerCase(),
+    String(c.duration||0),
+    String(c.areaCode||'')
+  ].join('|');
+  const n=counts[base]=(counts[base]||0)+1;
+  return base+'#'+n;
+}
+function inRange(d,a,b){return !!(d&&a&&b&&d>=a&&d<=b);}
+function mergeCalls(existing,incoming,mode,span){
+  let kept,removed=0;
+  if(mode==='all'){kept=[];removed=existing.length;}
+  else if(mode==='period'){
+    kept=existing.filter(c=>{
+      if(span.label&&c.period===span.label)return false;
+      if(inRange(c.date,span.start,span.end))return false;
+      return true;
+    });
+    removed=existing.length-kept.length;
+  }else{kept=existing.slice();}
+
+  const keys=new Set(),kc={};
+  kept.forEach(c=>keys.add(callKey(c,kc)));
+  const ic={},added=[];
+  let dupes=0;
+  incoming.forEach(c=>{
+    const k=callKey(c,ic);
+    if(keys.has(k)){dupes++;return;}
+    keys.add(k);added.push(c);
+  });
+  return {kept,added,removed,dupes,final:kept.concat(added)};
+}
+// Which already-saved periods this file lands on top of.
+function overlapReport(existing,span){
+  const hit={};
+  existing.forEach(c=>{
+    if((span.label&&c.period===span.label)||inRange(c.date,span.start,span.end)){
+      const k=c.period||'(unlabelled)';
+      hit[k]=(hit[k]||0)+1;
+    }
+  });
+  return hit;
+}
+
 /* ---------- Import flow ---------- */
 let pendingImport=null;
+let importMode='add';
+function onModeChange(){
+  const el=document.querySelector('input[name="im-mode"]:checked');
+  importMode=el?el.value:'add';
+  document.querySelectorAll('#im-modes .im-mode').forEach(m=>m.classList.toggle('sel',m.dataset.mode===importMode));
+  if(pendingImport)analyzeImport();          // re-preview under the new mode
+}
 function openImport(){
   pendingImport=null;
+  importMode='add';
+  const addRadio=document.querySelector('input[name="im-mode"][value="add"]');
+  if(addRadio)addRadio.checked=true;
+  document.querySelectorAll('#im-modes .im-mode').forEach(m=>m.classList.toggle('sel',m.dataset.mode==='add'));
   document.getElementById('im-calls').value='';
   document.getElementById('im-res').value='';
   document.getElementById('im-status').textContent='';
@@ -520,29 +716,74 @@ async function analyzeImport(){
   try{
     const callRows=parseCSV(await cf.text());
     const resRows=parseCSV(await rf.text());
-    const {calls,period}=parseCallLog(callRows);
+    const parsed=parseCallLog(callRows);
+    const {calls,period,periodStart,periodEnd,dataStart,dataEnd}=parsed;
     const {map,resCount,phoneColCount}=parseReservations(resRows);
     if(!calls.length){status.textContent='No calls found in the call log.';return;}
-    // match
+
+    // match phone numbers — browser only
     let matchedCalls=0;
     calls.forEach(c=>{
       const set=c.phone?map[c.phone]:null;
       c.matched=set?[...set]:[];
       if(c.matched.length)matchedCalls++;
+      c.period=period;c.periodStart=periodStart;c.periodEnd=periodEnd;
+      delete c.phone;                        // drop it the moment matching is done
     });
     const matchedRes=new Set();calls.forEach(c=>c.matched.forEach(r=>matchedRes.add(r)));
-    pendingImport={calls,period};
-    // preview
+
+    status.textContent='Reading saved history…';
+    const existingRaw=await fetchTab(CALLS_TAB);
+    const existing=parseStoredCalls(existingRaw);
+
+    // removal window covers both the stated period and where the calls actually fall
+    const span={
+      label:period,
+      start:[periodStart,dataStart].filter(Boolean).sort((a,b)=>a-b)[0]||null,
+      end:[periodEnd,dataEnd].filter(Boolean).sort((a,b)=>b-a)[0]||null
+    };
+    const merge=mergeCalls(existing,calls,importMode,span);
+    const overlap=overlapReport(existing,span);
+    const overlapKeys=Object.keys(overlap);
+    const withTime=calls.filter(c=>c.hasTime).length;
+
+    pendingImport={calls,period,periodStart,periodEnd,span,mode:importMode,merge,existingRowCount:existingRaw.length,matchedCalls,matchedRes:matchedRes.size};
+
     const p=document.getElementById('im-preview');
-    p.innerHTML=
-      `<div class="im-stat"><span>Reporting period</span><b>${period||'—'}</b></div>`+
-      `<div class="im-stat"><span>Calls in log</span><b>${calls.length}</b></div>`+
+    let html=
+      `<div class="im-stat"><span>Reporting period</span><b>${esc(period||'—')}</b></div>`+
+      `<div class="im-stat"><span>Calls in this file</span><b>${calls.length}</b></div>`+
       `<div class="im-stat"><span>Reservations scanned</span><b>${resCount} (${phoneColCount} phone column${phoneColCount===1?'':'s'})</b></div>`+
       `<div class="im-stat"><span>Calls matched to a reservation</span><b>${matchedCalls} (${pct(calls.length?matchedCalls/calls.length:0)})</b></div>`+
-      `<div class="im-stat"><span>Distinct reservations matched</span><b>${matchedRes.size}</b></div>`;
+      `<div class="im-stat"><span>Distinct reservations matched</span><b>${matchedRes.size}</b></div>`+
+      `<div class="im-stat"><span>Already saved on the sheet</span><b>${existing.length} call${existing.length===1?'':'s'}</b></div>`;
+    if(merge.removed)html+=`<div class="im-stat"><span>Saved calls this will remove</span><b>${merge.removed}</b></div>`;
+    if(merge.dupes)html+=`<div class="im-stat"><span>Duplicates skipped (already saved)</span><b>${merge.dupes}</b></div>`;
+    html+=`<div class="im-stat"><span>New calls to add</span><b>${merge.added.length}</b></div>`+
+      `<div class="im-stat"><span>Sheet after saving</span><b>${merge.final.length} call${merge.final.length===1?'':'s'}</b></div>`;
+    p.innerHTML=html;
     document.getElementById('im-preview-wrap').style.display='block';
-    status.textContent='Matched in your browser. Review below, then save. Saving replaces all existing call ads data (re-import fresh each time).';
-  }catch(e){status.textContent='';document.getElementById('im-result').style.display='block';document.getElementById('im-result').innerHTML='<div class="im-err">Could not read the files:\n'+e.message+'</div>';}
+
+    // warn when this file lands on periods that are already saved
+    const result=document.getElementById('im-result');
+    let warn='';
+    if(importMode==='add'&&overlapKeys.length&&merge.added.length){
+      warn='Heads up — this file overlaps call history you already saved:\n'+
+        overlapKeys.map(k=>'  · '+k+' ('+overlap[k]+' call'+(overlap[k]===1?'':'s')+')').join('\n')+
+        '\n\n'+merge.dupes+' exact duplicate'+(merge.dupes===1?' was':'s were')+' skipped, but '+merge.added.length+
+        ' call'+(merge.added.length===1?'':'s')+' would still be added on top. If this is a corrected version of a report you already imported, choose "Replace this period only" instead.';
+    }
+    if(importMode==='add'&&!withTime&&overlapKeys.length){
+      warn+=(warn?'\n\n':'')+'This call log has no time-of-day column, so duplicate detection can only work at day level. "Replace this period only" is the safer choice here.';
+    }
+    if(importMode==='all'&&existing.length){
+      warn=(warn?warn+'\n\n':'')+'This erases all '+existing.length+' saved calls, including periods not in this file. There is no undo.';
+    }
+    if(warn){result.style.display='block';result.innerHTML='<div class="im-warn">'+esc(warn)+'</div>';}
+    else result.style.display='none';
+
+    status.textContent='Matched in your browser. Review below, then save.';
+  }catch(e){status.textContent='';document.getElementById('im-result').style.display='block';document.getElementById('im-result').innerHTML='<div class="im-err">Could not read the files:\n'+esc(e.message)+'</div>';}
 }
 
 async function confirmImport(){
@@ -552,33 +793,38 @@ async function confirmImport(){
   const result=document.getElementById('im-result');result.style.display='none';
   let step='starting';
   try{
-    const {calls,period}=pendingImport;
-    const rows=calls.map(c=>[
-      c.date?toISO(c.date):'',
-      period,
-      c.campaign||'',
-      c.source||'',
-      c.type||'',
-      c.status||'',
-      c.duration||0,
-      c.areaCode||'',
-      c.matched&&c.matched.length?c.matched.join(';'):''
-    ]);
+    const {period,merge,existingRowCount,matchedCalls,matchedRes,mode}=pendingImport;
+    const rows=merge.final.map(callToRow);
+
     step='creating the '+CALLS_TAB+' tab if needed';status.textContent='Saving… ('+step+')';
     await ensureTab(CALLS_TAB);
-    step='clearing old data';status.textContent='Saving… ('+step+')';
-    await clearTab(CALLS_TAB);
-    step='writing rows';status.textContent='Saving… ('+step+')';
-    await putValues(CALLS_TAB,[CALLS_HEADER].concat(rows));
-    const matchedCalls=calls.filter(c=>c.matched&&c.matched.length).length;
-    const matchedRes=new Set();calls.forEach(c=>(c.matched||[]).forEach(r=>matchedRes.add(r)));
-    try{await appendValues(LOG_TAB,[[nowStamp(),'CALL ADS',calls.length,'','','','',matchedRes.size,period,'matched '+matchedCalls+' of '+calls.length+' calls']]);}catch(e){}
+
+    // One write, no clear. The old rows are overwritten in place and anything left
+    // over from a shorter result is blanked by padding, so there is never a moment
+    // where the sheet is empty and the write has not landed yet.
+    const out=[CALLS_HEADER].concat(rows);
+    const blank=new Array(CALLS_HEADER.length).fill('');
+    for(let i=out.length;i<existingRowCount;i++)out.push(blank.slice());
+
+    step='writing '+rows.length+' rows';status.textContent='Saving… ('+step+')';
+    await putValues(CALLS_TAB,out);
+
+    const modeText=mode==='all'?'replace all':mode==='period'?'replace period':'add';
+    try{await appendValues(LOG_TAB,[[nowStamp(),'CALL ADS',merge.added.length,'','','','',matchedRes,period,
+      modeText+' · +'+merge.added.length+' new, '+merge.dupes+' dup skipped, '+merge.removed+' removed, '+rows.length+' total']]);}catch(e){}
+
     result.style.display='block';
-    result.innerHTML='<div class="im-ok">Saved '+calls.length+' calls. '+matchedCalls+' matched to '+matchedRes.size+' reservation'+(matchedRes.size===1?'':'s')+'. Reloading…</div>';
-    setTimeout(async()=>{closeImport();showLoad();await loadAll();},1200);
+    result.innerHTML='<div class="im-ok">'+esc(
+      'Saved. '+merge.added.length+' new call'+(merge.added.length===1?'':'s')+' added'+
+      (merge.dupes?', '+merge.dupes+' duplicate'+(merge.dupes===1?'':'s')+' skipped':'')+
+      (merge.removed?', '+merge.removed+' replaced':'')+'.\n'+
+      matchedCalls+' of this file\'s calls matched '+matchedRes+' reservation'+(matchedRes===1?'':'s')+'.\n'+
+      'Call history now holds '+rows.length+' call'+(rows.length===1?'':'s')+'. Reloading…')+'</div>';
+    setTimeout(async()=>{closeImport();showLoad();await loadAll();},1400);
   }catch(e){
     result.style.display='block';
-    result.innerHTML='<div class="im-err">Save failed while '+step+':\n'+e.message+'\n\nNothing partial should remain — the data is replaced in one write. Fix the issue and re-import.</div>';
+    result.innerHTML='<div class="im-err">Save failed while '+esc(step)+':\n'+esc(e.message)+
+      '\n\nYour existing call history was not cleared first, so it should still be intact. Fix the issue and try again.</div>';
     btn.disabled=false;
   }
 }
@@ -598,16 +844,7 @@ async function loadAll(){
       staysByRes[res].revenue+=rev;
       if(ro&&(!staysByRes[res].reservedOn||ro<staysByRes[res].reservedOn))staysByRes[res].reservedOn=ro;
     });
-    callsData=toRows(callRaw).map(r=>({
-      date:parseDateLoose(r['CallDateTime']),
-      period:r['ReportPeriod']||'',
-      campaign:r['Campaign']||'(no campaign)',
-      type:r['CallType']||'',
-      status:r['Status']||'',
-      duration:parseInt(r['Duration'])||0,
-      areaCode:r['AreaCode']||'',
-      matched:(r['MatchedRes']||'').split(';').map(s=>s.trim()).filter(Boolean)
-    }));
+    callsData=parseStoredCalls(callRaw);
     buildPeriods();
     render();
     document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
@@ -617,12 +854,26 @@ async function loadAll(){
 
 function buildPeriods(){
   const sel=document.getElementById('period-select');
-  const periods=[...new Set(callsData.map(c=>c.period).filter(Boolean))];
-  periods.sort((a,b)=>{const da=parseDateLoose(a.split('–')[0]),db=parseDateLoose(b.split('–')[0]);return (da&&db)?da-db:0;});
-  sel.innerHTML='<option value="ALL">All periods</option>'+periods.map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
-  activePeriod=periods.length?periods[periods.length-1]:'ALL';
+  const by={};
+  callsData.forEach(c=>{
+    if(!c.period)return;
+    if(!by[c.period])by[c.period]={label:c.period,start:c.periodStart,end:c.periodEnd};
+    const p=by[c.period];
+    if(!p.start&&c.periodStart)p.start=c.periodStart;
+    if(!p.end&&c.periodEnd)p.end=c.periodEnd;
+  });
+  knownPeriods=Object.keys(by).map(k=>by[k]).sort((a,b)=>{
+    if(a.start&&b.start)return a.start-b.start;
+    if(a.start)return 1;
+    if(b.start)return -1;
+    return a.label.localeCompare(b.label);
+  });
+  sel.innerHTML='<option value="ALL">All periods</option>'+
+    knownPeriods.map(p=>`<option value="${esc(p.label)}">${esc(p.label)}</option>`).join('');
+  activePeriod=knownPeriods.length?knownPeriods[knownPeriods.length-1].label:'ALL';
   sel.value=activePeriod;
 }
+function periodIndex(label){return knownPeriods.findIndex(p=>p.label===label);}
 function onPeriodChange(){activePeriod=document.getElementById('period-select').value;customFrom=customTo=null;document.getElementById('date-from').value='';document.getElementById('date-to').value='';render();}
 function onCustomChange(){
   const f=document.getElementById('date-from').value,t=document.getElementById('date-to').value;
@@ -635,8 +886,10 @@ function periodBounds(){
   // returns [from,to] as day Dates, or null for open
   if(customFrom||customTo)return [customFrom,customTo];
   if(activePeriod==='ALL')return [null,null];
-  const parts=activePeriod.split('–');
-  return [parseDateLoose(parts[0]),parseDateLoose(parts[1]||parts[0])];
+  const p=knownPeriods[periodIndex(activePeriod)];
+  if(p&&p.start)return [p.start,p.end||p.start];
+  const parts=parsePeriodLabel(activePeriod);
+  return [parts[0],parts[1]||parts[0]];
 }
 function inView(c){
   if(customFrom||customTo){
@@ -656,6 +909,27 @@ function classify(res,callDate){
   return {bucket:booked,revenue:s.revenue,reservedOn:s.reservedOn};
 }
 
+// Reservation-level attribution: a reservation belongs to the earliest call that matched it.
+function firstCallByRes(calls){
+  const out={};
+  calls.forEach(c=>{if(!c.date)return;c.matched.forEach(res=>{if(!out[res]||c.date<out[res].date)out[res]={date:c.date,campaign:c.campaign};});});
+  return out;
+}
+function computeMetrics(calls){
+  const answered=calls.filter(c=>/receiv|answer|complet/i.test(c.status)).length;
+  const resFirstCall=firstCallByRes(calls);
+  let convCount=0,existCount=0,unknownCount=0,convRev=0;
+  const rows=[];
+  Object.keys(resFirstCall).forEach(res=>{
+    const fc=resFirstCall[res];
+    const cl=classify(res,fc.date);
+    if(cl.bucket==='conv'){convCount++;convRev+=cl.revenue;rows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:cl.reservedOn,revenue:cl.revenue,type:'Conversion'});}
+    else if(cl.bucket==='exist'){existCount++;rows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:cl.reservedOn,revenue:cl.revenue,type:'Existing guest'});}
+    else {unknownCount++;rows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:null,revenue:cl.revenue,type:'No stay data'});}
+  });
+  return {calls:calls.length,answered,missed:calls.length-answered,convCount,existCount,unknownCount,convRev,rows};
+}
+
 function render(){
   const isEmpty=callsData.length===0;
   document.getElementById('empty-info').style.display=isEmpty?'block':'none';
@@ -663,46 +937,59 @@ function render(){
   if(isEmpty)return;
 
   const calls=callsData.filter(inView);
-  const answered=calls.filter(c=>/receiv|answer|complet/i.test(c.status)).length;
-  const missed=calls.length-answered;
-
-  // reservation-level attribution: earliest matching call date per Res#
-  const resFirstCall={};
-  calls.forEach(c=>{if(!c.date)return;c.matched.forEach(res=>{if(!resFirstCall[res]||c.date<resFirstCall[res].date)resFirstCall[res]={date:c.date,campaign:c.campaign};});});
-
-  let convCount=0,existCount=0,unknownCount=0,convRev=0,existRev=0;
-  const convRows=[];
-  Object.keys(resFirstCall).forEach(res=>{
-    const fc=resFirstCall[res];
-    const cl=classify(res,fc.date);
-    if(cl.bucket==='conv'){convCount++;convRev+=cl.revenue;convRows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:cl.reservedOn,revenue:cl.revenue,type:'Conversion'});}
-    else if(cl.bucket==='exist'){existCount++;existRev+=cl.revenue;convRows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:cl.reservedOn,revenue:cl.revenue,type:'Existing guest'});}
-    else {unknownCount++;convRows.push({res,campaign:fc.campaign,callDate:fc.date,reservedOn:null,revenue:cl.revenue,type:'No stay data'});}
-  });
+  const m=computeMetrics(calls);
 
   // scorecards
-  document.getElementById('sc-calls').textContent=calls.length;
-  document.getElementById('sc-calls-meta').textContent=answered+' answered · '+missed+' missed';
-  document.getElementById('sc-conv').textContent=convCount;
-  document.getElementById('sc-conv-rate').textContent=calls.length?pct(convCount/calls.length)+' of calls converted':'';
-  document.getElementById('sc-exist').textContent=existCount;
-  document.getElementById('sc-rev').textContent=fmt$(convRev);
-  document.getElementById('sc-rev-percall').textContent=calls.length?fmt$(convRev/calls.length)+' per call':'';
+  document.getElementById('sc-calls').textContent=m.calls;
+  document.getElementById('sc-calls-meta').textContent=m.answered+' answered · '+m.missed+' missed';
+  document.getElementById('sc-conv').textContent=m.convCount;
+  document.getElementById('sc-conv-rate').textContent=m.calls?pct(m.convCount/m.calls)+' of calls converted':'';
+  document.getElementById('sc-exist').textContent=m.existCount;
+  document.getElementById('sc-rev').textContent=fmt$(m.convRev);
+  document.getElementById('sc-rev-percall').textContent=m.calls?fmt$(m.convRev/m.calls)+' per call':'';
+  renderDeltas(m);
 
   // filter note
   const [f,t]=periodBounds();
   let note='';
   if(customFrom||customTo)note='Custom range'+(f?' from '+fmtDay(f):'')+(t?' to '+fmtDay(t):'');
-  else if(activePeriod==='ALL')note='All imported calls';
+  else if(activePeriod==='ALL')note=knownPeriods.length+' period'+(knownPeriods.length===1?'':'s')+' · '+callsData.length+' calls in history';
   else note='Agency reporting period';
-  if(unknownCount)note+=' · '+unknownCount+' matched reservation'+(unknownCount===1?'':'s')+' not yet in stays data';
+  if(m.unknownCount)note+=' · '+m.unknownCount+' matched reservation'+(m.unknownCount===1?'':'s')+' not yet in stays data';
   document.getElementById('filter-note').textContent=note;
 
-  renderSpend(convCount,convRev);
+  renderSpend(m.convCount,m.convRev);
   renderCampaignTable(calls);
-  renderConvTable(convRows);
+  renderConvTable(m.rows);
   renderTimeChart(calls);
   renderCampaignChart(calls);
+}
+
+/* period-over-period comparison — only meaningful on a single stored period */
+function setDelta(id,cur,prev,fmt,label,neutral){
+  const el=document.getElementById(id);
+  const diff=cur-prev;
+  if(!prev&&!cur){el.textContent='';el.className='scorecard-delta';return;}
+  const dir=neutral?'flat':diff>0?'up':diff<0?'down':'flat';
+  const arrow=diff>0?'▲ ':diff<0?'▼ ':'';
+  const rel=prev?' ('+Math.abs(Math.round(diff/prev*100))+'%)':'';
+  el.className='scorecard-delta '+dir;
+  el.textContent=diff===0?'No change vs '+label:arrow+fmt(Math.abs(diff))+rel+' vs '+label;
+}
+function renderDeltas(cur){
+  const ids=['sc-calls-delta','sc-conv-delta','sc-exist-delta','sc-rev-delta'];
+  const clear=()=>ids.forEach(i=>{const el=document.getElementById(i);el.textContent='';el.className='scorecard-delta';});
+  if(customFrom||customTo||activePeriod==='ALL'){clear();return;}
+  const idx=periodIndex(activePeriod);
+  if(idx<1){clear();return;}
+  const prevP=knownPeriods[idx-1];
+  const prev=computeMetrics(callsData.filter(c=>c.period===prevP.label));
+  const label=prevP.start?prevP.start.toLocaleDateString('en-US',{month:'short',year:'2-digit'}):'previous';
+  const num=n=>String(Math.round(n));
+  setDelta('sc-calls-delta',cur.calls,prev.calls,num,label);
+  setDelta('sc-conv-delta',cur.convCount,prev.convCount,num,label);
+  setDelta('sc-exist-delta',cur.existCount,prev.existCount,num,label,true);
+  setDelta('sc-rev-delta',cur.convRev,prev.convRev,fmt$,label);
 }
 
 /* spend / ROI (localStorage per period) */
@@ -726,8 +1013,7 @@ function renderCampaignTable(calls){
     by[k].calls++;
     if(/receiv|answer|complet/i.test(c.status))by[k].answered++;else by[k].missed++;});
   // attribute reservations to the campaign of their earliest matching call
-  const resFirstCall={};
-  calls.forEach(c=>{if(!c.date)return;c.matched.forEach(res=>{if(!resFirstCall[res]||c.date<resFirstCall[res].date)resFirstCall[res]={date:c.date,campaign:c.campaign};});});
+  const resFirstCall=firstCallByRes(calls);
   Object.keys(resFirstCall).forEach(res=>{
     const fc=resFirstCall[res];const k=fc.campaign||'(no campaign)';if(!by[k])return;
     const cl=classify(res,fc.date);
@@ -760,17 +1046,31 @@ function renderConvTable(rows){
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 /* ---------- Charts ---------- */
+function startOfWeek(d){const x=startOfDay(d);x.setDate(x.getDate()-x.getDay());return x;}
 function renderTimeChart(calls){
-  const by={};calls.forEach(c=>{if(!c.date)return;const k=toISO(c.date);by[k]=(by[k]||0)+1;});
-  const labels=Object.keys(by).sort();
-  const data=labels.map(k=>by[k]);
-  const disp=labels.map(k=>{const d=parseDateLoose(k);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});});
+  const dates=calls.map(c=>c.date).filter(Boolean).sort((a,b)=>a-b);
+  // Years of daily points are unreadable — widen the bucket as history grows.
+  const span=dates.length?daysBetween(dates[0],dates[dates.length-1])+1:0;
+  const bucket=span>400?'month':span>92?'week':'day';
+  const by={};
+  dates.forEach(d=>{
+    const b=bucket==='month'?new Date(d.getFullYear(),d.getMonth(),1):bucket==='week'?startOfWeek(d):d;
+    const k=toISO(b);by[k]=(by[k]||0)+1;
+  });
+  const keys=Object.keys(by).sort();
+  const data=keys.map(k=>by[k]);
+  const disp=keys.map(k=>{
+    const d=parseDateLoose(k);
+    if(bucket==='month')return d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    const s=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return bucket==='week'?'wk '+s:s;
+  });
+  document.getElementById('time-sub').textContent=bucket==='month'?'by month':bucket==='week'?'by week':'by day';
   if(timeChart)timeChart.destroy();
-  timeChart=new Chart(document.getElementById('chart-time'),{type:'line',data:{labels:disp,datasets:[{label:'Calls',data,borderColor:'#4a5e6d',backgroundColor:'rgba(74,94,109,0.1)',fill:true,tension:0.3,pointRadius:2}]},options:chartOpts(true)});
+  timeChart=new Chart(document.getElementById('chart-time'),{type:'line',data:{labels:disp,datasets:[{label:'Calls',data,borderColor:'#4a5e6d',backgroundColor:'rgba(74,94,109,0.1)',fill:true,tension:0.3,pointRadius:span>92?1:2}]},options:chartOpts(true)});
 }
 function renderCampaignChart(calls){
-  const resFirstCall={};
-  calls.forEach(c=>{if(!c.date)return;c.matched.forEach(res=>{if(!resFirstCall[res]||c.date<resFirstCall[res].date)resFirstCall[res]={date:c.date,campaign:c.campaign};});});
+  const resFirstCall=firstCallByRes(calls);
   const conv={},exist={};
   Object.keys(resFirstCall).forEach(res=>{const fc=resFirstCall[res];const cl=classify(res,fc.date);const k=fc.campaign||'(no campaign)';if(cl.bucket==='conv')conv[k]=(conv[k]||0)+1;else if(cl.bucket==='exist')exist[k]=(exist[k]||0)+1;});
   const labels=[...new Set([...Object.keys(conv),...Object.keys(exist)])];
