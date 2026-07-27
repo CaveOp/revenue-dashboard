@@ -114,6 +114,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .spend-input{font-family:var(--sans);font-size:14px;width:130px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;}
 .spend-metric{font-size:13px;color:var(--text2);}
 .spend-metric b{color:var(--text);font-size:16px;font-weight:700;}
+.spend-metric b.loss{color:var(--terra);}
+.spend-metric b.thin{color:var(--amber);}
+.spend-metric b.good{color:var(--green);}
+.spend-note{font-size:12px;color:var(--text3);margin-top:12px;line-height:1.6;}
+.spend-note .warn{color:var(--amber);font-weight:600;}
+.spend-note .bad{color:var(--terra);font-weight:600;}
 
 /* MODAL */
 .import-overlay{display:none;position:fixed;inset:0;background:rgba(26,37,48,0.4);z-index:200;}
@@ -275,7 +281,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
           <div class="scorecard-label">Attributed Revenue</div>
           <div class="scorecard-value" id="sc-rev">—</div>
           <div class="scorecard-meta">stay revenue from conversions</div>
-          <div class="scorecard-sub" id="sc-rev-percall"></div>
+          <div class="scorecard-sub" id="sc-rev-avg"></div>
           <div class="scorecard-delta" id="sc-rev-delta"></div>
         </div>
       </div>
@@ -283,15 +289,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Ad Spend &amp; Return</span>
-          <span class="panel-sub">optional — saved on this computer only</span>
+          <span class="panel-sub">entered per period · saved on this computer only</span>
         </div>
         <div class="panel-body">
           <div class="spend-box">
-            <span class="scorecard-label" style="margin:0;">Ad spend for this view</span>
+            <span class="scorecard-label" style="margin:0;" id="spend-label">Ad spend for this view</span>
             <input type="number" class="spend-input" id="spend-input" placeholder="$0" oninput="onSpendChange()">
             <span class="spend-metric" id="spend-cpa"></span>
             <span class="spend-metric" id="spend-roas"></span>
           </div>
+          <div class="spend-note" id="spend-note"></div>
         </div>
       </div>
 
@@ -990,7 +997,7 @@ function render(){
   document.getElementById('sc-conv-rate').textContent=m.calls?pct(m.convCount/m.calls)+' of calls converted':'';
   document.getElementById('sc-exist').textContent=m.existCount;
   document.getElementById('sc-rev').textContent=fmt$(m.convRev);
-  document.getElementById('sc-rev-percall').textContent=m.calls?fmt$(m.convRev/m.calls)+' per call':'';
+  document.getElementById('sc-rev-avg').textContent=m.convCount?fmt$(m.convRev/m.convCount)+' average booking':'';
   renderDeltas(m);
 
   // filter note
@@ -1002,7 +1009,7 @@ function render(){
   if(m.unknownCount)note+=' · '+m.unknownCount+' matched reservation'+(m.unknownCount===1?'':'s')+' not yet in stays data';
   document.getElementById('filter-note').textContent=note;
 
-  renderSpend(m.convCount,m.convRev);
+  renderSpend(m.convCount,m.convRev,m.unknownCount);
   renderCampaignTable(calls);
   renderConvTable(m.rows);
   renderTimeChart(calls);
@@ -1036,19 +1043,69 @@ function renderDeltas(cur){
   setDelta('sc-rev-delta',cur.convRev,prev.convRev,fmt$,label);
 }
 
-/* spend / ROI (localStorage per period) */
-function spendKey(){if(customFrom||customTo)return 'cs_adspend_custom';return 'cs_adspend_'+activePeriod;}
-function onSpendChange(){try{localStorage.setItem(spendKey(),document.getElementById('spend-input').value||'');}catch(e){}render();}
-function renderSpend(convCount,convRev){
-  let saved='';try{saved=localStorage.getItem(spendKey())||'';}catch(e){}
+/* spend / ROI — stored per period on this computer.
+   A period is the unit spend is entered against. "All periods" sums those entries
+   rather than reading a bucket of its own, and a custom range is keyed to its actual
+   dates so two different ranges cannot share one figure. */
+function spendKeyFor(label){return 'cs_adspend_'+label;}
+function spendKey(){
+  if(customFrom||customTo)return 'cs_adspend_range_'+(customFrom?toISO(customFrom):'')+'_'+(customTo?toISO(customTo):'');
+  return spendKeyFor(activePeriod);
+}
+function readSpend(key){let v='';try{v=localStorage.getItem(key)||'';}catch(e){}return pMoney(v);}
+function isSummedView(){return !(customFrom||customTo)&&activePeriod==='ALL';}
+function summedSpend(){
+  let total=0,n=0;
+  knownPeriods.forEach(p=>{const v=readSpend(spendKeyFor(p.label));if(v>0){total+=v;n++;}});
+  return {total,n};
+}
+function onSpendChange(){
+  if(isSummedView())return;                  // summed view is derived, never written
+  try{localStorage.setItem(spendKey(),document.getElementById('spend-input').value||'');}catch(e){}
+  render();
+}
+function renderSpend(convCount,convRev,unknownCount){
   const inp=document.getElementById('spend-input');
-  if(document.activeElement!==inp)inp.value=saved;
-  const spend=pMoney(saved);
   const cpaEl=document.getElementById('spend-cpa'),roasEl=document.getElementById('spend-roas');
+  const note=document.getElementById('spend-note'),lbl=document.getElementById('spend-label');
+  let spend=0,summedFrom=0;
+  if(isSummedView()){
+    const s=summedSpend();spend=s.total;summedFrom=s.n;
+    inp.disabled=true;
+    inp.value=spend>0?Math.round(spend):'';
+    lbl.textContent='Total ad spend (summed)';
+  }else{
+    inp.disabled=false;
+    let saved='';try{saved=localStorage.getItem(spendKey())||'';}catch(e){}
+    if(document.activeElement!==inp)inp.value=saved;
+    spend=pMoney(saved);
+    lbl.textContent=(customFrom||customTo)?'Ad spend for this date range':'Ad spend for this period';
+  }
+
   if(spend>0){
     cpaEl.innerHTML=convCount>0?'Cost per conversion <b>'+fmt$(spend/convCount)+'</b>':'Cost per conversion <b>—</b>';
-    roasEl.innerHTML='Return on ad spend <b>'+(spend>0?(convRev/spend).toFixed(1)+'×':'—')+'</b>';
-  }else{cpaEl.textContent='Enter your ad spend to see cost per conversion and ROAS.';roasEl.textContent='';}
+    const roas=convRev/spend;
+    const cls=roas<1?'loss':roas<2?'thin':'good';
+    roasEl.innerHTML='Return on ad spend <b class="'+cls+'">'+roas.toFixed(1)+'×</b>';
+  }else{
+    cpaEl.textContent=isSummedView()?'':'Enter your ad spend to see cost per conversion and return.';
+    roasEl.textContent='';
+  }
+
+  const parts=[];
+  if(isSummedView()){
+    const blank=knownPeriods.length-summedFrom;
+    parts.push(summedFrom
+      ? 'Summed from '+summedFrom+' period'+(summedFrom===1?'':'s')+' with spend entered'+
+        (blank?'. <span class="warn">'+blank+' period'+(blank===1?' has':'s have')+' no spend recorded, so this total is low.</span>':'.')
+      : 'No spend recorded yet. Pick a single period above to enter it — this view adds those figures up.');
+  }
+  if(unknownCount)parts.push('<span class="warn">'+unknownCount+' matched reservation'+(unknownCount===1?' is':'s are')+
+    ' missing from stays data, so conversions are undercounted here — cost per conversion reads higher and return reads lower than it should.</span>');
+  if(spend>0&&!convCount)parts.push('<span class="bad">No conversions in this view, so there is no return to measure against '+fmt$(spend)+' of spend.</span>');
+  else if(spend>0&&convRev<spend)parts.push('<span class="bad">Attributed revenue is '+fmt$(spend-convRev)+' below ad spend in this view.</span>');
+  if(spend>0)parts.push('Return compares gross stay revenue to spend. It is not profit — the cost of hosting the stay is not deducted.');
+  note.innerHTML=parts.join('<br>');
 }
 
 function renderCampaignTable(calls){
