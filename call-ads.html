@@ -687,9 +687,11 @@ function onModeChange(){
   document.querySelectorAll('#im-modes .im-mode').forEach(m=>m.classList.toggle('sel',m.dataset.mode===importMode));
   if(pendingImport)analyzeImport();          // re-preview under the new mode
 }
+function enableConfirm(){const b=document.getElementById('im-confirm-btn');if(b)b.disabled=false;}
 function openImport(){
   pendingImport=null;
   importMode='add';
+  enableConfirm();                           // a previous save leaves it disabled
   const addRadio=document.querySelector('input[name="im-mode"][value="add"]');
   if(addRadio)addRadio.checked=true;
   document.querySelectorAll('#im-modes .im-mode').forEach(m=>m.classList.toggle('sel',m.dataset.mode==='add'));
@@ -706,6 +708,7 @@ function cancelPreview(){pendingImport=null;document.getElementById('im-preview-
 
 async function analyzeImport(){
   const status=document.getElementById('im-status');
+  enableConfirm();
   document.getElementById('im-preview-wrap').style.display='none';
   document.getElementById('im-result').style.display='none';
   const cf=document.getElementById('im-calls').files[0];
@@ -722,8 +725,9 @@ async function analyzeImport(){
     if(!calls.length){status.textContent='No calls found in the call log.';return;}
 
     // match phone numbers — browser only
-    let matchedCalls=0;
+    let matchedCalls=0,withPhone=0;
     calls.forEach(c=>{
+      if(c.phone)withPhone++;
       const set=c.phone?map[c.phone]:null;
       c.matched=set?[...set]:[];
       if(c.matched.length)matchedCalls++;
@@ -753,7 +757,8 @@ async function analyzeImport(){
     let html=
       `<div class="im-stat"><span>Reporting period</span><b>${esc(period||'—')}</b></div>`+
       `<div class="im-stat"><span>Calls in this file</span><b>${calls.length}</b></div>`+
-      `<div class="im-stat"><span>Reservations scanned</span><b>${resCount} (${phoneColCount} phone column${phoneColCount===1?'':'s'})</b></div>`+
+      `<div class="im-stat"><span>Calls with a usable phone number</span><b>${withPhone} of ${calls.length}</b></div>`+
+      `<div class="im-stat"><span>Reservations scanned</span><b>${resCount} (${phoneColCount} phone column${phoneColCount===1?'':'s'}, ${Object.keys(map).length} numbers)</b></div>`+
       `<div class="im-stat"><span>Calls matched to a reservation</span><b>${matchedCalls} (${pct(calls.length?matchedCalls/calls.length:0)})</b></div>`+
       `<div class="im-stat"><span>Distinct reservations matched</span><b>${matchedRes.size}</b></div>`+
       `<div class="im-stat"><span>Already saved on the sheet</span><b>${existing.length} call${existing.length===1?'':'s'}</b></div>`;
@@ -775,6 +780,12 @@ async function analyzeImport(){
     }
     if(importMode==='add'&&!withTime&&overlapKeys.length){
       warn+=(warn?'\n\n':'')+'This call log has no time-of-day column, so duplicate detection can only work at day level. "Replace this period only" is the safer choice here.';
+    }
+    if(!matchedCalls&&calls.length){
+      warn+=(warn?'\n\n':'')+(
+        !withPhone
+          ? 'None of the '+calls.length+' calls in this log carry a readable phone number, so nothing can be matched. Saving still records the call volume, but there will be no conversions or revenue for this period.'
+          : 'None of the '+withPhone+' callers appear in this reservations export. Usually that means the export does not cover them — if it was filtered by arrival or booking date, re-run it wide enough to include anyone who called between '+fmtDay(span.start)+' and '+fmtDay(span.end)+'. Saving now records the calls with zero conversions.');
     }
     if(importMode==='all'&&existing.length){
       warn=(warn?warn+'\n\n':'')+'This erases all '+existing.length+' saved calls, including periods not in this file. There is no undo.';
