@@ -366,23 +366,53 @@ let staysData=[],paceData=[],logData=[],discountsData=[],snapshotData=[],retailM
 let activeFilter='';
 let revChart,chChart,paceChart,bwChart,catChart,retailChart;
 let partialsVisible=false;
-function loadGSI(){return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});}
+/* Token is cached in sessionStorage so moving between Revenue and Call Ads does not
+   re-prompt. sessionStorage, not localStorage: it is scoped to this tab and dies when
+   the tab closes, rather than leaving a live Sheets token on disk. */
+const TOKEN_KEY='cs_gtoken';
+function saveToken(tok,expiresIn){
+  try{sessionStorage.setItem(TOKEN_KEY,JSON.stringify({token:tok,exp:Date.now()+((expiresIn||3600)*1000)-60000}));}catch(e){}
+}
+function loadToken(){
+  try{const j=JSON.parse(sessionStorage.getItem(TOKEN_KEY)||'null');if(j&&j.token&&j.exp>Date.now())return j.token;}catch(e){}
+  return null;
+}
+function clearToken(){try{sessionStorage.removeItem(TOKEN_KEY);}catch(e){}}
+function showAuth(){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
+function loadGSI(){
+  if(window.google&&window.google.accounts)return Promise.resolve();
+  return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});
+}
 async function signIn(){
   await loadGSI();
   tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:async(resp)=>{
     if(resp.error){showErr('Authentication failed: '+resp.error);return;}
-    accessToken=resp.access_token;showLoad();await loadAll();
+    accessToken=resp.access_token;saveToken(resp.access_token,resp.expires_in);showLoad();await loadAll();
   }});
-  tokenClient.requestAccessToken({prompt:'consent'});
+  // No prompt:'consent' — Google reissues silently once access has been granted.
+  tokenClient.requestAccessToken({});
 }
 function signOut(){
-  if(accessToken)google.accounts.oauth2.revoke(accessToken);
+  if(accessToken&&window.google&&window.google.accounts)google.accounts.oauth2.revoke(accessToken);
+  clearToken();
   accessToken=null;staysData=[];paceData=[];logData=[];discountsData=[];snapshotData=[];retailMonthlyData=[];activeFilter='';
   document.getElementById('dashboard').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
   [revChart,chChart,paceChart,bwChart,catChart,retailChart].forEach(c=>{if(c)c.destroy();});
   revChart=chChart=paceChart=bwChart=catChart=retailChart=null;
 }
+// Resume an existing session on load instead of showing the sign-in screen again.
+function resumeSession(){
+  const t=loadToken();
+  if(!t)return;
+  accessToken=t;showLoad();loadAll();
+}
+if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',resumeSession);
+else resumeSession();
 function storageKey(){return 'cs_blocked_'+(activeFilter||'all');}
 function customKey(){return 'cs_custom_'+(activeFilter||'all');}
 function getBlocked(){try{return new Set(JSON.parse(localStorage.getItem(storageKey())||'[]'));}catch(e){return new Set();}}
@@ -419,7 +449,7 @@ async function fetchTab(tab){const r=await fetch(`https://sheets.googleapis.com/
 async function fetchAllTabs(tabs){
   const params=tabs.map(t=>'ranges='+encodeURIComponent(t)).join('&');
   const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchGet?majorDimension=ROWS&${params}`,{headers:{Authorization:`Bearer ${accessToken}`}});
-  if(!r.ok)throw new Error(`Batch fetch failed (${r.status})`);
+  if(!r.ok){const err=new Error(`Batch fetch failed (${r.status})`);if(r.status===401||r.status===403)err.auth=true;throw err;}
   const json=await r.json();
   const out={};
   (json.valueRanges||[]).forEach((vr,i)=>{out[tabs[i]]=vr.values||[];});
@@ -462,7 +492,10 @@ async function loadAll(){
     }catch(e){document.getElementById('partial-alert').style.display='none';}
     showDash();
     document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  }catch(e){showErr('Error loading data: '+e.message);showDash();}
+  }catch(e){
+    if(e.auth){clearToken();accessToken=null;showAuth();return;}   // cached token expired
+    showErr('Error loading data: '+e.message);showDash();
+  }
 }
 function buildFilters(){
   const months=new Set();

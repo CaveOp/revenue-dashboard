@@ -356,18 +356,35 @@ let activePeriod = 'ALL', customFrom = null, customTo = null;
 let knownPeriods = [];                       // [{label,start,end}] oldest → newest
 let timeChart, campaignChart;
 
-/* ---------- Auth ---------- */
-function loadGSI(){return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});}
+/* ---------- Auth ----------
+   Token is cached in sessionStorage so moving between Revenue and Call Ads does not
+   re-prompt. sessionStorage, not localStorage: it is scoped to this tab and dies when
+   the tab closes, rather than leaving a live Sheets token on disk. */
+const TOKEN_KEY='cs_gtoken';
+function saveToken(tok,expiresIn){
+  try{sessionStorage.setItem(TOKEN_KEY,JSON.stringify({token:tok,exp:Date.now()+((expiresIn||3600)*1000)-60000}));}catch(e){}
+}
+function loadToken(){
+  try{const j=JSON.parse(sessionStorage.getItem(TOKEN_KEY)||'null');if(j&&j.token&&j.exp>Date.now())return j.token;}catch(e){}
+  return null;
+}
+function clearToken(){try{sessionStorage.removeItem(TOKEN_KEY);}catch(e){}}
+function loadGSI(){
+  if(window.google&&window.google.accounts)return Promise.resolve();
+  return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});
+}
 async function signIn(){
   await loadGSI();
   tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:async(resp)=>{
     if(resp.error){showErr('Sign-in failed: '+resp.error);return;}
-    accessToken=resp.access_token;showLoad();await loadAll();
+    accessToken=resp.access_token;saveToken(resp.access_token,resp.expires_in);showLoad();await loadAll();
   }});
-  tokenClient.requestAccessToken({prompt:'consent'});
+  // No prompt:'consent' — Google reissues silently once access has been granted.
+  tokenClient.requestAccessToken({});
 }
 function signOut(){
-  if(accessToken)google.accounts.oauth2.revoke(accessToken);
+  if(accessToken&&window.google&&window.google.accounts)google.accounts.oauth2.revoke(accessToken);
+  clearToken();
   accessToken=null;callsData=[];staysByRes={};
   document.getElementById('dashboard').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
@@ -376,6 +393,19 @@ function signOut(){
 }
 function showLoad(){document.getElementById('auth-screen').style.display='none';document.getElementById('loading-screen').style.display='flex';}
 function showDash(){document.getElementById('loading-screen').style.display='none';document.getElementById('dashboard').style.display='block';}
+function showAuth(){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
+// Resume an existing session on load instead of showing the sign-in screen again.
+function resumeSession(){
+  const t=loadToken();
+  if(!t)return;
+  accessToken=t;showLoad();loadAll();
+}
+if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',resumeSession);
+else resumeSession();
 function showErr(msg){const b=document.getElementById('error-banner');b.style.display='block';b.textContent=msg;}
 
 /* ---------- Sheet helpers ---------- */
@@ -389,7 +419,7 @@ async function sheetsApi(url,opts){
 async function fetchTab(tab){
   const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});
   if(r.status===400)return [];               // tab does not exist yet
-  if(!r.ok)throw new Error(`Cannot load ${tab} (${r.status})`);
+  if(!r.ok){const err=new Error(`Cannot load ${tab} (${r.status})`);if(r.status===401||r.status===403)err.auth=true;throw err;}
   return (await r.json()).values||[];
 }
 async function listSheetTitles(){
@@ -860,7 +890,10 @@ async function loadAll(){
     render();
     document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     showDash();
-  }catch(e){showErr('Error loading data: '+e.message);showDash();}
+  }catch(e){
+    if(e.auth){clearToken();accessToken=null;showAuth();return;}   // cached token expired
+    showErr('Error loading data: '+e.message);showDash();
+  }
 }
 
 function buildPeriods(){
