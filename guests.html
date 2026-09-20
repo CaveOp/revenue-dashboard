@@ -234,7 +234,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
   <div class="filter-bar">
     <span class="filter-label">Count by</span>
-    <div class="seg" id="seg-basis"><button data-v="booked" class="active" onclick="setBasis('booked')">Month booked</button><button data-v="stay" onclick="setBasis('stay')">Month of stay</button></div>
+    <div class="seg" id="seg-basis"><button data-v="stay" class="active" onclick="setBasis('stay')">Month of stay</button><button data-v="booked" onclick="setBasis('booked')">Month booked</button></div>
     <span class="filter-sep"></span>
     <span class="filter-label">Period</span>
     <select class="filter-select" id="period-select" onchange="onPeriodChange()"></select>
@@ -273,9 +273,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
     </div>
 
     <div class="panel">
-      <div class="panel-header"><span class="panel-title">Markets by month</span><span class="panel-sub" id="heat-sub"></span></div>
+      <div class="panel-header"><span class="panel-title">Markets by month</span><span class="panel-sub"><span id="heat-sub"></span> &nbsp;<select class="filter-select" id="heat-range" onchange="heatRange=this.value;renderHeat();" style="padding:4px 8px;font-size:12px;"></select></span></div>
       <div class="table-scroll" id="heat"></div>
-      <div class="panel-foot">A market is every origin within driving reach of a hub (for example, the Bay Area is anything within about 55 miles of Oakland). Anything outside every hub is listed under its state. This table always shows the last 12 months and ignores the Period filter, so you can read across for a trend.</div>
+      <div class="panel-foot">A market is every origin within driving reach of a hub (for example, the Bay Area is anything within about 55 miles of Oakland). Anything outside every hub is listed under its state. This table shows a whole year, January to December, and ignores the Period filter, so you can read across for a trend; months that have not happened yet fill in as reservations arrive. Switch "Count by" to Month booked to judge advertising — an ad moves the month a guest books, not the month they stay.</div>
     </div>
 
     <div class="grid-2">
@@ -338,7 +338,7 @@ const MARKETS = [
 let tokenClient, accessToken;
 let GEO=null, AREA=null, BASE=null;      // bundled lookups and map background, loaded once
 let guests=[];                            // one entry per reservation, location resolved
-let basis='booked', metric='res', period='ALL', showAllCities=false;
+let basis='stay', metric='res', period='ALL', showAllCities=false, heatRange='YEAR';   // heatRange: 'YEAR' = this year until chosen, a year number, or 'LAST12'
 let map=null, layer=null, lastBounds=null;
 let pendingImport=null;
 
@@ -976,18 +976,28 @@ function renderUnplaced(){
 function copyUnplaced(btn){navigator.clipboard.writeText(unplacedText).then(()=>{btn.textContent='Copied';setTimeout(()=>btn.textContent='Copy list',1500);}).catch(()=>{});}
 function renderHeat(){
   const el=document.getElementById('heat');
-  const now=new Date(),end=now.getFullYear()*12+now.getMonth(),cols=[];for(let k=end-11;k<=end;k++)cols.push(k);
-  const rows=guests.filter(g=>{const k=keyOf(g);return k!=null&&k>=cols[0]&&k<=end;});
-  document.getElementById('heat-sub').textContent=(metric==='rev'?'Revenue':'Reservations')+' by '+(basis==='booked'?'month booked':'month of stay')+' · last 12 months';
-  if(!rows.length){el.innerHTML='<div class="empty-state">No reservations '+(basis==='booked'?'booked':'staying')+' in the last 12 months yet.</div>';return;}
+  // which 12 months: a calendar year (this year unless another is picked) or the last 12 months
+  const now=new Date(),thisYear=now.getFullYear(),nowKey=thisYear*12+now.getMonth();
+  const years=[...new Set(guests.map(keyOf).filter(k=>k!=null).map(k=>Math.floor(k/12)).concat([thisYear]))].sort((x,y)=>y-x);
+  if(heatRange==='YEAR'||(heatRange!=='LAST12'&&!years.includes(+heatRange)))heatRange=String(thisYear);
+  const sel=document.getElementById('heat-range');
+  sel.innerHTML=years.map(y=>'<option value="'+y+'">'+y+'</option>').join('')+'<option value="LAST12">Last 12 months</option>';
+  sel.value=heatRange;
+  const cols=[];
+  if(heatRange==='LAST12'){for(let k=nowKey-11;k<=nowKey;k++)cols.push(k);}
+  else{for(let m=0;m<12;m++)cols.push(+heatRange*12+m);}
+  const rows=guests.filter(g=>{const k=keyOf(g);return k!=null&&k>=cols[0]&&k<=cols[11];});
+  const rangeText=heatRange==='LAST12'?'the last 12 months':heatRange;
+  document.getElementById('heat-sub').textContent=(metric==='rev'?'Revenue':'Reservations')+' by '+(basis==='booked'?'month booked':'month of stay');
+  if(!rows.length){el.innerHTML='<div class="empty-state">No reservations '+(basis==='booked'?'booked':'staying')+' in '+rangeText+' yet.</div>';return;}
   const mk={};rows.forEach(g=>{const o=mk[g.market]||(mk[g.market]={name:g.market,total:0,m:{}});const v=val(g);o.total+=v;o.m[keyOf(g)]=(o.m[keyOf(g)]||0)+v;});
   let list=Object.values(mk).sort((a,b)=>b.total-a.total);
   const top=list.slice(0,10),rest=list.slice(10);
   if(rest.length){const o={name:'Everywhere else ('+rest.length+')',total:0,m:{}};rest.forEach(r=>{o.total+=r.total;Object.entries(r.m).forEach(([k,v])=>o.m[k]=(o.m[k]||0)+v);});top.push(o);}
   const max=Math.max(1,...top.flatMap(r=>cols.map(c=>r.m[c]||0)));
   const colTot=cols.map(c=>top.reduce((a,r)=>a+(r.m[c]||0),0)),grand=colTot.reduce((a,b)=>a+b,0);
-  el.innerHTML='<table class="data-table heat"><thead><tr><th>Market</th>'+cols.map(c=>'<th class="m">'+mShort(c)+'</th>').join('')+'<th class="m">Total</th></tr></thead><tbody>'+
-    top.map(r=>'<tr><td class="name">'+esc(r.name)+'</td>'+cols.map(c=>{const v=r.m[c]||0;return '<td class="h" style="background:rgba(74,94,109,'+(v?(0.06+0.5*v/max).toFixed(3):0)+');">'+(v?fmtVal(v):'<span style="color:var(--border2);">·</span>')+'</td>';}).join('')+'<td class="h" style="font-weight:700;">'+fmtVal(r.total)+'</td></tr>').join('')+
+  el.innerHTML='<table class="data-table heat"><thead><tr><th>Market</th>'+cols.map(c=>'<th class="m"'+(c>nowKey?' style="font-style:italic;font-weight:600;" title="Still to come"':'')+'>'+mShort(c)+'</th>').join('')+'<th class="m">Total</th></tr></thead><tbody>'+
+    top.map(r=>'<tr><td class="name">'+esc(r.name)+'</td>'+cols.map(c=>{const v=r.m[c]||0;return '<td class="h" style="background:rgba(74,94,109,'+(v?(0.06+0.5*v/max).toFixed(3):0)+');'+(c>nowKey?'font-style:italic;':'')+'">'+(v?fmtVal(v):'<span style="color:var(--border2);">·</span>')+'</td>';}).join('')+'<td class="h" style="font-weight:700;">'+fmtVal(r.total)+'</td></tr>').join('')+
     '<tr class="total"><td class="name">All markets</td>'+colTot.map(v=>'<td class="h">'+(v?fmtVal(v):'·')+'</td>').join('')+'<td class="h">'+fmtVal(grand)+'</td></tr></tbody></table>';
 }
 
