@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cave Springs — Guests</title>
+<link rel="icon" type="image/png" href="favicon-32x32.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f2ee;--surface:#fff;--surface2:#f9f7f4;
+  --border:#e8e2da;--border2:#d6cec3;
+  --slate:#4a5e6d;--slate2:#3a4d5c;--slate3:#6a7e8d;--slate-bg:#eef2f5;
+  --terra:#c4572a;--terra2:#a8451f;--terra-bg:#faf0eb;
+  --green:#3a7d5c;--green-bg:#edf6f1;
+  --amber:#b87c2a;--amber-bg:#fdf5e8;
+  --purple:#6b5b8c;--purple-bg:#f2f0f7;
+  --text:#1a2530;--text2:#4a5568;--text3:#8a9bb0;
+  --sans:'Raleway',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+  --shadow2:0 2px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.06);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* AUTH */
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+.auth-card{background:var(--surface);border-radius:20px;box-shadow:var(--shadow2);padding:60px 56px;text-align:center;max-width:460px;width:90%;}
+.auth-logo-title{font-size:22px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--slate);}
+.auth-logo-sub{font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--text3);}
+.auth-divider{width:40px;height:2px;background:var(--terra);margin:20px auto 28px;}
+.auth-desc{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.7;}
+.auth-btn{display:inline-flex;align-items:center;gap:10px;background:var(--slate);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.auth-btn:hover{background:var(--slate2);}
+
+/* LOADING */
+#loading-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;}
+.spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--slate);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:12px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;}
+
+#dashboard{display:none;}
+
+/* HEADER */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:1100;}
+.header-title{font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
+.header-sub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.last-updated{font-size:12px;color:var(--text3);}
+.hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
+.hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
+
+/* NAV */
+.nav-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;height:44px;gap:4px;}
+.nav-tab{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:0 16px;height:44px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;}
+.nav-tab:hover{color:var(--slate);}
+.nav-tab.active{color:var(--slate);border-bottom-color:var(--slate);}
+
+/* FILTER BAR */
+.filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 40px;display:flex;align-items:center;gap:10px;min-height:52px;flex-wrap:wrap;}
+.filter-label{font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-right:4px;}
+.filter-select{font-family:var(--sans);font-size:13px;color:var(--text);background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;cursor:pointer;}
+.filter-sep{width:1px;height:24px;background:var(--border2);margin:0 6px;}
+.filter-note{font-size:11px;color:var(--text3);margin-left:auto;}
+.seg{display:inline-flex;border:1px solid var(--border2);border-radius:7px;overflow:hidden;}
+.seg button{font-family:var(--sans);font-size:11px;font-weight:600;color:var(--text3);background:transparent;border:none;padding:6px 12px;cursor:pointer;}
+.seg button+button{border-left:1px solid var(--border2);}
+.seg button.active{background:var(--slate-bg);color:var(--slate);}
+
+/* CONTENT */
+.content{padding:32px 40px;max-width:1600px;margin:0 auto;}
+.error-banner{display:none;background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-bottom:20px;}
+.info-banner{background:var(--slate-bg);border:1px solid var(--border2);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.7;}
+.info-banner strong{color:var(--slate);}
+.status-line{font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.7;}
+.status-line b{color:var(--text2);font-weight:600;}
+
+/* SCORECARDS */
+.scorecards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+.scorecard{border-radius:16px;padding:22px 24px;box-shadow:var(--shadow);border:1px solid var(--border);background:var(--surface);position:relative;overflow:hidden;}
+.scorecard::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--slate);}
+.scorecard.a::after{background:var(--slate);}.scorecard.b::after{background:var(--terra);}.scorecard.c::after{background:var(--green);}.scorecard.d::after{background:var(--amber);}
+.scorecard-label{font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:10px;color:var(--text3);}
+.scorecard-value{font-size:30px;font-weight:700;letter-spacing:-0.01em;color:var(--text);}
+.scorecard-value.small{font-size:20px;line-height:1.3;padding:8px 0 3px;}
+.scorecard-meta{font-size:12px;color:var(--text3);margin-top:6px;}
+
+/* PANELS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px;}
+.panel-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.panel-title{font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);}
+.panel-sub{font-size:11px;color:var(--text3);}
+.panel-body{padding:22px 24px;}
+.panel-foot{padding:12px 24px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);line-height:1.7;}
+.empty-state{text-align:center;color:var(--text3);font-size:13px;padding:32px 20px;}
+#map{height:540px;width:100%;background:#e9eef1;}
+.map-legend{display:flex;gap:18px;flex-wrap:wrap;align-items:center;}
+.lg{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:var(--text2);}
+.lg i{display:inline-block;width:13px;height:13px;border-radius:50%;}
+.lg i.city{background:rgba(74,94,109,0.55);border:1.5px solid #4a5e6d;}
+.lg i.area{background:rgba(184,124,42,0.10);border:1.5px dashed #b87c2a;}
+.lg i.home{background:#c4572a;border:2px solid #fff;box-shadow:0 0 0 1px #c4572a;}
+.leaflet-tooltip.gt{font-family:var(--sans);font-size:12px;line-height:1.5;border-radius:8px;padding:8px 11px;color:var(--text);box-shadow:var(--shadow2);border:1px solid var(--border2);}
+.leaflet-tooltip.gt b{color:var(--slate);}
+.leaflet-container{font-family:var(--sans);}
+
+/* TABLES */
+.table-scroll{overflow-x:auto;}
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{text-align:left;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.data-table td{padding:11px 14px;border-bottom:1px solid var(--surface2);}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table .right{text-align:right;}
+.data-table tbody tr:hover td{background:var(--surface2);}
+.cell-sub{font-size:11px;color:var(--text3);}
+.est{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:2px 7px;border-radius:20px;background:var(--amber-bg);color:var(--amber);margin-left:6px;vertical-align:middle;}
+.bar-wrap{height:6px;background:var(--surface2);border-radius:3px;min-width:70px;}
+.bar-fill{height:6px;border-radius:3px;background:var(--slate);}
+.heat td.h{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.heat th.m{text-align:right;}
+.heat td.name{white-space:nowrap;font-weight:600;}
+.heat tr.total td{border-top:2px solid var(--border2);font-weight:700;}
+.link-btn{font-family:var(--sans);font-size:11px;font-weight:600;color:var(--slate3);background:none;border:none;cursor:pointer;text-decoration:underline;}
+
+/* MODAL */
+.import-overlay{display:none;position:fixed;inset:0;background:rgba(26,37,48,0.4);z-index:1200;}
+.import-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border-radius:18px;box-shadow:var(--shadow2);width:92%;max-width:640px;max-height:88vh;overflow-y:auto;z-index:1201;padding:32px 34px;}
+.import-modal h3{font-size:16px;font-weight:700;letter-spacing:0.04em;color:var(--slate);margin-bottom:6px;}
+.im-desc{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.7;}
+.im-field{margin-bottom:16px;}
+.im-field label{display:block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.im-field input[type=file]{font-family:var(--sans);font-size:13px;width:100%;padding:10px;border:1px dashed var(--border2);border-radius:8px;background:var(--surface2);}
+.im-btn{font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 20px;border-radius:9px;border:none;cursor:pointer;background:var(--slate);color:#fff;}
+.im-btn:hover{background:var(--slate2);}
+.im-btn.ghost{background:transparent;color:var(--text3);border:1px solid var(--border2);}
+.im-btn.ghost:hover{color:var(--slate);border-color:var(--slate3);}
+.im-btn.confirm{background:var(--green);}
+.im-btn.confirm:hover{background:#2f6b4d;}
+.im-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.im-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
+.im-status{font-size:13px;color:var(--text2);margin-top:12px;min-height:20px;}
+.im-err{background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-top:14px;white-space:pre-wrap;}
+.im-ok{background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--green);margin-top:14px;white-space:pre-wrap;}
+.im-warn{background:var(--amber-bg);border:1px solid rgba(184,124,42,0.3);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--amber);margin-top:14px;line-height:1.7;}
+.im-preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:16px;}
+.im-stat{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);}
+.im-stat:last-child{border-bottom:none;}
+.im-stat b{font-weight:700;color:var(--text);}
+.im-privacy{font-size:11px;color:var(--text3);margin-top:16px;line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
+
+@media(max-width:1000px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
+@media(max-width:700px){.header,.nav-bar,.filter-bar{padding-left:16px;padding-right:16px;}.content{padding:20px 16px;}.scorecards{grid-template-columns:1fr;}.header{height:auto;min-height:64px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px;}.last-updated{display:none;}#map{height:400px;}.filter-note{margin-left:0;width:100%;}}
+@media print{.header-right,.nav-bar,.import-overlay,.import-modal,.filter-bar{display:none!important;}.header{position:static;}}
+</style>
+</head>
+<body>
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo-title">Cave Springs</div>
+    <div class="auth-logo-sub">Hotel · Cabins · Airstreams</div>
+    <div class="auth-divider"></div>
+    <div class="auth-desc">Where Guests Come From — sign in with your Cave Springs Google account to continue</div>
+    <button class="auth-btn" onclick="signIn()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/></svg>
+      Sign in with Google
+    </button>
+  </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Loading guest origins</div></div>
+
+<!-- IMPORT MODAL -->
+<div class="import-overlay" id="import-overlay" onclick="closeImport()"></div>
+<div class="import-modal" id="import-modal">
+  <h3>Import Guests by Date</h3>
+  <div class="im-desc">Choose the <b>Guests by Date</b> export from ResNexus (CSV). It is opened here in your browser only. From each row this page keeps the reservation number, the start date and nights, the city and state, and the three-digit area code — nothing else. Importing a range that overlaps an earlier import is safe: a reservation already saved is updated, never doubled.</div>
+
+  <div class="im-field">
+    <label>Guests by Date export (CSV)</label>
+    <input type="file" id="im-file" accept=".csv,text/csv">
+  </div>
+
+  <div class="im-row">
+    <button class="im-btn" id="im-analyze-btn" onclick="analyzeImport()">Read &amp; preview</button>
+    <button class="im-btn ghost" onclick="closeImport()">Close</button>
+  </div>
+  <div class="im-status" id="im-status"></div>
+
+  <div id="im-preview-wrap" style="display:none;">
+    <div class="im-preview" id="im-preview"></div>
+    <div id="im-notes"></div>
+    <div class="im-row" style="margin-top:16px;">
+      <button class="im-btn confirm" id="im-confirm-btn" onclick="confirmImport()">Confirm — save to sheet</button>
+      <button class="im-btn ghost" onclick="cancelPreview()">Cancel</button>
+    </div>
+  </div>
+
+  <div id="im-result" style="display:none;"></div>
+
+  <div class="im-privacy">Privacy: guest names, additional guests, email addresses and phone numbers are never saved, never shown and never sent anywhere. The file is read on this computer; the columns holding them are not even looked at, except that the first three digits of a phone number (the area code) are kept to estimate a region when the city is blank. Before anything is written to the sheet, every value is checked once more and the save is refused if anything resembling an email address or a phone number is found.</div>
+</div>
+
+<div id="dashboard">
+  <div class="header">
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Where Guests Come From · Dunsmuir, CA</div></div>
+    <div class="header-right">
+      <div class="last-updated" id="last-updated-text"></div>
+      <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
+      <button class="hdr-btn" onclick="openImport()">&#8679; Import Guests</button>
+      <button class="hdr-btn" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <a class="nav-tab" href="index.html">Revenue</a>
+    <a class="nav-tab" href="call-ads.html">Call Ads</a>
+    <a class="nav-tab" href="invoices.html">Invoices</a>
+    <a class="nav-tab active" href="guests.html">Guests</a>
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-label">Count by</span>
+    <div class="seg" id="seg-basis"><button data-v="booked" class="active" onclick="setBasis('booked')">Month booked</button><button data-v="stay" onclick="setBasis('stay')">Month of stay</button></div>
+    <span class="filter-sep"></span>
+    <span class="filter-label">Period</span>
+    <select class="filter-select" id="period-select" onchange="onPeriodChange()"></select>
+    <span class="filter-sep"></span>
+    <span class="filter-label">Measure</span>
+    <div class="seg" id="seg-metric"><button data-v="res" class="active" onclick="setMetric('res')">Reservations</button><button data-v="rev" onclick="setMetric('rev')">Revenue</button></div>
+    <span class="filter-note" id="filter-note"></span>
+  </div>
+
+  <div class="content">
+    <div class="error-banner" id="error-banner"></div>
+    <div class="info-banner" id="empty-info" style="display:none;">
+      <strong>No guest origins saved yet.</strong> In ResNexus, run <strong>Guests by Date</strong> for the range you want, export it as CSV, then use <strong>Import Guests</strong> above. Names, emails and phone numbers in that file are never saved.
+    </div>
+    <div class="status-line" id="status-line"></div>
+
+    <div class="scorecards">
+      <div class="scorecard a"><div class="scorecard-label">Reservations in view</div><div class="scorecard-value" id="sc-res">—</div><div class="scorecard-meta" id="sc-res-meta"></div></div>
+      <div class="scorecard b"><div class="scorecard-label">Top market</div><div class="scorecard-value small" id="sc-top">—</div><div class="scorecard-meta" id="sc-top-meta"></div></div>
+      <div class="scorecard c"><div class="scorecard-label">Within 100 miles</div><div class="scorecard-value" id="sc-near">—</div><div class="scorecard-meta" id="sc-near-meta"></div></div>
+      <div class="scorecard d"><div class="scorecard-label">From outside California</div><div class="scorecard-value" id="sc-out">—</div><div class="scorecard-meta" id="sc-out-meta"></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Map</span>
+        <div class="map-legend">
+          <span class="lg"><i class="city"></i>City on the reservation</span>
+          <span class="lg"><i class="area"></i>Estimated from area code</span>
+          <span class="lg"><i class="home"></i>Cave Springs</span>
+          <span class="seg"><button onclick="mapView('west')">West</button><button onclick="mapView('usa')">USA</button><button onclick="mapView('fit')">Fit all</button></span>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="panel-foot" id="map-foot"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Markets by month</span><span class="panel-sub" id="heat-sub"></span></div>
+      <div class="table-scroll" id="heat"></div>
+      <div class="panel-foot">A market is every origin within driving reach of a hub (for example, the Bay Area is anything within about 55 miles of Oakland). Anything outside every hub is listed under its state. This table always shows the last 12 months and ignores the Period filter, so you can read across for a trend.</div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Distance from Cave Springs</span><span class="panel-sub">straight-line miles from Dunsmuir</span></div>
+        <div class="table-scroll" id="bands"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">By state</span><span class="panel-sub" id="state-sub"></span></div>
+        <div class="table-scroll" id="states"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Cities and regions</span><span class="panel-sub" id="city-sub"></span></div>
+      <div class="table-scroll" id="cities"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLIENT_ID = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
+const SHEET_ID  = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
+const GUEST_TAB = 'GUEST_ORIGINS';
+const STAYS_TAB = 'STAYS_CLEAN';
+const LOG_TAB   = 'IMPORT_LOG';
+const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
+const GUEST_HEADER = ['Res#','StartDate','Nights','City','State','AreaCode','Source'];
+const HOME = {lat:41.208,lng:-122.272,name:'Cave Springs · Dunsmuir'};
+const WEST = [[32.4,-125.2],[48.9,-115.5]];   // San Diego to Seattle, coast to Boise
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const BANDS = [[0,100,'Under 100 miles'],[100,250,'100 – 250 miles'],[250,500,'250 – 500 miles'],[500,1e9,'Over 500 miles']];
+/* Markets: every origin within `r` miles of a hub point belongs to that market. When two
+   hubs could claim a place, the one it sits deepest inside (distance / radius) wins. */
+const MARKETS = [
+  {name:'Local (Siskiyou / Shasta)',pts:[[41.208,-122.272,75]]},
+  {name:'Bay Area',pts:[[37.804,-122.271,55]]},
+  {name:'Sacramento area',pts:[[38.582,-121.494,40]]},
+  {name:'Chico / Butte',pts:[[39.728,-121.837,30]]},
+  {name:'Central Valley',pts:[[37.958,-121.291,35],[36.748,-119.772,70]]},
+  {name:'North Coast (Eureka)',pts:[[40.802,-124.164,60]]},
+  {name:'Southern Oregon',pts:[[42.327,-122.876,65]]},
+  {name:'Eugene / Bend',pts:[[44.052,-123.087,45],[44.058,-121.315,35]]},
+  {name:'Portland area',pts:[[45.523,-122.676,50]]},
+  {name:'Seattle area',pts:[[47.606,-122.332,50]]},
+  {name:'Reno / Tahoe',pts:[[39.530,-119.814,45]]},
+  {name:'Los Angeles area',pts:[[34.052,-118.244,60]]},
+  {name:'San Diego',pts:[[32.716,-117.165,40]]},
+  {name:'Las Vegas',pts:[[36.175,-115.137,40]]}
+];
+
+let tokenClient, accessToken;
+let GEO=null, AREA=null;                 // bundled lookups, loaded once
+let guests=[];                            // one entry per reservation, location resolved
+let basis='booked', metric='res', period='ALL', showAllCities=false;
+let map=null, layer=null, lastBounds=null;
+let pendingImport=null;
+
+/* ---------- Auth ----------
+   Same token, same key as the other pages, so moving between them does not re-prompt.
+   sessionStorage, not localStorage: it is scoped to this tab and dies when the tab
+   closes, rather than leaving a live Sheets token on disk. */
+const TOKEN_KEY='cs_gtoken';
+function saveToken(tok,expiresIn){
+  try{sessionStorage.setItem(TOKEN_KEY,JSON.stringify({token:tok,exp:Date.now()+((expiresIn||3600)*1000)-60000}));}catch(e){}
+}
+function loadToken(){
+  try{const j=JSON.parse(sessionStorage.getItem(TOKEN_KEY)||'null');if(j&&j.token&&j.exp>Date.now())return j.token;}catch(e){}
+  return null;
+}
+function clearToken(){try{sessionStorage.removeItem(TOKEN_KEY);}catch(e){}}
+function loadGSI(){
+  if(window.google&&window.google.accounts)return Promise.resolve();
+  return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});
+}
+async function signIn(){
+  await loadGSI();
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:async(resp)=>{
+    if(resp.error){showErr('Sign-in failed: '+resp.error);return;}
+    accessToken=resp.access_token;saveToken(resp.access_token,resp.expires_in);showLoad();await loadAll();
+  }});
+  // No prompt:'consent' — Google reissues silently once access has been granted.
+  tokenClient.requestAccessToken({});
+}
+function signOut(){
+  if(accessToken&&window.google&&window.google.accounts)google.accounts.oauth2.revoke(accessToken);
+  clearToken();
+  accessToken=null;guests=[];
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
+function showLoad(){document.getElementById('auth-screen').style.display='none';document.getElementById('loading-screen').style.display='flex';}
+function showDash(){document.getElementById('loading-screen').style.display='none';document.getElementById('dashboard').style.display='block';}
+function showAuth(){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
+// Resume an existing session on load instead of showing the sign-in screen again.
+function resumeSession(){
+  const t=loadToken();
+  if(!t)return;
+  accessToken=t;showLoad();loadAll();
+}
+if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',resumeSession);
+else resumeSession();
+function showErr(msg){const b=document.getElementById('error-banner');b.style.display='block';b.textContent=msg;}
+
+/* ---------- Sheet helpers ---------- */
+async function sheetsApi(url,opts){
+  const r=await fetch(url,Object.assign({headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'}},opts||{}));
+  if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=(j.error&&j.error.message)?j.error.message:msg;}catch(e){}
+    if(r.status===401)msg+=' — your sign-in may have expired. Sign out and back in, then retry.';
+    throw new Error(msg);}
+  return r.json();
+}
+async function fetchTab(tab){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  if(r.status===400)return [];               // tab does not exist yet
+  if(!r.ok){const err=new Error(`Cannot load ${tab} (${r.status})`);if(r.status===401||r.status===403)err.auth=true;throw err;}
+  return (await r.json()).values||[];
+}
+async function listSheetTitles(){
+  const j=await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`);
+  return (j.sheets||[]).map(s=>s.properties.title);
+}
+async function ensureTab(tab){
+  const titles=await listSheetTitles();
+  if(titles.includes(tab))return;
+  await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:tab}}}]})});
+}
+// RAW: dates stay as plain YYYY-MM-DD text and nothing is reinterpreted by the sheet.
+async function putRaw(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}!A1?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values})});}
+async function appendValues(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:append?valueInputOption=USER_ENTERED`,{method:'POST',body:JSON.stringify({values})});}
+
+function cell(v){return String(v==null?'':v).trim();}
+function toRows(raw){
+  if(!raw||raw.length<2)return[];
+  const H=raw[0].map(h=>String(h).trim());
+  return raw.slice(1).filter(row=>row.some(c=>cell(c)!=='')).map(row=>{const o={};H.forEach((h,i)=>o[h]=cell(row[i]));return o;});
+}
+function pMoney(s){return parseFloat(String(s||0).replace(/[$,]/g,''))||0;}
+function fmt$(n){return '$'+Math.round(n).toLocaleString('en-US');}
+function pct(n){return (isFinite(n)?(n*100):0).toFixed(0)+'%';}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function p2(n){return String(n).padStart(2,'0');}
+function nowStamp(){const d=new Date();return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleString('en-US',{hour:'numeric',minute:'2-digit'});}
+function resKey(s){return String(s||'').replace(/[^0-9A-Za-z]/g,'').toUpperCase();}
+
+/* Dates are built by hand from local Y/M/D parts — new Date("2026-06-17") is read as UTC
+   and lands on the previous day west of Greenwich. Months are compared as numbers
+   (year*12+month), never as spelled-out text, which is slow on thousands of rows. */
+function parseDay(s){
+  s=cell(s);if(!s)return null;
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return new Date(y,+m[1]-1,+m[2]);}
+  const d=new Date(s);
+  return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function toISO(d){return d?d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()):'';}
+function mKey(d){return d?d.getFullYear()*12+d.getMonth():null;}
+function mLabel(k){return MONTHS[k%12]+' '+Math.floor(k/12);}
+function mShort(k){return MONTHS[k%12]+' '+String(Math.floor(k/12)).slice(2);}
+
+/* ---------- Geography ---------- */
+// Must match norm() in tools/build-geo.cjs exactly.
+function normCity(s){
+  return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()
+    .replace(/\bst\.?\s+/g,'saint ').replace(/\bste\.?\s+/g,'sainte ').replace(/\bmt\.?\s+/g,'mount ').replace(/\bft\.?\s+/g,'fort ')
+    .replace(/[^a-z0-9]+/g,' ').trim();
+}
+async function loadGeo(){
+  if(GEO&&AREA)return;
+  const [c,a]=await Promise.all([fetch('data/us-cities.json'),fetch('data/area-codes.json')]);
+  if(!c.ok||!a.ok)throw new Error('Could not load the city and area-code lookup files.');
+  GEO=await c.json();AREA=(await a.json()).codes;
+}
+function stateCodeOf(s){const k=normCity(s);return k?(GEO.states[k]||null):null;}
+function miles(aLat,aLng,bLat,bLng){
+  const R=3958.8,t=Math.PI/180,dLat=(bLat-aLat)*t,dLng=(bLng-aLng)*t;
+  const h=Math.sin(dLat/2)**2+Math.cos(aLat*t)*Math.cos(bLat*t)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function marketOf(loc,stCode){
+  if(loc){
+    let best=null,bestRatio=1;
+    MARKETS.forEach(m=>m.pts.forEach(([la,ln,r])=>{const q=miles(la,ln,loc.lat,loc.lng)/r;if(q<=bestRatio){bestRatio=q;best=m.name;}}));
+    if(best)return best;
+  }
+  if(stCode==='CA')return 'Elsewhere in California';
+  return stCode?('Elsewhere — '+stCode):'Unknown';
+}
+/* Where a reservation is from: the city printed on it when there is one and it can be found;
+   otherwise an estimate from the area code; otherwise unknown. Worked out on load and never
+   stored, so a better lookup file improves old rows with nothing to re-import. */
+function resolve(g){
+  const st=stateCodeOf(g.state);
+  g.stCode=st;
+  let loc=null;
+  if(g.city&&st){
+    const ll=(GEO.cities[st]||{})[normCity(g.city)];
+    if(ll)loc={kind:'city',lat:ll[0],lng:ll[1],label:g.city+', '+st};
+  }
+  const ac=g.areaCode&&AREA[g.areaCode];
+  if(!loc&&ac){
+    loc={kind:'area',lat:ac[2],lng:ac[3],label:g.areaCode+' area — '+ac[0]};
+    if(!g.stCode)g.stCode=ac[1];
+  }
+  g.loc=loc;
+  g.place=loc?loc.label:(g.city?(g.city+(st?', '+st:(g.state?', '+g.state:''))+' (not on the map)'):'Unknown');
+  g.miles=loc?miles(HOME.lat,HOME.lng,loc.lat,loc.lng):null;
+  g.market=marketOf(loc,g.stCode);
+  // how far the area code sits from the printed city, where a row carries both
+  g.portMiles=(loc&&loc.kind==='city'&&ac)?miles(loc.lat,loc.lng,ac[2],ac[3]):null;
+}
+
+/* ==================== IMPORT: THE ONLY CODE THAT TOUCHES THE EXPORT ====================
+   The export holds guest names, additional guests, emails and phone numbers. The rule:
+   a row is reduced to the seven safe values below the moment it is read, the raw text is
+   dropped, and nothing else in this page ever sees the file. Pure functions — the test
+   harness runs everything between the two markers. */
+/*SAFE-START*/
+function parseCSV(text){
+  const rows=[];let row=[],cur='',q=false;
+  text=String(text).replace(/^﻿/,'');
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=ch;continue;}
+    if(ch==='"'){q=true;continue;}
+    if(ch===','){row.push(cur);cur='';continue;}
+    if(ch==='\r')continue;
+    if(ch==='\n'){row.push(cur);rows.push(row);row=[];cur='';continue;}
+    cur+=ch;
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows;
+}
+function findCol(headers,names){
+  const norm=headers.map(h=>String(h).toLowerCase().replace(/[^a-z0-9#]/g,''));
+  for(const n of names){const i=norm.indexOf(n.toLowerCase().replace(/[^a-z0-9#]/g,''));if(i!==-1)return i;}
+  return -1;
+}
+// Three digits and nothing more. International and toll-free numbers give no area code.
+function areaCodeOf(phone){
+  let d=String(phone||'').replace(/\D/g,'');
+  if(d.length===11&&d[0]==='1')d=d.slice(1);
+  if(d.length!==10)return '';
+  const ac=d.slice(0,3);
+  if(/^[01]/.test(ac)||/^(800|833|844|855|866|877|888)$/.test(ac))return '';
+  return ac;
+}
+// A value may be saved only if it cannot be an email address or a phone number.
+function looksPersonal(v){const s=String(v==null?'':v);return /@/.test(s)||/\d[\d\-\s().]{5,}\d/.test(s.replace(/^\d{4}-\d{2}-\d{2}$/,''));}
+function isoDay(s){
+  s=String(s||'').trim();
+  let m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return y+'-'+String(+m[1]).padStart(2,'0')+'-'+String(+m[2]).padStart(2,'0');}
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');
+  return '';
+}
+/* Returns {rows:[safe rows], stats} and nothing else. `table` is the parsed CSV. */
+function reduceExport(table){
+  if(!table.length)throw new Error('The file is empty.');
+  const H=table[0];
+  const ix={res:findCol(H,['Res#','Res','Reservation','Reservation#']),start:findCol(H,['Start Date','StartDate','Arrival','Check In']),
+    nights:findCol(H,['# Nights','Nights','#Nights']),end:findCol(H,['End Date','EndDate','Departure','Check Out']),
+    city:findCol(H,['City','City/State','City, State']),cell:findCol(H,['Cell Phone','CellPhone','Mobile']),phone:findCol(H,['Phone','Home Phone'])};
+  if(ix.res===-1)throw new Error('This does not look like the Guests by Date export — there is no "Res#" column.');
+  if(ix.city===-1&&ix.cell===-1&&ix.phone===-1)throw new Error('This file has no City column and no phone column, so there is nothing to place guests by.');
+  const byRes={};let dataRows=0;
+  for(let r=1;r<table.length;r++){
+    const row=table[r];if(!row||!row.some(c=>String(c||'').trim()!==''))continue;
+    const res=String(row[ix.res]||'').replace(/[^0-9A-Za-z]/g,'').toUpperCase();if(!res)continue;
+    dataRows++;
+    const start=ix.start!==-1?isoDay(row[ix.start]):'';
+    let nights=ix.nights!==-1?parseInt(String(row[ix.nights]).replace(/\D/g,''),10):NaN;
+    if(!(nights>0)&&ix.end!==-1&&start){const a=new Date(start),b=new Date(isoDay(row[ix.end]));const n=Math.round((b-a)/86400000);if(n>0)nights=n;}
+    // "Clearlake, California" -> city + state. The last comma splits them.
+    let city='',state='';
+    if(ix.city!==-1){
+      const raw=String(row[ix.city]||'').replace(/\s+/g,' ').trim(),k=raw.lastIndexOf(',');
+      if(k===-1)city=raw;else{city=raw.slice(0,k).trim();state=raw.slice(k+1).trim();}
+      state=state.replace(/\s*\d{5}(-\d{4})?$/,'').trim();                  // "California 96025" -> "California"
+      if(looksPersonal(city)||looksPersonal(state)){city='';state='';}     // someone typed contact details into the City box
+      if(city.length>60||state.length>40){city='';state='';}
+    }
+    const ac=areaCodeOf(ix.cell!==-1?row[ix.cell]:'')||areaCodeOf(ix.phone!==-1?row[ix.phone]:'');
+    const safe={res,start,nights:nights>0?nights:'',city,state,areaCode:ac,source:city?'city':(ac?'areacode':'unknown')};
+    // A reservation listed on several rows (a room move, a split stay) counts once:
+    // earliest start, nights added up, and the best origin any of its rows offers.
+    const prev=byRes[res];
+    if(!prev)byRes[res]=safe;
+    else{
+      if(safe.start&&(!prev.start||safe.start<prev.start))prev.start=safe.start;
+      if(safe.nights)prev.nights=(prev.nights||0)+safe.nights;
+      if(!prev.city&&safe.city){prev.city=safe.city;prev.state=safe.state;}
+      if(!prev.areaCode&&safe.areaCode)prev.areaCode=safe.areaCode;
+      prev.source=prev.city?'city':(prev.areaCode?'areacode':'unknown');
+    }
+  }
+  const rows=Object.values(byRes);
+  return {rows,stats:{dataRows,reservations:rows.length,byCity:rows.filter(x=>x.source==='city').length,byArea:rows.filter(x=>x.source==='areacode').length,unknown:rows.filter(x=>x.source==='unknown').length}};
+}
+const SRC_RANK={city:3,areacode:2,unknown:1,'':0};
+/* Existing saved rows + this import -> the table to write. The better origin wins. */
+function mergeOrigins(existing,incoming){
+  const by={};existing.forEach(x=>by[x.res]=Object.assign({},x));
+  let added=0,updated=0,same=0;
+  incoming.forEach(n=>{
+    const o=by[n.res];
+    if(!o){by[n.res]=n;added++;return;}
+    const before=JSON.stringify(o);
+    if((SRC_RANK[n.source]||0)>=(SRC_RANK[o.source]||0)&&n.source!=='unknown'){o.city=n.city;o.state=n.state;o.source=n.source;}
+    if(n.areaCode)o.areaCode=n.areaCode;
+    if(n.start)o.start=n.start;
+    if(n.nights)o.nights=n.nights;
+    if(o.source==='unknown'||!o.source)o.source=o.city?'city':(o.areaCode?'areacode':'unknown');
+    if(JSON.stringify(o)===before)same++;else updated++;
+  });
+  const final=Object.values(by).sort((a,b)=>(a.start||'')<(b.start||'')?-1:(a.start||'')>(b.start||'')?1:(a.res<b.res?-1:1));
+  return {final,added,updated,same};
+}
+function originToRow(x){return [x.res,x.start||'',x.nights||'',x.city||'',x.state||'',x.areaCode||'',x.source||''];}
+/* The last gate before the network. Every cell of every row is re-checked; the reservation
+   number must be a plain code, the area code exactly three digits, and nothing may resemble
+   an email address or a phone number. One bad cell refuses the whole save. */
+function assertSafeToSave(values){
+  values.forEach((row,r)=>{
+    if(r===0)return;
+    if(row.length!==7)throw new Error('Refusing to save: row '+r+' has '+row.length+' values instead of 7.');
+    const [res,start,nights,city,state,ac,src]=row.map(v=>String(v==null?'':v));
+    if(!/^[0-9A-Z]{1,12}$/.test(res)||!/[0-9]/.test(res))throw new Error('Refusing to save: row '+r+' has a reservation number that is not a plain code.');
+    if(start&&!/^\d{4}-\d{2}-\d{2}$/.test(start))throw new Error('Refusing to save: row '+r+' has a start date in the wrong shape.');
+    if(nights&&!/^\d{1,3}$/.test(nights))throw new Error('Refusing to save: row '+r+' has a nights value that is not a small number.');
+    if(ac&&!/^\d{3}$/.test(ac))throw new Error('Refusing to save: row '+r+' has an area code that is not exactly three digits.');
+    if(!/^(city|areacode|unknown)$/.test(src))throw new Error('Refusing to save: row '+r+' has an unexpected source value.');
+    if(looksPersonal(city)||looksPersonal(state))throw new Error('Refusing to save: row '+r+' has something resembling an email address or phone number in the city or state.');
+  });
+  return true;
+}
+/*SAFE-END*/
+
+/* ---------- Import flow ---------- */
+function openImport(){
+  pendingImport=null;
+  document.getElementById('im-confirm-btn').disabled=false;
+  document.getElementById('im-file').value='';
+  document.getElementById('im-status').textContent='';
+  document.getElementById('im-preview-wrap').style.display='none';
+  document.getElementById('im-result').style.display='none';
+  document.getElementById('import-overlay').style.display='block';
+  document.getElementById('import-modal').style.display='block';
+}
+function closeImport(){pendingImport=null;document.getElementById('import-overlay').style.display='none';document.getElementById('import-modal').style.display='none';}
+function cancelPreview(){pendingImport=null;document.getElementById('im-preview-wrap').style.display='none';document.getElementById('im-status').textContent='Cancelled — nothing was saved.';}
+function readStored(raw){
+  return toRows(raw).map(r=>({res:resKey(r['Res#']),start:toISO(parseDay(r.StartDate)),nights:parseInt(r.Nights,10)||'',city:r.City||'',state:r.State||'',areaCode:/^\d{3}$/.test(r.AreaCode||'')?r.AreaCode:'',source:r.Source||''})).filter(x=>x.res);
+}
+
+async function analyzeImport(){
+  const f=document.getElementById('im-file').files[0];
+  const status=document.getElementById('im-status'),result=document.getElementById('im-result');
+  result.style.display='none';document.getElementById('im-preview-wrap').style.display='none';
+  if(!f){status.textContent='Choose the Guests by Date export first.';return;}
+  const btn=document.getElementById('im-analyze-btn');btn.disabled=true;
+  try{
+    status.textContent='Reading…';
+    await loadGeo();
+    const head=new Uint8Array(await f.slice(0,4).arrayBuffer());
+    if(head[0]===0x50&&head[1]===0x4B)throw new Error('This is an Excel file, not a CSV. In ResNexus choose the CSV export — or open the file in Excel and use Save As → CSV — then try again.');
+    // The raw text and the parsed table live only inside this block and are gone when it ends.
+    let reduced;{const text=await f.text();const table=parseCSV(text);reduced=reduceExport(table);}
+    const existing=readStored(await fetchTab(GUEST_TAB));
+    const merge=mergeOrigins(existing,reduced.rows);
+    // cities the lookup does not know — city and state only, which is all we hold by now
+    const unplaced={};
+    reduced.rows.forEach(x=>{if(!x.city)return;const st=stateCodeOf(x.state);const hit=st&&(GEO.cities[st]||{})[normCity(x.city)];if(!hit){const k=x.city+(x.state?', '+x.state:'');unplaced[k]=(unplaced[k]||0)+1;}});
+    const dates=reduced.rows.map(x=>x.start).filter(Boolean).sort();
+    pendingImport={merge,stats:reduced.stats,existingRowCount:existing.length,unplaced,span:dates.length?[dates[0],dates[dates.length-1]]:null};
+    renderPreview();status.textContent='';
+  }catch(e){
+    status.textContent='';result.style.display='block';result.innerHTML='<div class="im-err">'+esc(e.message)+'</div>';
+  }finally{btn.disabled=false;}
+}
+
+function renderPreview(){
+  const {merge,stats,unplaced,span}=pendingImport;
+  const day=s=>{const d=parseDay(s);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';};
+  let h='<div class="im-stat"><span>Reservations in this file</span><b>'+stats.reservations+' <span style="font-weight:400;color:var(--text3);">from '+stats.dataRows+' rows</span></b></div>';
+  if(span)h+='<div class="im-stat"><span>Start dates</span><b>'+esc(day(span[0]))+' – '+esc(day(span[1]))+'</b></div>';
+  h+='<div class="im-stat"><span>Placed by the city on the reservation</span><b>'+stats.byCity+'</b></div>';
+  h+='<div class="im-stat"><span>Estimated from the area code</span><b>'+stats.byArea+'</b></div>';
+  h+='<div class="im-stat"><span>Unknown — no city and no usable phone</span><b>'+stats.unknown+'</b></div>';
+  h+='<div class="im-stat"><span>New to the sheet</span><b>'+merge.added+'</b></div>';
+  h+='<div class="im-stat"><span>Already saved — updated / unchanged</span><b>'+merge.updated+' / '+merge.same+'</b></div>';
+  document.getElementById('im-preview').innerHTML=h;
+  const names=Object.entries(unplaced).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('im-notes').innerHTML=names.length?
+    '<div class="im-warn"><b>'+names.length+' place'+(names.length===1?'':'s')+' could not be found in the city list</b> (a very small town, a misspelling, or somewhere outside the US and Canada). They are still saved and still counted in the lists; on the map they fall back to the area code where there is one.<br>'+
+    esc(names.slice(0,14).map(([n,c])=>n+(c>1?' ×'+c:'')).join(' · '))+(names.length>14?' · and '+(names.length-14)+' more':'')+'</div>':'';
+  document.getElementById('im-confirm-btn').style.display=(merge.added+merge.updated)?'':'none';
+  if(!(merge.added+merge.updated))document.getElementById('im-notes').innerHTML+='<div class="im-ok">Everything in this file is already saved. Nothing to do.</div>';
+  document.getElementById('im-preview-wrap').style.display='block';
+}
+
+async function confirmImport(){
+  if(!pendingImport)return;
+  const btn=document.getElementById('im-confirm-btn');btn.disabled=true;
+  const status=document.getElementById('im-status'),result=document.getElementById('im-result');result.style.display='none';
+  let step='starting';
+  try{
+    const {merge,stats,existingRowCount,span}=pendingImport;
+    const out=[GUEST_HEADER].concat(merge.final.map(originToRow));
+    step='checking every value before it leaves this computer';status.textContent='Saving… ('+step+')';
+    assertSafeToSave(out);
+    step='creating the '+GUEST_TAB+' tab if needed';status.textContent='Saving… ('+step+')';
+    await ensureTab(GUEST_TAB);
+    // One write, no clear: old rows are overwritten in place and any leftover rows are blanked
+    // by padding, so there is never a moment where the sheet is empty and the write has not landed.
+    const blank=new Array(GUEST_HEADER.length).fill('');
+    for(let i=out.length;i<existingRowCount+1;i++)out.push(blank.slice());
+    step='writing '+merge.final.length+' reservations';status.textContent='Saving… ('+step+')';
+    await putRaw(GUEST_TAB,out);
+    try{await appendValues(LOG_TAB,[[nowStamp(),'GUEST ORIGINS',merge.added,'','','','',stats.reservations,span?span[0]+' to '+span[1]:'',
+      '+'+merge.added+' new, '+merge.updated+' updated, '+merge.same+' unchanged · '+stats.byCity+' by city, '+stats.byArea+' by area code, '+stats.unknown+' unknown']]);}catch(e){}
+    result.style.display='block';
+    result.innerHTML='<div class="im-ok">'+esc('Saved. '+merge.added+' new reservation'+(merge.added===1?'':'s')+', '+merge.updated+' updated.\nThe sheet now holds '+merge.final.length+' reservations. Reloading…')+'</div>';
+    document.getElementById('im-preview-wrap').style.display='none';status.textContent='';
+    setTimeout(async()=>{closeImport();showLoad();await loadAll();},1400);
+  }catch(e){
+    result.style.display='block';
+    result.innerHTML='<div class="im-err">Save failed while '+esc(step)+':\n'+esc(e.message)+'\n\nNothing already in the sheet was cleared first, so it should still be intact.</div>';
+    btn.disabled=false;
+  }
+}
+
+/* ---------- Load ---------- */
+async function loadAll(){
+  try{
+    const [,originRaw,stayRaw]=await Promise.all([loadGeo(),fetchTab(GUEST_TAB),fetchTab(STAYS_TAB)]);
+    // per reservation from the stay report: revenue, first night, and the day it was booked
+    const stays={};
+    if(stayRaw.length>1){
+      const H=stayRaw[0].map(h=>String(h).trim()),iRes=H.indexOf('Res#')!==-1?H.indexOf('Res#'):H.indexOf('Res'),iRev=H.indexOf('NightRevenue'),iNight=H.indexOf('NightDate'),iBooked=H.indexOf('ReservedOn');
+      for(let r=1;r<stayRaw.length;r++){
+        const row=stayRaw[r],k=resKey(row[iRes]);if(!k)continue;
+        const s=stays[k]||(stays[k]={rev:0,nights:0,first:null,booked:null});
+        s.rev+=pMoney(row[iRev]);s.nights++;
+        const n=parseDay(row[iNight]);if(n&&(!s.first||n<s.first))s.first=n;
+        const b=parseDay(row[iBooked]);if(b&&(!s.booked||b<s.booked))s.booked=b;
+      }
+    }
+    guests=readStored(originRaw).map(x=>{
+      const s=stays[x.res]||null,start=parseDay(x.start)||(s&&s.first)||null;
+      const g={res:x.res,city:x.city,state:x.state,areaCode:x.areaCode,start,nights:x.nights||(s?s.nights:0)||0,
+        rev:s?s.rev:0,inStays:!!s,booked:s?s.booked:null,stayKey:mKey(start),bookedKey:s?mKey(s.booked):null};
+      resolve(g);return g;
+    });
+    // Show the page BEFORE drawing: the map measures its own box, and a hidden box measures
+    // zero, which makes it zoom out to the whole world.
+    showDash();
+    if(map)map.invalidateSize();
+    buildPeriods();render();
+    document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    if(e.auth){clearToken();accessToken=null;showAuth();return;}   // cached token expired
+    showErr('Error loading data: '+e.message);showDash();
+  }
+}
+
+/* ---------- Filters ---------- */
+function keyOf(g){return basis==='booked'?g.bookedKey:g.stayKey;}
+function buildPeriods(){
+  const keys=[...new Set(guests.map(keyOf).filter(k=>k!=null))].sort((a,b)=>b-a);
+  const sel=document.getElementById('period-select');
+  sel.innerHTML='<option value="ALL">All time</option>'+keys.map(k=>'<option value="'+k+'">'+mLabel(k)+'</option>').join('');
+  if(period!=='ALL'&&!keys.includes(+period))period='ALL';
+  sel.value=period;
+}
+function onPeriodChange(){period=document.getElementById('period-select').value;render();}
+function setBasis(v){basis=v;document.querySelectorAll('#seg-basis button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));buildPeriods();render();}
+function setMetric(v){metric=v;document.querySelectorAll('#seg-metric button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));render();}
+function inView(){return period==='ALL'?guests:guests.filter(g=>keyOf(g)===+period);}
+function val(g){return metric==='rev'?g.rev:1;}
+function fmtVal(n){return metric==='rev'?fmt$(n):Math.round(n).toLocaleString('en-US');}
+
+/* ---------- Render ---------- */
+function groupBy(list,keyFn){
+  const by={};
+  list.forEach(g=>{const k=keyFn(g);if(k==null)return;const o=by[k]||(by[k]={key:k,res:0,rev:0,nights:0,items:[]});o.res++;o.rev+=g.rev;o.nights+=g.nights||0;o.items.push(g);});
+  return Object.values(by);
+}
+function render(){
+  const empty=!guests.length;
+  document.getElementById('empty-info').style.display=empty?'block':'none';
+  const view=inView(),n=view.length;
+  const total=view.reduce((a,g)=>a+val(g),0)||0;
+
+  // coverage — how much of the picture is fact and how much is estimate
+  const cCity=view.filter(g=>g.loc&&g.loc.kind==='city').length,cArea=view.filter(g=>g.loc&&g.loc.kind==='area').length,cNone=n-cCity-cArea;
+  const both=guests.filter(g=>g.portMiles!=null),agree=both.filter(g=>g.portMiles<=150).length;
+  const noStay=guests.filter(g=>!g.inStays).length;
+  document.getElementById('status-line').innerHTML=empty?'':
+    '<b>'+pct(cCity/(n||1))+'</b> placed by the city on the reservation · <b>'+pct(cArea/(n||1))+'</b> estimated from the area code · <b>'+pct(cNone/(n||1))+'</b> not placed'+
+    (both.length>=10?'<br>How far to trust an area code: on the '+both.length+' reservations that carry both a city and a phone, the area code points within 150 miles of the city <b>'+pct(agree/both.length)+'</b> of the time.':'')+
+    (noStay?'<br>'+noStay+' saved reservation'+(noStay===1?' is':'s are')+' not in the stay report yet, so '+(noStay===1?'it shows':'they show')+' no revenue and no booking date. Importing the stay report for the same dates fills that in.':'');
+  const missingBasis=basis==='booked'?guests.filter(g=>g.bookedKey==null).length:guests.filter(g=>g.stayKey==null).length;
+  document.getElementById('filter-note').textContent=(period!=='ALL'&&missingBasis)?missingBasis+' reservation'+(missingBasis===1?'':'s')+' with no '+(basis==='booked'?'booking':'start')+' date are left out of single-month views':'';
+
+  // scorecards
+  document.getElementById('sc-res').textContent=empty?'—':n.toLocaleString('en-US');
+  document.getElementById('sc-res-meta').textContent=empty?'':fmt$(view.reduce((a,g)=>a+g.rev,0))+' revenue · '+(period==='ALL'?'all time':mLabel(+period))+' by '+(basis==='booked'?'month booked':'month of stay');
+  const mk=groupBy(view.filter(g=>g.market!=='Unknown'),g=>g.market).sort((a,b)=>(metric==='rev'?b.rev-a.rev:b.res-a.res));
+  document.getElementById('sc-top').textContent=mk.length?mk[0].key:'—';
+  document.getElementById('sc-top-meta').textContent=mk.length?mk[0].res+' reservation'+(mk[0].res===1?'':'s')+' · '+fmt$(mk[0].rev)+' · '+pct((metric==='rev'?mk[0].rev:mk[0].res)/(total||1))+' of '+(metric==='rev'?'revenue':'reservations'):'';
+  const placed=view.filter(g=>g.miles!=null),near=placed.filter(g=>g.miles<100);
+  document.getElementById('sc-near').textContent=placed.length?pct(near.reduce((a,g)=>a+val(g),0)/(placed.reduce((a,g)=>a+val(g),0)||1)):'—';
+  document.getElementById('sc-near-meta').textContent=placed.length?near.length+' of '+placed.length+' placed reservations':'';
+  const known=view.filter(g=>g.stCode),out=known.filter(g=>g.stCode!=='CA');
+  document.getElementById('sc-out').textContent=known.length?pct(out.reduce((a,g)=>a+val(g),0)/(known.reduce((a,g)=>a+val(g),0)||1)):'—';
+  document.getElementById('sc-out-meta').textContent=known.length?out.length+' of '+known.length+' with a known state':'';
+
+  renderMap(view);renderHeat();renderBands(view);renderStates(view);renderCities(view);
+}
+
+function renderMap(view){
+  if(!map){
+    map=L.map('map',{scrollWheelZoom:false,worldCopyJump:true});map.fitBounds(WEST);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:12,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · city locations: <a href="https://www.geonames.org/">GeoNames</a>'}).addTo(map);
+    map.on('click',()=>map.scrollWheelZoom.enable());map.on('mouseout',()=>map.scrollWheelZoom.disable());
+  }
+  if(layer)layer.remove();
+  layer=L.layerGroup().addTo(map);
+  const spots=groupBy(view.filter(g=>g.loc),g=>g.loc.kind+'|'+g.loc.label);
+  const max=Math.max(1,...spots.map(s=>metric==='rev'?s.rev:s.res));
+  const pts=[];
+  // largest first, so small bubbles stay on top and stay hoverable
+  spots.sort((a,b)=>(metric==='rev'?b.rev-a.rev:b.res-a.res)).forEach(s=>{
+    const loc=s.items[0].loc,v=metric==='rev'?s.rev:s.res,area=loc.kind==='area';
+    const m=L.circleMarker([loc.lat,loc.lng],{radius:4+19*Math.sqrt(v/max),color:area?'#b87c2a':'#4a5e6d',weight:1.5,dashArray:area?'4 3':null,fillColor:area?'#b87c2a':'#4a5e6d',fillOpacity:area?0.10:0.5});
+    m.bindTooltip('<b>'+esc(loc.label)+'</b>'+(area?' <i>(estimate)</i>':'')+'<br>'+s.res+' reservation'+(s.res===1?'':'s')+' · '+fmt$(s.rev)+(s.nights?' · '+s.nights+' nights':'')+'<br>'+Math.round(s.items[0].miles)+' miles away',{className:'gt',direction:'top',sticky:true});
+    m.addTo(layer);pts.push([loc.lat,loc.lng]);
+  });
+  L.circleMarker([HOME.lat,HOME.lng],{radius:7,color:'#fff',weight:2,fillColor:'#c4572a',fillOpacity:1}).bindTooltip('<b>'+esc(HOME.name)+'</b>',{className:'gt',direction:'top'}).addTo(layer);
+  lastBounds=pts.length?L.latLngBounds(pts.concat([[HOME.lat,HOME.lng]])):null;
+  const unplaced=view.length-view.filter(g=>g.loc).length;
+  document.getElementById('map-foot').textContent='Bubble size shows '+(metric==='rev'?'revenue':'reservations')+'. '+spots.length+' place'+(spots.length===1?'':'s')+' on the map'+(unplaced?'; '+unplaced+' reservation'+(unplaced===1?'':'s')+' could not be placed.':'.')+' Click the map to zoom with the mouse wheel.';
+}
+function mapView(which){
+  if(!map)return;
+  if(which==='west')map.fitBounds(WEST);
+  else if(which==='usa')map.setView([39.5,-98.5],4);
+  else if(lastBounds)map.fitBounds(lastBounds.pad(0.12));
+}
+
+function renderHeat(){
+  const el=document.getElementById('heat');
+  const now=new Date(),end=now.getFullYear()*12+now.getMonth(),cols=[];for(let k=end-11;k<=end;k++)cols.push(k);
+  const rows=guests.filter(g=>{const k=keyOf(g);return k!=null&&k>=cols[0]&&k<=end;});
+  document.getElementById('heat-sub').textContent=(metric==='rev'?'Revenue':'Reservations')+' by '+(basis==='booked'?'month booked':'month of stay')+' · last 12 months';
+  if(!rows.length){el.innerHTML='<div class="empty-state">No reservations '+(basis==='booked'?'booked':'staying')+' in the last 12 months yet.</div>';return;}
+  const mk={};rows.forEach(g=>{const o=mk[g.market]||(mk[g.market]={name:g.market,total:0,m:{}});const v=val(g);o.total+=v;o.m[keyOf(g)]=(o.m[keyOf(g)]||0)+v;});
+  let list=Object.values(mk).sort((a,b)=>b.total-a.total);
+  const top=list.slice(0,10),rest=list.slice(10);
+  if(rest.length){const o={name:'Everywhere else ('+rest.length+')',total:0,m:{}};rest.forEach(r=>{o.total+=r.total;Object.entries(r.m).forEach(([k,v])=>o.m[k]=(o.m[k]||0)+v);});top.push(o);}
+  const max=Math.max(1,...top.flatMap(r=>cols.map(c=>r.m[c]||0)));
+  const colTot=cols.map(c=>top.reduce((a,r)=>a+(r.m[c]||0),0)),grand=colTot.reduce((a,b)=>a+b,0);
+  el.innerHTML='<table class="data-table heat"><thead><tr><th>Market</th>'+cols.map(c=>'<th class="m">'+mShort(c)+'</th>').join('')+'<th class="m">Total</th></tr></thead><tbody>'+
+    top.map(r=>'<tr><td class="name">'+esc(r.name)+'</td>'+cols.map(c=>{const v=r.m[c]||0;return '<td class="h" style="background:rgba(74,94,109,'+(v?(0.06+0.5*v/max).toFixed(3):0)+');">'+(v?fmtVal(v):'<span style="color:var(--border2);">·</span>')+'</td>';}).join('')+'<td class="h" style="font-weight:700;">'+fmtVal(r.total)+'</td></tr>').join('')+
+    '<tr class="total"><td class="name">All markets</td>'+colTot.map(v=>'<td class="h">'+(v?fmtVal(v):'·')+'</td>').join('')+'<td class="h">'+fmtVal(grand)+'</td></tr></tbody></table>';
+}
+
+function shareCells(o,totRes,totRev){
+  const share=(metric==='rev'?o.rev/(totRev||1):o.res/(totRes||1));
+  return '<td class="right">'+o.res.toLocaleString('en-US')+'</td><td class="right">'+fmt$(o.rev)+'</td><td class="right">'+(o.res?(o.nights/o.res).toFixed(1):'—')+'</td>'+
+    '<td class="right" style="font-weight:600;">'+pct(share)+'</td><td><div class="bar-wrap"><div class="bar-fill" style="width:'+Math.min(100,share*100).toFixed(1)+'%;"></div></div></td>';
+}
+const SHARE_HEAD='<th class="right">Reservations</th><th class="right">Revenue</th><th class="right">Avg nights</th><th class="right">Share</th><th style="width:110px;"></th>';
+function renderBands(view){
+  const el=document.getElementById('bands'),placed=view.filter(g=>g.miles!=null);
+  if(!placed.length){el.innerHTML='<div class="empty-state">Nothing placed yet.</div>';return;}
+  const tr=placed.length,tv=placed.reduce((a,g)=>a+g.rev,0);
+  el.innerHTML='<table class="data-table"><thead><tr><th>Distance</th>'+SHARE_HEAD+'</tr></thead><tbody>'+
+    BANDS.map(([lo,hi,label])=>{const it=placed.filter(g=>g.miles>=lo&&g.miles<hi);const o={res:it.length,rev:it.reduce((a,g)=>a+g.rev,0),nights:it.reduce((a,g)=>a+(g.nights||0),0)};
+      return '<tr><td style="font-weight:600;">'+label+'</td>'+shareCells(o,tr,tv)+'</tr>';}).join('')+'</tbody></table>';
+}
+function renderStates(view){
+  const el=document.getElementById('states'),known=view.filter(g=>g.stCode);
+  document.getElementById('state-sub').textContent=known.length?known.length+' with a known state':'';
+  if(!known.length){el.innerHTML='<div class="empty-state">No states yet.</div>';return;}
+  const tr=known.length,tv=known.reduce((a,g)=>a+g.rev,0);
+  const list=groupBy(known,g=>g.stCode).sort((a,b)=>(metric==='rev'?b.rev-a.rev:b.res-a.res)).slice(0,12);
+  el.innerHTML='<table class="data-table"><thead><tr><th>State</th>'+SHARE_HEAD+'</tr></thead><tbody>'+list.map(o=>'<tr><td style="font-weight:600;">'+esc(o.key)+'</td>'+shareCells(o,tr,tv)+'</tr>').join('')+'</tbody></table>';
+}
+function renderCities(view){
+  const el=document.getElementById('cities');
+  const list=groupBy(view.filter(g=>g.place!=='Unknown'),g=>g.place).sort((a,b)=>(metric==='rev'?b.rev-a.rev:b.res-a.res));
+  document.getElementById('city-sub').textContent=list.length?list.length+' places':'';
+  if(!list.length){el.innerHTML='<div class="empty-state">No places yet.</div>';return;}
+  const tr=view.length,tv=view.reduce((a,g)=>a+g.rev,0),shown=showAllCities?list:list.slice(0,25);
+  el.innerHTML='<table class="data-table"><thead><tr><th>Place</th><th>Market</th><th class="right">Miles</th>'+SHARE_HEAD+'</tr></thead><tbody>'+
+    shown.map(o=>{const g=o.items[0],est=g.loc&&g.loc.kind==='area';
+      return '<tr><td style="font-weight:600;">'+esc(o.key)+(est?'<span class="est">estimate</span>':'')+'</td><td class="cell-sub">'+esc(g.market)+'</td><td class="right">'+(g.miles!=null?Math.round(g.miles).toLocaleString('en-US'):'—')+'</td>'+shareCells(o,tr,tv)+'</tr>';}).join('')+
+    '</tbody></table>'+(list.length>25?'<div style="padding:12px 24px;"><button class="link-btn" onclick="showAllCities=!showAllCities;render();">'+(showAllCities?'Show the top 25 only':'Show all '+list.length+' places')+'</button></div>':'');
+}
+</script>
+</body>
+</html>
