@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cave Springs — Invoices</title>
+<link rel="icon" type="image/png" href="favicon-32x32.png">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f2ee;--surface:#fff;--surface2:#f9f7f4;
+  --border:#e8e2da;--border2:#d6cec3;
+  --slate:#4a5e6d;--slate2:#3a4d5c;--slate3:#6a7e8d;--slate-bg:#eef2f5;
+  --terra:#c4572a;--terra2:#a8451f;--terra-bg:#faf0eb;
+  --green:#3a7d5c;--green-bg:#edf6f1;
+  --amber:#b87c2a;--amber-bg:#fdf5e8;
+  --purple:#6b5b8c;--purple-bg:#f2f0f7;
+  --text:#1a2530;--text2:#4a5568;--text3:#8a9bb0;
+  --sans:'Raleway',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+  --shadow2:0 2px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.06);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* AUTH */
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+.auth-card{background:var(--surface);border-radius:20px;box-shadow:var(--shadow2);padding:60px 56px;text-align:center;max-width:460px;width:90%;}
+.auth-logo-title{font-size:22px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--slate);}
+.auth-logo-sub{font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--text3);}
+.auth-divider{width:40px;height:2px;background:var(--terra);margin:20px auto 28px;}
+.auth-desc{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.7;}
+.auth-btn{display:inline-flex;align-items:center;gap:10px;background:var(--slate);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.auth-btn:hover{background:var(--slate2);}
+
+/* LOADING */
+#loading-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;}
+.spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--slate);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:12px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;}
+
+#dashboard{display:none;}
+
+/* HEADER */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;}
+.header-title{font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
+.header-sub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.last-updated{font-size:12px;color:var(--text3);}
+.hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
+.hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
+
+/* NAV */
+.nav-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;height:44px;gap:4px;}
+.nav-tab{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:0 16px;height:44px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;}
+.nav-tab:hover{color:var(--slate);}
+.nav-tab.active{color:var(--slate);border-bottom-color:var(--slate);}
+
+/* CONTENT */
+.content{padding:32px 40px;max-width:1600px;margin:0 auto;}
+.error-banner{display:none;background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-bottom:20px;}
+.info-banner{background:var(--slate-bg);border:1px solid var(--border2);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.7;}
+.info-banner strong{color:var(--slate);}
+.status-line{font-size:12px;color:var(--text3);margin-bottom:16px;}
+
+/* SCORECARDS */
+.scorecards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+.scorecard{border-radius:16px;padding:22px 24px;box-shadow:var(--shadow);border:1px solid var(--border);background:var(--surface);position:relative;overflow:hidden;}
+.scorecard::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--slate);}
+.scorecard.ytd::after{background:var(--terra);}
+.scorecard.avg::after{background:var(--slate);}
+.scorecard.alert::after{background:var(--amber);}
+.scorecard.items::after{background:var(--green);}
+.scorecard-label{font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:10px;color:var(--text3);}
+.scorecard-value{font-size:30px;font-weight:700;letter-spacing:-0.01em;color:var(--text);}
+.scorecard-value.warn{color:var(--terra);}
+.scorecard-meta{font-size:12px;color:var(--text3);margin-top:6px;}
+
+/* PANELS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px;}
+.panel-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.panel-title{font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);}
+.panel-sub{font-size:11px;color:var(--text3);}
+.panel-body{padding:22px 24px;}
+.chart-wrap{position:relative;height:260px;}
+.empty-state{text-align:center;color:var(--text3);font-size:13px;padding:32px 20px;}
+.tog-row{display:flex;gap:6px;}
+.tog{font-size:11px;font-weight:600;font-family:var(--sans);color:var(--text3);background:transparent;border:1px solid var(--border);border-radius:6px;padding:5px 11px;cursor:pointer;}
+.tog:hover{border-color:var(--slate3);color:var(--slate);}
+.tog.active{background:var(--slate-bg);border-color:var(--slate);color:var(--slate);}
+
+/* ALERT ROWS */
+.alert-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--surface2);cursor:pointer;}
+.alert-row:last-child{border-bottom:none;}
+.alert-row:hover .alert-name{color:var(--slate);}
+.alert-name{font-size:13px;font-weight:600;color:var(--text);}
+.alert-sub{font-size:11px;color:var(--text3);}
+.alert-right{text-align:right;font-size:13px;white-space:nowrap;}
+.alert-from{color:var(--text3);}
+.pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.06em;padding:3px 9px;border-radius:20px;margin-left:6px;}
+.pill.up{background:var(--terra-bg);color:var(--terra);}
+.pill.down{background:var(--green-bg);color:var(--green);}
+.pill.qty{background:var(--amber-bg);color:var(--amber);}
+
+/* TABLE */
+.table-scroll{overflow-x:auto;}
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{text-align:left;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:12px 14px;border-bottom:1px solid var(--border);}
+.data-table td{padding:12px 14px;border-bottom:1px solid var(--surface2);}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table .right{text-align:right;}
+.data-table .center{text-align:center;}
+.data-table tbody tr{cursor:pointer;}
+.data-table tbody tr:hover td{background:var(--surface2);}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--text2);}
+.cell-sub{font-size:11px;color:var(--text3);}
+.search-input{font-family:var(--sans);font-size:13px;width:100%;max-width:320px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);}
+.list-scroll{max-height:420px;overflow-y:auto;}
+
+/* MODAL */
+.import-overlay{display:none;position:fixed;inset:0;background:rgba(26,37,48,0.4);z-index:200;}
+.import-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border-radius:18px;box-shadow:var(--shadow2);width:92%;max-width:680px;max-height:88vh;overflow-y:auto;z-index:201;padding:32px 34px;}
+.import-modal h3{font-size:16px;font-weight:700;letter-spacing:0.04em;color:var(--slate);margin-bottom:6px;}
+.im-desc{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.7;}
+.im-field{margin-bottom:16px;}
+.im-field label{display:block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.im-field input[type=file]{font-family:var(--sans);font-size:13px;width:100%;padding:10px;border:1px dashed var(--border2);border-radius:8px;background:var(--surface2);}
+.im-btn{font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 20px;border-radius:9px;border:none;cursor:pointer;background:var(--slate);color:#fff;}
+.im-btn:hover{background:var(--slate2);}
+.im-btn.ghost{background:transparent;color:var(--text3);border:1px solid var(--border2);}
+.im-btn.ghost:hover{color:var(--slate);border-color:var(--slate3);}
+.im-btn.confirm{background:var(--green);}
+.im-btn.confirm:hover{background:#2f6b4d;}
+.im-btn.sm{padding:6px 12px;font-size:12px;}
+.im-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.im-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
+.im-status{font-size:13px;color:var(--text2);margin-top:12px;min-height:20px;}
+.im-err{background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-top:14px;white-space:pre-wrap;}
+.im-ok{background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--green);margin-top:14px;white-space:pre-wrap;}
+.im-warn{background:var(--amber-bg);border:1px solid rgba(184,124,42,0.3);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--amber);margin-top:14px;}
+.im-preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:16px;}
+.im-stat{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);}
+.im-stat:last-child{border-bottom:none;}
+.im-stat b{font-weight:700;color:var(--text);}
+.im-held{margin-top:10px;padding-top:10px;border-top:1px solid rgba(184,124,42,0.3);}
+.im-held:first-of-type{border-top:none;padding-top:0;}
+.im-held-name{font-weight:700;}
+.im-held pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:8px;max-height:220px;overflow:auto;white-space:pre;}
+.im-privacy{font-size:11px;color:var(--text3);margin-top:16px;line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
+.detail-meta{display:flex;gap:26px;flex-wrap:wrap;font-size:13px;color:var(--text2);margin:14px 0 16px;}
+.detail-meta span{display:block;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);}
+.detail-totals{margin-top:14px;font-size:13px;color:var(--text2);text-align:right;line-height:1.8;}
+.detail-totals strong{font-size:15px;color:var(--text);}
+.spark-row{display:flex;gap:32px;flex-wrap:wrap;margin:10px 0 16px;}
+.spark-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);}
+
+@media(max-width:1000px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
+@media(max-width:700px){.header,.nav-bar{padding:0 16px;}.content{padding:20px 16px;}.scorecards{grid-template-columns:1fr;}.header{height:auto;min-height:64px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px;}.last-updated{display:none;}}
+@media print{.header-right,.nav-bar,.import-overlay,.import-modal{display:none!important;}.header{position:static;}.list-scroll{max-height:none;}}
+</style>
+</head>
+<body>
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo-title">Cave Springs</div>
+    <div class="auth-logo-sub">Hotel · Cabins · Airstreams</div>
+    <div class="auth-divider"></div>
+    <div class="auth-desc">Supply Invoices — sign in with your Cave Springs Google account to continue</div>
+    <button class="auth-btn" onclick="signIn()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#fff"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff"/></svg>
+      Sign in with Google
+    </button>
+  </div>
+</div>
+
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Loading invoices</div></div>
+
+<!-- IMPORT MODAL -->
+<div class="import-overlay" id="import-overlay" onclick="closeImport()"></div>
+<div class="import-modal" id="import-modal">
+  <h3>Import Invoices</h3>
+  <div class="im-desc">Choose one or more <b>Mendes invoice PDFs</b>. Each one is read here in your browser and checked against its own arithmetic: the line totals must add up, and merchandise, freight, delivery and tax must equal the invoice total. An invoice that does not add up is held back and named below — it is never saved with wrong numbers. Invoices already saved are skipped, so choosing the whole folder again is safe.</div>
+
+  <div class="im-field">
+    <label>Invoice PDFs</label>
+    <input type="file" id="im-files" accept=".pdf,application/pdf" multiple>
+  </div>
+
+  <div class="im-row">
+    <button class="im-btn" id="im-analyze-btn" onclick="analyzeImport()">Read &amp; preview</button>
+    <button class="im-btn ghost" onclick="closeImport()">Close</button>
+  </div>
+  <div class="im-status" id="im-status"></div>
+
+  <div id="im-preview-wrap" style="display:none;">
+    <div class="im-preview" id="im-preview"></div>
+    <div id="im-held"></div>
+    <div class="im-row" style="margin-top:16px;">
+      <button class="im-btn confirm" id="im-confirm-btn" onclick="confirmImport()">Confirm — save to sheet</button>
+      <button class="im-btn ghost" onclick="cancelPreview()">Cancel</button>
+    </div>
+  </div>
+
+  <div id="im-result" style="display:none;"></div>
+
+  <div class="im-privacy">Privacy: the PDFs are opened on this computer only. They are never uploaded anywhere. What gets saved to the sheet is the invoice number, dates, the five totals, and each line's codes, description, quantity and prices.</div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="import-overlay" id="detail-overlay" onclick="closeDetail()"></div>
+<div class="import-modal" id="detail-modal">
+  <h3 id="detail-title">Detail</h3>
+  <div id="detail-body"></div>
+  <div class="im-row" style="margin-top:18px;"><button class="im-btn ghost" onclick="closeDetail()">Close</button></div>
+</div>
+
+<div id="dashboard">
+  <div class="header">
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Supply Invoices · Dunsmuir, CA</div></div>
+    <div class="header-right">
+      <div class="last-updated" id="last-updated-text"></div>
+      <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
+      <button class="hdr-btn" onclick="openImport()">&#8679; Import Invoices</button>
+      <button class="hdr-btn" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <a class="nav-tab" href="index.html">Revenue</a>
+    <a class="nav-tab" href="call-ads.html">Call Ads</a>
+    <a class="nav-tab active" href="invoices.html">Invoices</a>
+  </div>
+
+  <div class="content">
+    <div class="error-banner" id="error-banner"></div>
+    <div class="info-banner" id="empty-info" style="display:none;">
+      <strong>No invoices saved yet.</strong> Use <strong>Import Invoices</strong> above and choose the Mendes PDFs. You can select every file in the folder at once — the page reads them all, shows you what it found, and saves nothing until you confirm.
+    </div>
+    <div class="status-line" id="status-line"></div>
+
+    <div class="scorecards">
+      <div class="scorecard ytd"><div class="scorecard-label" id="sc-ytd-label">Spend YTD</div><div class="scorecard-value" id="sc-ytd">—</div><div class="scorecard-meta" id="sc-ytd-meta"></div></div>
+      <div class="scorecard avg"><div class="scorecard-label">Avg / invoice</div><div class="scorecard-value" id="sc-avg">—</div><div class="scorecard-meta" id="sc-avg-meta"></div></div>
+      <div class="scorecard alert"><div class="scorecard-label">Price alerts</div><div class="scorecard-value" id="sc-alerts">—</div><div class="scorecard-meta">vs last invoice · over 2%</div></div>
+      <div class="scorecard items"><div class="scorecard-label">Tracked items</div><div class="scorecard-value" id="sc-items">—</div><div class="scorecard-meta">distinct products ordered</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Monthly spend</span><span class="panel-sub" id="spend-sub"></span></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="spend-chart"></canvas></div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Price alerts</span><span class="panel-sub">vs last invoice · over 2%</span></div>
+        <div class="panel-body" id="price-alerts"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Quantity alerts</span><span class="panel-sub">unusual amount ordered</span></div>
+        <div class="panel-body" id="qty-alerts"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Top items</span>
+        <div class="tog-row">
+          <button class="tog active" data-sort="spend" onclick="setTopSort('spend')">By spend</button>
+          <button class="tog" data-sort="qty" onclick="setTopSort('qty')">By quantity</button>
+          <button class="tog" data-sort="orders" onclick="setTopSort('orders')">By frequency</button>
+        </div>
+      </div>
+      <div class="table-scroll" id="top-items"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Invoices</span>
+        <span class="panel-sub" id="inv-count-label"></span>
+      </div>
+      <div style="padding:14px 24px 0;"><input type="search" class="search-input" id="inv-search" placeholder="Search invoice #…" autocomplete="off" oninput="renderInvoiceRows()"></div>
+      <div class="table-scroll list-scroll" id="inv-list" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLIENT_ID = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
+const SHEET_ID  = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
+const INV_TAB   = 'INVOICES';
+const ITEMS_TAB = 'INVOICE_ITEMS';
+const LOG_TAB   = 'IMPORT_LOG';
+const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
+const INV_HEADER   = ['InvoiceNumber','InvoiceDate','OrderDate','Vendor','Merchandise','Freight','Delivery','Tax','Total','LineCount','FileName','ImportedOn'];
+const ITEMS_HEADER = ['InvoiceNumber','InvoiceDate','LineNo','ProductCode','MfgCode','Description','Qty','UOM','UnitPrice','Extension','ItemKey'];
+const VENDOR = 'Mendes Supply';
+const PRICE_THRESHOLD = 0.02, QTY_MULT = 2;
+const PDFJS_VER = '3.11.174';
+
+let tokenClient, accessToken;
+let invoices = [], items = [];
+let itemsByInvoice = {}, historyByKey = {};
+let topData = [], topSort = 'spend';
+let spendChart;
+let pendingImport = null;
+
+/* ---------- Auth ----------
+   Same token, same key as Revenue and Call Ads, so moving between the three pages
+   does not re-prompt. sessionStorage, not localStorage: it is scoped to this tab and
+   dies when the tab closes, rather than leaving a live Sheets token on disk. */
+const TOKEN_KEY='cs_gtoken';
+function saveToken(tok,expiresIn){
+  try{sessionStorage.setItem(TOKEN_KEY,JSON.stringify({token:tok,exp:Date.now()+((expiresIn||3600)*1000)-60000}));}catch(e){}
+}
+function loadToken(){
+  try{const j=JSON.parse(sessionStorage.getItem(TOKEN_KEY)||'null');if(j&&j.token&&j.exp>Date.now())return j.token;}catch(e){}
+  return null;
+}
+function clearToken(){try{sessionStorage.removeItem(TOKEN_KEY);}catch(e){}}
+function loadGSI(){
+  if(window.google&&window.google.accounts)return Promise.resolve();
+  return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});
+}
+async function signIn(){
+  await loadGSI();
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:async(resp)=>{
+    if(resp.error){showErr('Sign-in failed: '+resp.error);return;}
+    accessToken=resp.access_token;saveToken(resp.access_token,resp.expires_in);showLoad();await loadAll();
+  }});
+  // No prompt:'consent' — Google reissues silently once access has been granted.
+  tokenClient.requestAccessToken({});
+}
+function signOut(){
+  if(accessToken&&window.google&&window.google.accounts)google.accounts.oauth2.revoke(accessToken);
+  clearToken();
+  accessToken=null;invoices=[];items=[];itemsByInvoice={};historyByKey={};topData=[];
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  if(spendChart){spendChart.destroy();spendChart=null;}
+}
+function showLoad(){document.getElementById('auth-screen').style.display='none';document.getElementById('loading-screen').style.display='flex';}
+function showDash(){document.getElementById('loading-screen').style.display='none';document.getElementById('dashboard').style.display='block';}
+function showAuth(){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
+// Resume an existing session on load instead of showing the sign-in screen again.
+function resumeSession(){
+  const t=loadToken();
+  if(!t)return;
+  accessToken=t;showLoad();loadAll();
+}
+if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',resumeSession);
+else resumeSession();
+function showErr(msg){const b=document.getElementById('error-banner');b.style.display='block';b.textContent=msg;}
+
+/* ---------- Sheet helpers ---------- */
+async function sheetsApi(url,opts){
+  const r=await fetch(url,Object.assign({headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'}},opts||{}));
+  if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=(j.error&&j.error.message)?j.error.message:msg;}catch(e){}
+    if(r.status===401)msg+=' — your sign-in may have expired. Sign out and back in, then retry.';
+    throw new Error(msg);}
+  return r.json();
+}
+async function fetchTab(tab){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  if(r.status===400)return [];               // tab does not exist yet
+  if(!r.ok){const err=new Error(`Cannot load ${tab} (${r.status})`);if(r.status===401||r.status===403)err.auth=true;throw err;}
+  return (await r.json()).values||[];
+}
+async function listSheetTitles(){
+  const j=await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`);
+  return (j.sheets||[]).map(s=>s.properties.title);
+}
+async function ensureTab(tab){
+  const titles=await listSheetTitles();
+  if(titles.includes(tab))return;
+  await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:tab}}}]})});
+}
+/* RAW, not USER_ENTERED: product codes like 00123 or 1E5 must land exactly as printed,
+   and dates stay as plain YYYY-MM-DD text instead of being reinterpreted by the sheet. */
+async function appendRaw(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values})});}
+async function appendValues(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:append?valueInputOption=USER_ENTERED`,{method:'POST',body:JSON.stringify({values})});}
+
+function cell(v){return String(v==null?'':v).trim();}
+function toRows(raw){
+  if(!raw||raw.length<2)return[];
+  const H=raw[0].map(h=>String(h).trim());
+  return raw.slice(1)
+    .filter(row=>row.some(c=>cell(c)!==''))   // skip blank padding rows
+    .map(row=>{const o={};H.forEach((h,i)=>o[h]=cell(row[i]));return o;});
+}
+function pNum(s){const n=parseFloat(String(s==null?'':s).replace(/[$,]/g,''));return isNaN(n)?0:n;}
+function money(n){return '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function money0(n){return '$'+Math.round(Number(n)||0).toLocaleString('en-US');}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function p2(n){return String(n).padStart(2,'0');}
+function nowStamp(){const d=new Date();return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleString('en-US',{hour:'numeric',minute:'2-digit'});}
+function invKey(n){return String(n||'').trim().toUpperCase();}
+
+/* Dates are built by hand from local Y/M/D parts. Handing a bare "2026-06-17" to
+   new Date() parses it as UTC, which lands on the previous day west of Greenwich. */
+function parseDay(s){
+  s=cell(s);if(!s)return null;
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return new Date(y,+m[1]-1,+m[2]);}
+  const d=new Date(s);
+  return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function fmtDay(d){return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';}
+
+/* ==================== INVOICE READER ====================
+   Pure functions, no page or network access. Everything between the two marker
+   comments is also run by the test harness, so keep it self-contained.
+
+   How an invoice is read, with no AI and no guessing:
+   1. pdfToLines turns the PDF's own text into lines of positioned words.
+   2. A line is an ITEM ROW only if it proves itself: its right-most dollar figure
+      (the extension) equals a quantity on that line times a price on that line.
+   3. Header fields and the footer totals are found by their printed labels.
+   4. The invoice is accepted only if the extensions add up and
+      merchandise + freight + delivery + tax equals the printed total.
+   Anything that fails is returned with ok:false and a plain reason. */
+/*READER-START*/
+function numTok(s){
+  let t=String(s).replace(/[$,]/g,''),neg=false;
+  if(/^\(.+\)$/.test(t)){neg=true;t=t.slice(1,-1);}
+  if(/-$/.test(t)){neg=true;t=t.slice(0,-1);}
+  else if(/^-/.test(t)){neg=true;t=t.slice(1);}
+  if(!/^(\d+\.?\d*|\.\d+)$/.test(t))return null;
+  const dec=(t.split('.')[1]||'').length;
+  return {v:neg?-parseFloat(t):parseFloat(t),dec};
+}
+function near(a,b){return Math.abs(a-b)<=0.0151;}
+function isoDate(s){
+  s=String(s||'').trim();
+  let m=s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if(m){let y=+m[3];if(y<100)y+=2000;const mo=+m[1],d=+m[2];if(mo<1||mo>12||d<1||d>31)return null;return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m)return m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');
+  return null;
+}
+const DATE_RE=/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/;
+const FOOTER_WORDS=/MERCHANDISE|FREIGHT|DELIVERY|\bTAX\b|\bTOTAL\b|SUBTOTAL|CONTINUED|\bPAGE\b|REMIT|\bTERMS\b|AMOUNT\s+DUE|PLEASE\s+PAY|THANK\s+YOU|BALANCE/i;
+
+/* Turns raw positioned text items ({str,x,y,w,page}) into lines of words. */
+function itemsToLines(raw){
+  const words=[];
+  raw.forEach(it=>{
+    const str=String(it.str||'');if(!str.trim())return;
+    const n=str.length||1,re=/\S+/g;let m;
+    while((m=re.exec(str))){
+      words.push({t:m[0],x0:it.x+it.w*(m.index/n),x1:it.x+it.w*((m.index+m[0].length)/n),y:it.y,page:it.page});
+    }
+  });
+  words.sort((a,b)=>a.page-b.page||b.y-a.y||a.x0-b.x0);
+  const lines=[];let cur=null;
+  words.forEach(w=>{
+    if(cur&&cur.page===w.page&&Math.abs(cur.y-w.y)<=2.5){cur.words.push(w);}
+    else{cur={page:w.page,y:w.y,words:[w]};lines.push(cur);}
+  });
+  lines.forEach(l=>{l.words.sort((a,b)=>a.x0-b.x0);l.text=l.words.map(w=>w.t).join(' ');});
+  return lines;
+}
+
+/* An item row proves itself: extension = qty x price, all three printed on the line. */
+function readItemRow(line){
+  const w=line.words;if(w.length<4)return null;
+  if(FOOTER_WORDS.test(line.text))return null;
+  const nums=w.map((x,i)=>{const n=DATE_RE.test(x.t)?null:numTok(x.t);return n?{i,v:n.v,dec:n.dec}:null;}).filter(Boolean);
+  if(nums.length<3)return null;
+  let ext=null;
+  for(let k=nums.length-1;k>=0;k--){if(nums[k].dec===2){ext=nums[k];break;}}
+  if(!ext)return null;
+  const left=nums.filter(n=>n.i<ext.i);
+  let price=null,qty=null;
+  for(let a=left.length-1;a>=0&&!price;a--){
+    const p=left[a];if(p.dec<2||p.v<0)continue;
+    for(let b=left.length-1;b>=0;b--){
+      if(b===a)continue;const q=left[b];
+      if(q.dec>2)continue;
+      if(near(q.v*p.v,ext.v)&&(q.v!==0||ext.v===0)){price=p;qty=q;break;}
+    }
+  }
+  if(!price||!qty)return null;
+
+  // Tail = the run of figures ending at the extension, plus at most one unit word (e.g. CS).
+  // Anything printed after the extension (a tax flag such as "T") is ignored.
+  // The quantity belongs to the tail only if nothing but figures and one unit word sit
+  // between it and the price; otherwise the form prints quantities first (the lead).
+  let tailStart=price.i,uomIdx=-1;
+  if(qty.i<price.i){
+    let clean=true,alpha=-1;
+    for(let i=qty.i+1;i<price.i&&clean;i++){
+      if(numTok(w[i].t))continue;
+      if(alpha<0&&/^[A-Za-z]{1,4}$/.test(w[i].t))alpha=i;else clean=false;
+    }
+    if(clean){
+      uomIdx=alpha;tailStart=qty.i;
+      while(tailStart>0&&numTok(w[tailStart-1].t))tailStart--;        // e.g. QNTY ORD printed left of QNTY SHIP
+    }
+  }
+  // Lead = figures printed before the product code: a line number, or the quantities
+  // on forms that print them first (then the unit word may sit here instead).
+  let leadEnd=0,leadNums=[];
+  for(let i=0;i<tailStart;i++){
+    const n=numTok(w[i].t);
+    if(n){leadNums.push(n);leadEnd=i+1;continue;}
+    if(uomIdx<0&&leadNums.length&&/^[A-Za-z]{1,3}$/.test(w[i].t)){uomIdx=i;leadEnd=i+1;continue;}
+    break;
+  }
+  // The proven quantity and price must sit in the lead or the tail, never inside the description.
+  if(price.i<tailStart)return null;
+  if(qty.i>=leadEnd&&qty.i<tailStart)return null;
+  let lineNo=null;
+  if(leadNums.length===1&&qty.i>=tailStart&&leadNums[0].dec===0&&leadNums[0].v>0&&leadNums[0].v<1000)lineNo=leadNums[0].v;
+
+  const head=w.slice(leadEnd,tailStart);
+  if(!head.length)return null;
+  const product=head[0];
+  if(!/^[A-Za-z0-9][A-Za-z0-9\-\/\.#]{2,}$/.test(product.t))return null;
+  return {line,lineNo,product,descWords:head.slice(1),qty:qty.v,price:price.v,ext:ext.v,uom:uomIdx>=0?w[uomIdx].t.toUpperCase():null};
+}
+
+/* Finds a printed label, then the value beside it or boxed underneath it. */
+function findLabelled(lines,labelRe,valueOk,opts){
+  opts=opts||{};
+  const from=opts.from||0,pickLast=!!opts.last;
+  let found=null;
+  for(let li=from;li<lines.length;li++){
+    const line=lines[li];
+    const m=labelRe.exec(line.text);
+    if(!m)continue;
+    // map the match back to the words it covers
+    let pos=0,first=-1,last=-1;
+    line.words.forEach((wd,i)=>{const s=pos,e=pos+wd.t.length;if(e>m.index&&s<m.index+m[0].length){if(first<0)first=i;last=i;}pos=e+1;});
+    if(first<0)continue;
+    const x0=line.words[first].x0,x1=line.words[last].x1;
+    let val=null;
+    for(let i=last+1;i<line.words.length&&!val;i++){if(valueOk(line.words[i].t))val=line.words[i].t;}
+    if(!val&&!opts.rightOnly){
+      for(let lj=li+1;lj<Math.min(lines.length,li+4)&&!val;lj++){
+        if(lines[lj].page!==line.page)break;
+        for(const wd of lines[lj].words){
+          const c=(wd.x0+wd.x1)/2;
+          if(c>=x0-30&&c<=x1+45&&valueOk(wd.t)){val=wd.t;break;}
+        }
+      }
+    }
+    if(val){found=val;if(!pickLast)return found;}
+  }
+  return found;
+}
+const moneyOk=t=>{const n=numTok(t);return !!n&&n.dec===2;};
+const dateOk=t=>DATE_RE.test(t)&&!!isoDate(t);
+const invNoOk=t=>/^[A-Za-z]{0,3}-?\d[\dA-Za-z\-]{3,}$/.test(t)&&!DATE_RE.test(t);
+
+function parseInvoiceLines(lines,fileName){
+  const fail=reason=>({ok:false,fileName,reason,debug:lines.map(l=>l.text)});
+  if(!lines.length)return fail('No text could be read from this file. It may be a scanned picture rather than a printed invoice.');
+
+  // ---- line items ----
+  const rows=[];let lastItemLine=-1;
+  lines.forEach((l,i)=>{const r=readItemRow(l);if(r){r.idx=i;rows.push(r);lastItemLine=i;}});
+  if(!rows.length)return fail('No line items were found — no row on this file showed a quantity times a price equal to its line total.');
+
+  // An MFG# COLUMN only counts if the word sits on the column-heading line itself.
+  const mfgHdr=(()=>{for(const l of lines){if(!/EXTENSION|NET\s+PRICE/i.test(l.text))continue;for(const wd of l.words){if(/^MFG/i.test(wd.t))return wd;}}return null;})();
+  const out=[];
+  rows.forEach((r,k)=>{
+    let words=r.descWords.slice(),mfg=null;
+    // continuation lines under the row belong to its description
+    const stop=k+1<rows.length?rows[k+1].idx:lines.length;
+    let prevY=r.line.y;
+    const extra=[];
+    for(let j=r.idx+1;j<stop;j++){
+      const l=lines[j];
+      if(l.page!==r.line.page||prevY-l.y>18||FOOTER_WORDS.test(l.text))break;
+      extra.push(l.text);prevY=l.y;
+    }
+    let desc=words.map(x=>x.t).join(' ');
+    let all=(desc+' '+extra.join(' ')).replace(/\s+/g,' ').trim();
+    const mm=all.match(/MFG\s*#?\s*:?\s*([A-Za-z0-9][A-Za-z0-9\-\/\.]*)/i);
+    if(mm){mfg=mm[1];all=all.replace(mm[0],' ').replace(/\s+/g,' ').trim();}
+    else if(mfgHdr&&words.length){
+      const hit=words.findIndex(x=>Math.abs(x.x0-mfgHdr.x0)<14);
+      if(hit>=0){mfg=words[hit].t;words.splice(hit,1);all=(words.map(x=>x.t).join(' ')+' '+extra.join(' ')).replace(/\s+/g,' ').trim();}
+    }
+    const productCode=r.product.t.toUpperCase();
+    out.push({line_no:r.lineNo!=null?r.lineNo:k+1,product_code:productCode,mfg_code:mfg?mfg.toUpperCase():null,description:all,
+      qty:r.qty,uom:r.uom,unit_price:r.price,extension:r.ext,item_key:(mfg||productCode).toUpperCase()});
+  });
+  const sumExt=Math.round(out.reduce((a,b)=>a+b.extension,0)*100)/100;
+
+  // ---- header ----
+  let invoiceNumber=findLabelled(lines,/INV(OICE)?\.?\s*(NO|NUM(BER)?|#)\.?:?/i,invNoOk)
+    ||findLabelled(lines,/\bINVOICE\b(?!\s*DATE)/i,t=>/^\d{5,}$/.test(t)||(invNoOk(t)&&/\d{4}/.test(t)));
+  if(!invoiceNumber)return fail('The invoice number could not be found.');
+  const invoiceDateRaw=findLabelled(lines,/INV(OICE)?\.?\s*DATE/i,dateOk)||findLabelled(lines,/\bDATE\b/i,dateOk);
+  if(!invoiceDateRaw)return fail('The invoice date could not be found.');
+  const orderDateRaw=findLabelled(lines,/ORD(ER)?\.?\s*DATE/i,dateOk);
+
+  // ---- footer totals (looked for after the last line item) ----
+  const foot={from:Math.max(0,lastItemLine+1),last:true};
+  const get=re=>{const v=findLabelled(lines,re,moneyOk,foot);return v==null?null:numTok(v).v;};
+  const merchandise=get(/MERCHANDISE|SUB\s*-?\s*TOTAL/i);
+  const freight=get(/FREIGHT/i)||0;
+  const delivery=get(/DELIVERY/i)||0;
+  const tax=get(/\b(SALES\s+)?TAX\b(?!\s*(ID|EXEMPT))/i)||0;
+  let total=get(/INVOICE\s+TOTAL|TOTAL\s+DUE|AMOUNT\s+DUE|PLEASE\s+PAY|BALANCE\s+DUE|(?<!SUB\s?-?)\bTOTAL\b/i);
+
+  if(merchandise!=null&&!near(merchandise,sumExt))
+    return fail('The line totals add up to '+sumExt.toFixed(2)+' but the invoice prints merchandise of '+merchandise.toFixed(2)+'. A line may have been missed.');
+  const expected=Math.round((sumExt+freight+delivery+tax)*100)/100;
+  if(total==null||!near(total,expected)){
+    // The printed total may sit under a label this reader does not know. Accept it only
+    // if the exact expected figure is printed somewhere in the footer.
+    let printed=false;
+    for(let i=foot.from;i<lines.length&&!printed;i++){for(const wd of lines[i].words){const n=numTok(wd.t);if(n&&n.dec===2&&near(n.v,expected)){printed=true;break;}}}
+    if(printed&&(freight||delivery||tax||merchandise!=null))total=expected;
+    else return fail('The totals do not add up: lines '+sumExt.toFixed(2)+' + freight '+freight.toFixed(2)+' + delivery '+delivery.toFixed(2)+' + tax '+tax.toFixed(2)+' = '+expected.toFixed(2)+', but the invoice total reads '+(total==null?'(not found)':total.toFixed(2))+'.');
+  }
+  return {ok:true,fileName,invoice:{
+    invoice_number:String(invoiceNumber).toUpperCase(),invoice_date:isoDate(invoiceDateRaw),order_date:orderDateRaw?isoDate(orderDateRaw):null,
+    merchandise:merchandise!=null?merchandise:sumExt,freight,delivery_charge:delivery,tax,total,items:out}};
+}
+/*READER-END*/
+
+/* pdf.js is loaded only when an import starts — viewing the page never needs it. */
+function loadPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve();
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/build/pdf.min.js`;
+    s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/build/pdf.worker.min.js`;res();};
+    s.onerror=()=>rej(new Error('Could not load the PDF reader. Check the internet connection and try again.'));
+    document.head.appendChild(s);
+  });
+}
+async function pdfToLines(buf){
+  const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
+  const raw=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const tc=await page.getTextContent();
+    tc.items.forEach(it=>{if(it.str)raw.push({str:it.str,x:it.transform[4],y:it.transform[5],w:it.width||0,page:p});});
+  }
+  return itemsToLines(raw);
+}
+
+/* ---------- Import flow ---------- */
+function openImport(){
+  pendingImport=null;
+  document.getElementById('im-confirm-btn').disabled=false;
+  document.getElementById('im-files').value='';
+  document.getElementById('im-status').textContent='';
+  document.getElementById('im-preview-wrap').style.display='none';
+  document.getElementById('im-result').style.display='none';
+  document.getElementById('import-overlay').style.display='block';
+  document.getElementById('import-modal').style.display='block';
+}
+function closeImport(){pendingImport=null;document.getElementById('import-overlay').style.display='none';document.getElementById('import-modal').style.display='none';}
+function cancelPreview(){pendingImport=null;document.getElementById('im-preview-wrap').style.display='none';document.getElementById('im-status').textContent='Cancelled — nothing was saved.';}
+
+async function analyzeImport(){
+  const files=[...document.getElementById('im-files').files];
+  const status=document.getElementById('im-status');
+  document.getElementById('im-result').style.display='none';
+  document.getElementById('im-preview-wrap').style.display='none';
+  if(!files.length){status.textContent='Choose at least one invoice PDF first.';return;}
+  const btn=document.getElementById('im-analyze-btn');btn.disabled=true;
+  try{
+    status.textContent='Loading the PDF reader…';
+    await loadPdfJs();
+    const known=new Set(invoices.map(i=>invKey(i.number)));
+    const ready=[],dupes=[],held=[],seen=new Set();
+    for(let i=0;i<files.length;i++){
+      status.textContent='Reading '+(i+1)+' of '+files.length+' — '+files[i].name;
+      let res;
+      try{res=parseInvoiceLines(await pdfToLines(await files[i].arrayBuffer()),files[i].name);}
+      catch(e){res={ok:false,fileName:files[i].name,reason:'This file could not be opened as a PDF ('+e.message+').',debug:[]};}
+      if(!res.ok){held.push(res);continue;}
+      const k=invKey(res.invoice.invoice_number);
+      if(known.has(k)||seen.has(k)){dupes.push(res);continue;}
+      seen.add(k);ready.push(res);
+    }
+    ready.sort((a,b)=>a.invoice.invoice_date<b.invoice.invoice_date?-1:1);
+    pendingImport={ready,dupes,held};
+    renderPreview();
+    status.textContent='';
+  }catch(e){
+    status.textContent='';
+    const result=document.getElementById('im-result');result.style.display='block';
+    result.innerHTML='<div class="im-err">'+esc(e.message)+'</div>';
+  }finally{btn.disabled=false;}
+}
+
+function renderPreview(){
+  const {ready,dupes,held}=pendingImport;
+  const lineCount=ready.reduce((a,r)=>a+r.invoice.items.length,0);
+  const sum=ready.reduce((a,r)=>a+r.invoice.total,0);
+  const dates=ready.map(r=>r.invoice.invoice_date).sort();
+  let h='';
+  h+='<div class="im-stat"><span>Ready to save</span><b>'+ready.length+' invoice'+(ready.length===1?'':'s')+' · '+lineCount+' line'+(lineCount===1?'':'s')+'</b></div>';
+  if(ready.length){
+    h+='<div class="im-stat"><span>Invoice dates</span><b>'+esc(fmtDay(parseDay(dates[0])))+' – '+esc(fmtDay(parseDay(dates[dates.length-1])))+'</b></div>';
+    h+='<div class="im-stat"><span>Combined total</span><b>'+money(sum)+'</b></div>';
+  }
+  h+='<div class="im-stat"><span>Already saved — skipped</span><b>'+dupes.length+'</b></div>';
+  h+='<div class="im-stat"><span>Held back — did not add up</span><b>'+held.length+'</b></div>';
+  document.getElementById('im-preview').innerHTML=h;
+
+  const heldEl=document.getElementById('im-held');
+  if(held.length){
+    heldEl.innerHTML='<div class="im-warn"><div style="margin-bottom:8px;"><b>'+held.length+' file'+(held.length===1?' was':'s were')+' held back and will not be saved.</b> The rest can still be saved.</div>'+
+      held.map((x,i)=>'<div class="im-held"><div class="im-held-name">'+esc(x.fileName)+'</div><div>'+esc(x.reason)+'</div>'+
+        ((x.debug&&x.debug.length)?'<div class="im-row"><button class="im-btn ghost sm" onclick="toggleHeld('+i+')">Show what was read</button><button class="im-btn ghost sm" onclick="copyHeld('+i+',this)">Copy</button></div><pre id="held-pre-'+i+'" style="display:none;">'+esc(x.debug.join('\n'))+'</pre>':'')+
+      '</div>').join('')+'</div>';
+  }else heldEl.innerHTML='';
+  document.getElementById('im-confirm-btn').style.display=ready.length?'':'none';
+  document.getElementById('im-preview-wrap').style.display='block';
+}
+function toggleHeld(i){const p=document.getElementById('held-pre-'+i);p.style.display=p.style.display==='none'?'block':'none';}
+function copyHeld(i,btn){
+  const x=pendingImport&&pendingImport.held[i];if(!x)return;
+  const text=x.fileName+'\n'+x.reason+'\n\n'+x.debug.join('\n');
+  navigator.clipboard.writeText(text).then(()=>{btn.textContent='Copied';setTimeout(()=>btn.textContent='Copy',1500);}).catch(()=>{toggleHeld(i);});
+}
+
+async function confirmImport(){
+  if(!pendingImport||!pendingImport.ready.length)return;
+  const btn=document.getElementById('im-confirm-btn');btn.disabled=true;
+  const status=document.getElementById('im-status');
+  const result=document.getElementById('im-result');result.style.display='none';
+  let step='starting';
+  try{
+    const {ready,dupes,held}=pendingImport;
+    step='checking the sheet';status.textContent='Saving… ('+step+')';
+    await ensureTab(INV_TAB);await ensureTab(ITEMS_TAB);
+    const [invRaw,itemRaw]=await Promise.all([fetchTab(INV_TAB),fetchTab(ITEMS_TAB)]);
+    // Re-check against the sheet as it is right now, not as it was when the page loaded.
+    const savedInv=new Set(toRows(invRaw).map(r=>invKey(r.InvoiceNumber)));
+    const savedItems=new Set(toRows(itemRaw).map(r=>invKey(r.InvoiceNumber)));
+    const fresh=ready.filter(r=>!savedInv.has(invKey(r.invoice.invoice_number)));
+    const stamp=nowStamp();
+
+    const itemRows=[];
+    fresh.forEach(r=>{const v=r.invoice;
+      if(savedItems.has(invKey(v.invoice_number)))return;   // lines landed on an earlier, interrupted save
+      v.items.forEach(it=>itemRows.push([v.invoice_number,v.invoice_date,it.line_no,it.product_code,it.mfg_code||'',it.description,it.qty,it.uom||'',it.unit_price,it.extension,it.item_key]));
+    });
+    const invRows=fresh.map(r=>{const v=r.invoice;return [v.invoice_number,v.invoice_date,v.order_date||'',VENDOR,v.merchandise,v.freight,v.delivery_charge,v.tax,v.total,v.items.length,r.fileName,stamp];});
+
+    // Lines first, invoice rows last: an invoice only counts as saved once its row exists,
+    // so an interrupted save is simply picked up again on the next try without doubling lines.
+    step='writing '+itemRows.length+' lines';status.textContent='Saving… ('+step+')';
+    if(itemRows.length)await appendRaw(ITEMS_TAB,(itemRaw.length?[]:[ITEMS_HEADER]).concat(itemRows));
+    step='writing '+invRows.length+' invoices';status.textContent='Saving… ('+step+')';
+    if(invRows.length)await appendRaw(INV_TAB,(invRaw.length?[]:[INV_HEADER]).concat(invRows));
+
+    const dates=fresh.map(r=>r.invoice.invoice_date).sort();
+    const period=dates.length?fmtDay(parseDay(dates[0]))+' – '+fmtDay(parseDay(dates[dates.length-1])):'';
+    try{await appendValues(LOG_TAB,[[stamp,'INVOICES',fresh.length,'','','','','',period,
+      '+'+fresh.length+' new, '+(dupes.length+(ready.length-fresh.length))+' already saved, '+held.length+' held, '+itemRows.length+' lines']]);}catch(e){}
+
+    result.style.display='block';
+    result.innerHTML='<div class="im-ok">'+esc('Saved. '+fresh.length+' invoice'+(fresh.length===1?'':'s')+' and '+itemRows.length+' line'+(itemRows.length===1?'':'s')+' added.'+
+      (held.length?'\n'+held.length+' held file'+(held.length===1?' was':'s were')+' not saved.':'')+'\nReloading…')+'</div>';
+    document.getElementById('im-preview-wrap').style.display='none';
+    status.textContent='';
+    setTimeout(async()=>{closeImport();showLoad();await loadAll();},1400);
+  }catch(e){
+    result.style.display='block';
+    result.innerHTML='<div class="im-err">Save failed while '+esc(step)+':\n'+esc(e.message)+
+      '\n\nNothing already in the sheet was changed. Try again — invoices that did get through will be skipped.</div>';
+    btn.disabled=false;
+  }
+}
+
+/* ---------- Load ---------- */
+async function loadAll(){
+  try{
+    const [invRaw,itemRaw]=await Promise.all([fetchTab(INV_TAB),fetchTab(ITEMS_TAB)]);
+    const seenInv=new Set();
+    invoices=toRows(invRaw).map(r=>({
+      number:r.InvoiceNumber,date:parseDay(r.InvoiceDate),orderDate:parseDay(r.OrderDate),vendor:r.Vendor||VENDOR,
+      merchandise:pNum(r.Merchandise),freight:pNum(r.Freight),delivery:pNum(r.Delivery),tax:pNum(r.Tax),total:pNum(r.Total),
+      fileName:r.FileName||'',importedOn:r.ImportedOn||''
+    })).filter(v=>{const k=invKey(v.number);if(!k||seenInv.has(k))return false;seenInv.add(k);return true;});
+    const dateByInv={};invoices.forEach(v=>dateByInv[invKey(v.number)]=v.date);
+
+    const seenLine=new Set();
+    items=toRows(itemRaw).map(r=>({
+      invoice:r.InvoiceNumber,date:dateByInv[invKey(r.InvoiceNumber)]||parseDay(r.InvoiceDate),lineNo:pNum(r.LineNo),
+      productCode:r.ProductCode,mfgCode:r.MfgCode,description:r.Description,qty:pNum(r.Qty),uom:r.UOM,
+      unitPrice:pNum(r.UnitPrice),extension:pNum(r.Extension),key:(r.ItemKey||r.MfgCode||r.ProductCode||'').toUpperCase()
+    })).filter(it=>{
+      if(!seenInv.has(invKey(it.invoice)))return false;           // a line with no saved invoice is not counted
+      const k=invKey(it.invoice)+'|'+it.lineNo+'|'+it.productCode;
+      if(seenLine.has(k))return false;seenLine.add(k);return true;
+    });
+
+    itemsByInvoice={};historyByKey={};
+    items.forEach(it=>{
+      (itemsByInvoice[invKey(it.invoice)]=itemsByInvoice[invKey(it.invoice)]||[]).push(it);
+      if(it.key)(historyByKey[it.key]=historyByKey[it.key]||[]).push(it);
+    });
+    Object.values(itemsByInvoice).forEach(a=>a.sort((x,y)=>x.lineNo-y.lineNo));
+    Object.values(historyByKey).forEach(a=>a.sort((x,y)=>((x.date?x.date.getTime():0)-(y.date?y.date.getTime():0))));
+    invoices.sort((a,b)=>((b.date?b.date.getTime():0)-(a.date?a.date.getTime():0)));
+
+    render();
+    document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    showDash();
+  }catch(e){
+    if(e.auth){clearToken();accessToken=null;showAuth();return;}   // cached token expired
+    showErr('Error loading data: '+e.message);showDash();
+  }
+}
+
+/* ---------- Figures ---------- */
+function computeAlerts(){
+  const priceAlerts=[],qtyAlerts=[];
+  Object.keys(historyByKey).forEach(key=>{
+    const h=historyByKey[key].filter(x=>x.date&&x.unitPrice>0);
+    if(h.length<2)return;
+    const last=h[h.length-1],prev=h[h.length-2];
+    const pct=(last.unitPrice-prev.unitPrice)/prev.unitPrice;
+    if(Math.abs(pct)>=PRICE_THRESHOLD)priceAlerts.push({key,description:last.description,mfgCode:last.mfgCode,from:prev.unitPrice,to:last.unitPrice,pct:Math.round(pct*1000)/10,date:last.date});
+    const prior=h.slice(0,-1).map(x=>x.qty).filter(n=>n>0);
+    if(prior.length){
+      const avg=prior.reduce((a,b)=>a+b,0)/prior.length;
+      if(avg>0&&last.qty>=avg*QTY_MULT)qtyAlerts.push({key,description:last.description,typical:Math.round(avg*10)/10,ordered:last.qty,mult:Math.round(last.qty/avg*10)/10,date:last.date});
+    }
+  });
+  priceAlerts.sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct));
+  qtyAlerts.sort((a,b)=>b.mult-a.mult);
+  return {priceAlerts,qtyAlerts};
+}
+function computeTop(){
+  const today=new Date(),d365=new Date(today.getFullYear(),today.getMonth(),today.getDate()-365);
+  return Object.keys(historyByKey).map(key=>{
+    const h=historyByKey[key].filter(x=>x.date&&x.unitPrice>0);
+    const cur=h.filter(x=>x.date>=d365);
+    const lastRow=h[h.length-1]||historyByKey[key][historyByKey[key].length-1];
+    return {key,description:lastRow.description,mfgCode:lastRow.mfgCode,
+      spend:cur.reduce((a,b)=>a+b.extension,0),qty:cur.reduce((a,b)=>a+b.qty,0),orders:cur.length};
+  }).filter(x=>x.orders>0);
+}
+
+function render(){
+  const empty=!invoices.length;
+  document.getElementById('empty-info').style.display=empty?'block':'none';
+  const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
+  const dated=invoices.filter(v=>v.date);
+  const sumWhere=f=>dated.filter(f).reduce((a,v)=>a+v.total,0);
+  const ytd=sumWhere(v=>v.date.getFullYear()===yr);
+  const thisMonth=sumWhere(v=>v.date.getFullYear()===yr&&v.date.getMonth()===mo);
+  const lastYearMonth=sumWhere(v=>v.date.getFullYear()===yr-1&&v.date.getMonth()===mo);
+  const totals=invoices.map(v=>v.total).filter(n=>n>0);
+  const {priceAlerts,qtyAlerts}=computeAlerts();
+
+  document.getElementById('sc-ytd-label').textContent='Spend YTD '+yr;
+  document.getElementById('sc-ytd').textContent=empty?'—':money0(ytd);
+  const monthName=now.toLocaleString('en-US',{month:'short'});
+  document.getElementById('sc-ytd-meta').textContent=empty?'':monthName+' so far '+money0(thisMonth)+' · '+monthName+' '+(yr-1)+' '+money0(lastYearMonth);
+  document.getElementById('sc-avg').textContent=totals.length?money0(totals.reduce((a,b)=>a+b,0)/totals.length):'—';
+  document.getElementById('sc-avg-meta').textContent=invoices.length?invoices.length+' invoice'+(invoices.length===1?'':'s')+' saved':'';
+  const al=document.getElementById('sc-alerts');al.textContent=empty?'—':priceAlerts.length;al.classList.toggle('warn',priceAlerts.length>0);
+  document.getElementById('sc-items').textContent=empty?'—':Object.keys(historyByKey).length;
+
+  const newest=dated[0];
+  const lastImport=invoices.map(v=>v.importedOn).filter(Boolean).pop();
+  document.getElementById('status-line').textContent=empty?'':
+    'Latest invoice '+(newest?fmtDay(newest.date)+' · #'+newest.number:'—')+(lastImport?' · last import '+lastImport:'');
+
+  renderSpendChart(dated);
+  renderPriceAlerts(priceAlerts);
+  renderQtyAlerts(qtyAlerts);
+  topData=computeTop();renderTopItems();
+  renderInvoiceRows();
+}
+
+function renderSpendChart(dated){
+  const now=new Date(),labels=[],vals=[],idx={};
+  for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);idx[d.getFullYear()+'-'+d.getMonth()]=labels.length;labels.push(d.toLocaleString('en-US',{month:'short'})+' '+String(d.getFullYear()).slice(2));vals.push(0);}
+  dated.forEach(v=>{const k=v.date.getFullYear()+'-'+v.date.getMonth();if(idx[k]!==undefined)vals[idx[k]]+=v.total;});
+  const total=vals.reduce((a,b)=>a+b,0);
+  document.getElementById('spend-sub').textContent='Last 12 months · '+money0(total);
+  if(spendChart)spendChart.destroy();
+  spendChart=new Chart(document.getElementById('spend-chart'),{type:'bar',
+    data:{labels,datasets:[{data:vals.map(v=>Math.round(v*100)/100),backgroundColor:'#4a5e6d',borderRadius:5,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>money(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{font:{family:'Raleway',size:10},color:'#8a9bb0'}},
+        y:{beginAtZero:true,grid:{color:'#f0ece6'},ticks:{font:{family:'Raleway',size:10},color:'#8a9bb0',callback:v=>'$'+Number(v).toLocaleString('en-US')}}}}});
+}
+
+function keyAttr(k){return encodeURIComponent(k).replace(/'/g,'%27');}
+function renderPriceAlerts(list){
+  const el=document.getElementById('price-alerts');
+  if(!list.length){el.innerHTML='<div class="empty-state">No price changes over 2% on the latest invoices.</div>';return;}
+  el.innerHTML=list.map(a=>{const up=a.pct>=0;
+    return '<div class="alert-row" onclick="openItemHistory(\''+keyAttr(a.key)+'\')"><div style="min-width:0;"><div class="alert-name">'+esc(a.description||a.key)+'</div>'+
+      '<div class="alert-sub">'+esc(a.mfgCode?'MFG# '+a.mfgCode:a.key)+' · '+esc(fmtDay(a.date))+'</div></div>'+
+      '<div class="alert-right"><span class="alert-from">'+money(a.from)+'</span> → <b>'+money(a.to)+'</b><span class="pill '+(up?'up':'down')+'">'+(up?'+':'')+a.pct.toFixed(1)+'%</span></div></div>';
+  }).join('');
+}
+function renderQtyAlerts(list){
+  const el=document.getElementById('qty-alerts');
+  if(!list.length){el.innerHTML='<div class="empty-state">No unusual order quantities on the latest invoices.</div>';return;}
+  el.innerHTML=list.map(a=>
+    '<div class="alert-row" onclick="openItemHistory(\''+keyAttr(a.key)+'\')"><div style="min-width:0;"><div class="alert-name">'+esc(a.description||a.key)+'</div>'+
+    '<div class="alert-sub">Typically '+a.typical+' · ordered '+a.ordered+' · '+esc(fmtDay(a.date))+'</div></div>'+
+    '<span class="pill qty">▲ '+a.mult+'× typical</span></div>').join('');
+}
+function setTopSort(sort){
+  topSort=sort;
+  document.querySelectorAll('.tog').forEach(t=>t.classList.toggle('active',t.dataset.sort===sort));
+  renderTopItems();
+}
+function renderTopItems(){
+  const el=document.getElementById('top-items');
+  const top=[...topData].sort((a,b)=>(b[topSort]||0)-(a[topSort]||0)).slice(0,10);
+  if(!top.length){el.innerHTML='<div class="empty-state">No items in the last 12 months yet.</div>';return;}
+  el.innerHTML='<table class="data-table"><thead><tr><th>Item</th><th class="right">Spend 12 mo</th><th class="right">Quantity</th><th class="right">Orders</th></tr></thead><tbody>'+
+    top.map(x=>'<tr onclick="openItemHistory(\''+keyAttr(x.key)+'\')"><td><div style="font-weight:600;">'+esc(x.description||x.key)+'</div><div class="cell-sub">'+esc(x.mfgCode?'MFG# '+x.mfgCode:x.key)+'</div></td>'+
+      '<td class="right" style="font-weight:600;">'+money0(x.spend)+'</td><td class="right">'+(Math.round(x.qty*10)/10)+'</td><td class="right">'+x.orders+'</td></tr>').join('')+
+    '</tbody></table>';
+}
+function renderInvoiceRows(){
+  const el=document.getElementById('inv-list');
+  const q=(document.getElementById('inv-search').value||'').trim().toLowerCase();
+  const list=q?invoices.filter(v=>String(v.number).toLowerCase().includes(q)):invoices;
+  document.getElementById('inv-count-label').textContent=invoices.length?(q?list.length+' of '+invoices.length:invoices.length+' total'):'';
+  if(!invoices.length){el.innerHTML='<div class="empty-state">No invoices saved yet.</div>';return;}
+  if(!list.length){el.innerHTML='<div class="empty-state">No invoices match that search.</div>';return;}
+  el.innerHTML='<table class="data-table"><thead><tr><th>Invoice #</th><th>Date</th><th class="right">Lines</th><th class="right">Freight + delivery</th><th class="right">Tax</th><th class="right">Total</th></tr></thead><tbody>'+
+    list.map(v=>'<tr onclick="openInvoiceDetail(\''+keyAttr(v.number)+'\')"><td class="mono">'+esc(v.number)+'</td><td>'+esc(fmtDay(v.date))+'</td>'+
+      '<td class="right">'+((itemsByInvoice[invKey(v.number)]||[]).length)+'</td><td class="right">'+money(v.freight+v.delivery)+'</td><td class="right">'+money(v.tax)+'</td>'+
+      '<td class="right" style="font-weight:600;">'+money(v.total)+'</td></tr>').join('')+'</tbody></table>';
+}
+
+/* ---------- Detail modal ---------- */
+function openDetail(title,html){
+  document.getElementById('detail-title').textContent=title;
+  document.getElementById('detail-body').innerHTML=html;
+  document.getElementById('detail-overlay').style.display='block';
+  document.getElementById('detail-modal').style.display='block';
+}
+function closeDetail(){document.getElementById('detail-overlay').style.display='none';document.getElementById('detail-modal').style.display='none';}
+function openInvoiceDetail(enc){
+  const num=decodeURIComponent(enc);
+  const v=invoices.find(x=>invKey(x.number)===invKey(num));if(!v)return;
+  const lines=itemsByInvoice[invKey(num)]||[];
+  openDetail('Invoice '+v.number,
+    '<div class="detail-meta"><div><span>Date</span>'+esc(fmtDay(v.date))+'</div>'+(v.orderDate?'<div><span>Ordered</span>'+esc(fmtDay(v.orderDate))+'</div>':'')+
+    '<div><span>Vendor</span>'+esc(v.vendor)+'</div><div><span>Total</span><b>'+money(v.total)+'</b></div></div>'+
+    '<div class="table-scroll"><table class="data-table"><thead><tr><th>Item</th><th class="center">Qty</th><th class="right">Unit</th><th class="right">Ext</th></tr></thead><tbody>'+
+    lines.map(it=>'<tr onclick="openItemHistory(\''+keyAttr(it.key)+'\')"><td><div style="font-weight:600;">'+esc(it.description||'—')+'</div><div class="cell-sub">'+esc((it.mfgCode?'MFG# '+it.mfgCode+' · ':'')+(it.productCode||''))+'</div></td>'+
+      '<td class="center">'+it.qty+' '+esc(it.uom||'')+'</td><td class="right">'+money(it.unitPrice)+'</td><td class="right" style="font-weight:600;">'+money(it.extension)+'</td></tr>').join('')+
+    '</tbody></table></div>'+
+    '<div class="detail-totals">Merchandise '+money(v.merchandise)+' · Freight '+money(v.freight)+' · Delivery '+money(v.delivery)+' · Tax '+money(v.tax)+'<br><strong>Total '+money(v.total)+'</strong></div>'+
+    (v.fileName?'<div class="cell-sub" style="margin-top:10px;">From '+esc(v.fileName)+'</div>':''));
+}
+function openItemHistory(enc){
+  const key=decodeURIComponent(enc);
+  const hist=historyByKey[key]||[];
+  if(!hist.length){openDetail('Item history','<div class="empty-state">No history for this item.</div>');return;}
+  const latest=hist[hist.length-1];
+  const prices=hist.map(h=>h.unitPrice).filter(n=>n>0),qtys=hist.map(h=>h.qty);
+  openDetail(latest.description||'Item history',
+    '<div class="cell-sub" style="margin-top:4px;">'+esc((latest.mfgCode?'MFG# '+latest.mfgCode+' · ':'')+(latest.productCode||''))+'</div>'+
+    '<div class="spark-row"><div><div class="spark-label">Unit price</div>'+spark(prices,'#c4572a',true)+'</div><div><div class="spark-label">Qty ordered</div>'+spark(qtys,'#4a5e6d',false)+'</div></div>'+
+    '<div class="table-scroll"><table class="data-table"><thead><tr><th>Date</th><th>Invoice</th><th class="center">Qty</th><th class="right">Unit price</th><th class="right">Ext</th></tr></thead><tbody>'+
+    hist.slice().reverse().map(h=>'<tr onclick="openInvoiceDetail(\''+keyAttr(h.invoice)+'\')"><td>'+esc(fmtDay(h.date))+'</td><td class="mono">'+esc(h.invoice)+'</td><td class="center">'+h.qty+' '+esc(h.uom||'')+'</td>'+
+      '<td class="right" style="font-weight:600;">'+money(h.unitPrice)+'</td><td class="right">'+money(h.extension)+'</td></tr>').join('')+'</tbody></table></div>');
+}
+// Dependency-free inline sparkline. isMoney formats the end label as currency.
+function spark(vals,color,isMoney){
+  if(!vals.length)return '<div class="cell-sub">—</div>';
+  const lbl=v=>isMoney?money(v):v;
+  if(vals.length===1)return '<div style="font-size:18px;font-weight:700;margin-top:4px;">'+lbl(vals[0])+'</div>';
+  const w=200,h=46,pad=4,min=Math.min(...vals),max=Math.max(...vals),span=(max-min)||1;
+  const pts=vals.map((v,i)=>(pad+(i/(vals.length-1))*(w-2*pad)).toFixed(1)+','+(h-pad-((v-min)/span)*(h-2*pad)).toFixed(1)).join(' ');
+  return '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;"><svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>'+
+    '<div style="font-size:15px;font-weight:700;">'+lbl(vals[vals.length-1])+'</div></div>';
+}
+</script>
+</body>
+</html>
