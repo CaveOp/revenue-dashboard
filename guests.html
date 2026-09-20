@@ -5,10 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cave Springs — Guests</title>
 <link rel="icon" type="image/png" href="favicon-32x32.png">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- This page opens a file full of guest names, emails and phone numbers, so it loads NOTHING
+     from outside: the map library, the map background, the font and the lookup files all live in
+     this repo. The rule below makes the browser itself enforce that. The only outside addresses
+     allowed are Google's own — the Sheets API the data is saved to, and Google sign-in. Anything
+     else, from any cause, is blocked by the browser before it leaves. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; connect-src 'self' https://sheets.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com; frame-src https://accounts.google.com/gsi/; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<script src="vendor/leaflet/leaflet.js"></script>
 <style>
+@font-face{font-family:'Raleway';font-style:normal;font-weight:300 700;font-display:swap;src:url(vendor/fonts/raleway-latin.woff2) format('woff2');}
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
   --bg:#f5f2ee;--surface:#fff;--surface2:#f9f7f4;
@@ -96,7 +102,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .panel-body{padding:22px 24px;}
 .panel-foot{padding:12px 24px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);line-height:1.7;}
 .empty-state{text-align:center;color:var(--text3);font-size:13px;padding:32px 20px;}
-#map{height:540px;width:100%;background:#e9eef1;}
+#map{height:540px;width:100%;background:#d3e2ea;}
+.map-lbl{white-space:nowrap;font-family:var(--sans);pointer-events:none;}
+.map-lbl.st{font-size:12px;font-weight:700;letter-spacing:0.14em;color:#c3b8aa;transform:translate(-50%,-50%);}
+.map-lbl.ct{font-size:10px;font-weight:600;color:#6a7e8d;transform:translate(5px,-7px);text-shadow:0 0 3px #faf8f4,0 0 3px #faf8f4;}
 .map-legend{display:flex;gap:18px;flex-wrap:wrap;align-items:center;}
 .lg{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:var(--text2);}
 .lg i{display:inline-block;width:13px;height:13px;border-radius:50%;}
@@ -200,7 +209,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
   <div id="im-result" style="display:none;"></div>
 
-  <div class="im-privacy">Privacy: guest names, additional guests, email addresses and phone numbers are never saved, never shown and never sent anywhere. The file is read on this computer; the columns holding them are not even looked at, except that the first three digits of a phone number (the area code) are kept to estimate a region when the city is blank. Before anything is written to the sheet, every value is checked once more and the save is refused if anything resembling an email address or a phone number is found.</div>
+  <div class="im-privacy">Privacy: guest names, additional guests, email addresses and phone numbers are never saved, never shown and never sent anywhere. The file is read on this computer; the columns holding them are not even looked at, except that the first three digits of a phone number (the area code) are kept to estimate a region when the city is blank. A row whose columns do not line up with the headings is skipped whole, and city text is kept only beside a real US state or Canadian province, so nothing that strayed into the City column can be saved. This page loads nothing from outside — the map, its background and the font are all part of the dashboard — and the browser is instructed to block any connection except Google sign-in and your Google Sheet. Before anything is written to the sheet, every value is checked once more and the save is refused if anything resembling an email address or a phone number is found.</div>
 </div>
 
 <div id="dashboard">
@@ -295,6 +304,8 @@ const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
 const GUEST_HEADER = ['Res#','StartDate','Nights','City','State','AreaCode','Source'];
 const HOME = {lat:41.208,lng:-122.272,name:'Cave Springs · Dunsmuir'};
 const WEST = [[32.4,-125.2],[48.9,-115.5]];   // San Diego to Seattle, coast to Boise
+const STATE_LABELS = [['CA',36.6,-119.6],['OR',43.9,-120.6],['WA',47.4,-120.2],['NV',39.4,-116.8],['ID',44.3,-114.6],['UT',39.3,-111.7],['AZ',34.3,-111.7],['MT',47.0,-109.6],['WY',43.0,-107.5],['CO',39.0,-105.5],['NM',34.4,-106.1],['TX',31.4,-99.3],['BC',54.0,-125.0],['AB',54.5,-114.5]];
+const REF_CITIES = [['San Francisco',37.775,-122.419],['Sacramento',38.582,-121.494],['Redding',40.587,-122.392],['Eureka',40.802,-124.164],['Medford',42.327,-122.876],['Portland',45.523,-122.676],['Seattle',47.606,-122.332],['Reno',39.530,-119.814],['Fresno',36.748,-119.772],['Los Angeles',34.052,-118.244],['San Diego',32.716,-117.165],['Las Vegas',36.175,-115.137],['Boise',43.615,-116.202],['Bend',44.058,-121.315]];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const BANDS = [[0,100,'Under 100 miles'],[100,250,'100 – 250 miles'],[250,500,'250 – 500 miles'],[500,1e9,'Over 500 miles']];
 /* Markets: every origin within `r` miles of a hub point belongs to that market. When two
@@ -317,7 +328,7 @@ const MARKETS = [
 ];
 
 let tokenClient, accessToken;
-let GEO=null, AREA=null;                 // bundled lookups, loaded once
+let GEO=null, AREA=null, BASE=null;      // bundled lookups and map background, loaded once
 let guests=[];                            // one entry per reservation, location resolved
 let basis='booked', metric='res', period='ALL', showAllCities=false;
 let map=null, layer=null, lastBounds=null;
@@ -439,10 +450,10 @@ function normCity(s){
     .replace(/[^a-z0-9]+/g,' ').trim();
 }
 async function loadGeo(){
-  if(GEO&&AREA)return;
-  const [c,a]=await Promise.all([fetch('data/us-cities.json'),fetch('data/area-codes.json')]);
-  if(!c.ok||!a.ok)throw new Error('Could not load the city and area-code lookup files.');
-  GEO=await c.json();AREA=(await a.json()).codes;
+  if(GEO&&AREA&&BASE)return;
+  const [c,a,b]=await Promise.all([fetch('data/us-cities.json'),fetch('data/area-codes.json'),fetch('data/basemap.json')]);
+  if(!c.ok||!a.ok||!b.ok)throw new Error('Could not load the bundled city, area-code and map files.');
+  GEO=await c.json();AREA=(await a.json()).codes;BASE=await b.json();
 }
 function stateCodeOf(s){const k=normCity(s);return k?(GEO.states[k]||null):null;}
 function miles(aLat,aLng,bLat,bLng){
@@ -528,8 +539,10 @@ function isoDay(s){
   if(m)return m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');
   return '';
 }
-/* Returns {rows:[safe rows], stats} and nothing else. `table` is the parsed CSV. */
-function reduceExport(table){
+/* Returns {rows:[safe rows], stats} and nothing else. `table` is the parsed CSV.
+   `isState(text)` says whether text names a real US state or Canadian province. */
+function reduceExport(table,isState){
+  if(typeof isState!=='function')throw new Error('reduceExport needs the state check.');
   if(!table.length)throw new Error('The file is empty.');
   const H=table[0];
   const ix={res:findCol(H,['Res#','Res','Reservation','Reservation#']),start:findCol(H,['Start Date','StartDate','Arrival','Check In']),
@@ -537,9 +550,15 @@ function reduceExport(table){
     city:findCol(H,['City','City/State','City, State']),cell:findCol(H,['Cell Phone','CellPhone','Mobile']),phone:findCol(H,['Phone','Home Phone'])};
   if(ix.res===-1)throw new Error('This does not look like the Guests by Date export — there is no "Res#" column.');
   if(ix.city===-1&&ix.cell===-1&&ix.phone===-1)throw new Error('This file has no City column and no phone column, so there is nothing to place guests by.');
-  const byRes={};let dataRows=0;
+  const byRes={};let dataRows=0,skippedShape=0,droppedCity=0;
   for(let r=1;r<table.length;r++){
-    const row=table[r];if(!row||!row.some(c=>String(c||'').trim()!==''))continue;
+    let row=table[r];if(!row||!row.some(c=>String(c||'').trim()!==''))continue;
+    /* A row must have exactly as many columns as the heading row. A stray quote mark in a
+       name can slide every later value one column over — which could put a guest's name
+       under "City". Such a row is not trusted at all: it is skipped whole, never half-read.
+       (Extra EMPTY cells at the end are harmless padding and are trimmed first.) */
+    while(row.length>H.length&&String(row[row.length-1]||'').trim()==='')row=row.slice(0,-1);
+    if(row.length!==H.length){skippedShape++;continue;}
     const res=String(row[ix.res]||'').replace(/[^0-9A-Za-z]/g,'').toUpperCase();if(!res)continue;
     dataRows++;
     const start=ix.start!==-1?isoDay(row[ix.start]):'';
@@ -553,6 +572,11 @@ function reduceExport(table){
       state=state.replace(/\s*\d{5}(-\d{4})?$/,'').trim();                  // "California 96025" -> "California"
       if(looksPersonal(city)||looksPersonal(state)){city='';state='';}     // someone typed contact details into the City box
       if(city.length>60||state.length>40){city='';state='';}
+      /* City text is kept ONLY beside a real state or province. A name, a note or anything
+         else that strayed into this column will not have one, so it is discarded unseen.
+         The cost: a guest from outside the US and Canada shows as unknown. */
+      if(city&&!isState(state)){city='';state='';droppedCity++;}
+      if(!city)state='';
     }
     const ac=areaCodeOf(ix.cell!==-1?row[ix.cell]:'')||areaCodeOf(ix.phone!==-1?row[ix.phone]:'');
     const safe={res,start,nights:nights>0?nights:'',city,state,areaCode:ac,source:city?'city':(ac?'areacode':'unknown')};
@@ -569,7 +593,7 @@ function reduceExport(table){
     }
   }
   const rows=Object.values(byRes);
-  return {rows,stats:{dataRows,reservations:rows.length,byCity:rows.filter(x=>x.source==='city').length,byArea:rows.filter(x=>x.source==='areacode').length,unknown:rows.filter(x=>x.source==='unknown').length}};
+  return {rows,stats:{dataRows,skippedShape,droppedCity,reservations:rows.length,byCity:rows.filter(x=>x.source==='city').length,byArea:rows.filter(x=>x.source==='areacode').length,unknown:rows.filter(x=>x.source==='unknown').length}};
 }
 const SRC_RANK={city:3,areacode:2,unknown:1,'':0};
 /* Existing saved rows + this import -> the table to write. The better origin wins. */
@@ -594,7 +618,8 @@ function originToRow(x){return [x.res,x.start||'',x.nights||'',x.city||'',x.stat
 /* The last gate before the network. Every cell of every row is re-checked; the reservation
    number must be a plain code, the area code exactly three digits, and nothing may resemble
    an email address or a phone number. One bad cell refuses the whole save. */
-function assertSafeToSave(values){
+function assertSafeToSave(values,isState){
+  if(typeof isState!=='function')throw new Error('Refusing to save: the state check is missing.');
   values.forEach((row,r)=>{
     if(r===0)return;
     if(row.length!==7)throw new Error('Refusing to save: row '+r+' has '+row.length+' values instead of 7.');
@@ -605,6 +630,9 @@ function assertSafeToSave(values){
     if(ac&&!/^\d{3}$/.test(ac))throw new Error('Refusing to save: row '+r+' has an area code that is not exactly three digits.');
     if(!/^(city|areacode|unknown)$/.test(src))throw new Error('Refusing to save: row '+r+' has an unexpected source value.');
     if(looksPersonal(city)||looksPersonal(state))throw new Error('Refusing to save: row '+r+' has something resembling an email address or phone number in the city or state.');
+    if(city&&!isState(state))throw new Error('Refusing to save: row '+r+' has city text that is not beside a real state or province.');
+    if(!city&&state)throw new Error('Refusing to save: row '+r+' has a state with no city.');
+    if(src==='city'&&!city)throw new Error('Refusing to save: row '+r+' claims a city it does not have.');
   });
   return true;
 }
@@ -639,8 +667,9 @@ async function analyzeImport(){
     const head=new Uint8Array(await f.slice(0,4).arrayBuffer());
     if(head[0]===0x50&&head[1]===0x4B)throw new Error('This is an Excel file, not a CSV. In ResNexus choose the CSV export — or open the file in Excel and use Save As → CSV — then try again.');
     // The raw text and the parsed table live only inside this block and are gone when it ends.
-    let reduced;{const text=await f.text();const table=parseCSV(text);reduced=reduceExport(table);}
+    let reduced;{const text=await f.text();const table=parseCSV(text);reduced=reduceExport(table,s=>!!stateCodeOf(s));}
     const existing=readStored(await fetchTab(GUEST_TAB));
+    existing.forEach(x=>{if(x.city&&!stateCodeOf(x.state)){x.city='';x.state='';x.source=x.areaCode?'areacode':'unknown';}});
     const merge=mergeOrigins(existing,reduced.rows);
     // cities the lookup does not know — city and state only, which is all we hold by now
     const unplaced={};
@@ -661,6 +690,8 @@ function renderPreview(){
   h+='<div class="im-stat"><span>Placed by the city on the reservation</span><b>'+stats.byCity+'</b></div>';
   h+='<div class="im-stat"><span>Estimated from the area code</span><b>'+stats.byArea+'</b></div>';
   h+='<div class="im-stat"><span>Unknown — no city and no usable phone</span><b>'+stats.unknown+'</b></div>';
+  if(stats.skippedShape)h+='<div class="im-stat"><span>Rows skipped — their columns did not line up</span><b>'+stats.skippedShape+'</b></div>';
+  if(stats.droppedCity)h+='<div class="im-stat"><span>City text discarded — not beside a US state or Canadian province</span><b>'+stats.droppedCity+'</b></div>';
   h+='<div class="im-stat"><span>New to the sheet</span><b>'+merge.added+'</b></div>';
   h+='<div class="im-stat"><span>Already saved — updated / unchanged</span><b>'+merge.updated+' / '+merge.same+'</b></div>';
   document.getElementById('im-preview').innerHTML=h;
@@ -682,7 +713,7 @@ async function confirmImport(){
     const {merge,stats,existingRowCount,span}=pendingImport;
     const out=[GUEST_HEADER].concat(merge.final.map(originToRow));
     step='checking every value before it leaves this computer';status.textContent='Saving… ('+step+')';
-    assertSafeToSave(out);
+    assertSafeToSave(out,s=>!!stateCodeOf(s));
     step='creating the '+GUEST_TAB+' tab if needed';status.textContent='Saving… ('+step+')';
     await ensureTab(GUEST_TAB);
     // One write, no clear: old rows are overwritten in place and any leftover rows are blanked
@@ -795,8 +826,19 @@ function render(){
 
 function renderMap(view){
   if(!map){
-    map=L.map('map',{scrollWheelZoom:false,worldCopyJump:true});map.fitBounds(WEST);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:12,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · city locations: <a href="https://www.geonames.org/">GeoNames</a>'}).addTo(map);
+    map=L.map('map',{scrollWheelZoom:false,minZoom:3,maxZoom:9,zoomSnap:0.25,maxBounds:[[8,-179],[78,-40]]});map.fitBounds(WEST);
+    /* No map tiles: the background is drawn here from outlines bundled in data/basemap.json
+       (Natural Earth, public domain). Nothing about the map is fetched from an outside service. */
+    map.attributionControl.setPrefix(false).addAttribution('Map: Natural Earth · city locations: GeoNames');
+    const style=f=>f.properties.k==='lake'?{stroke:false,fillColor:'#d3e2ea',fillOpacity:1}
+      :f.properties.k==='land'?{color:'#d6cec3',weight:1,fillColor:'#efebe4',fillOpacity:1}
+      :{color:f.properties.c==='US'?'#c9bfb2':'#d6cec3',weight:1,fillColor:f.properties.c==='US'?'#faf8f4':'#efebe4',fillOpacity:1};
+    const order={land:0,state:1,lake:2};
+    L.geoJSON({type:'FeatureCollection',features:BASE.features.slice().sort((a,b)=>order[a.properties.k]-order[b.properties.k])},{style,interactive:false}).addTo(map);
+    // state codes and a few reference cities, so the map reads without street tiles
+    const lbl=(lat,lng,text,cls)=>L.marker([lat,lng],{interactive:false,keyboard:false,icon:L.divIcon({className:'map-lbl '+cls,html:esc(text),iconSize:[0,0]})}).addTo(map);
+    STATE_LABELS.forEach(([code,lat,lng])=>lbl(lat,lng,code,'st'));
+    REF_CITIES.forEach(([name,lat,lng])=>{L.circleMarker([lat,lng],{radius:1.6,stroke:false,fillColor:'#8a9bb0',fillOpacity:1,interactive:false}).addTo(map);lbl(lat,lng,name,'ct');});
     map.on('click',()=>map.scrollWheelZoom.enable());map.on('mouseout',()=>map.scrollWheelZoom.disable());
   }
   if(layer)layer.remove();
@@ -814,7 +856,7 @@ function renderMap(view){
   L.circleMarker([HOME.lat,HOME.lng],{radius:7,color:'#fff',weight:2,fillColor:'#c4572a',fillOpacity:1}).bindTooltip('<b>'+esc(HOME.name)+'</b>',{className:'gt',direction:'top'}).addTo(layer);
   lastBounds=pts.length?L.latLngBounds(pts.concat([[HOME.lat,HOME.lng]])):null;
   const unplaced=view.length-view.filter(g=>g.loc).length;
-  document.getElementById('map-foot').textContent='Bubble size shows '+(metric==='rev'?'revenue':'reservations')+'. '+spots.length+' place'+(spots.length===1?'':'s')+' on the map'+(unplaced?'; '+unplaced+' reservation'+(unplaced===1?'':'s')+' could not be placed.':'.')+' Click the map to zoom with the mouse wheel.';
+  document.getElementById('map-foot').textContent='Bubble size shows '+(metric==='rev'?'revenue':'reservations')+'. '+spots.length+' place'+(spots.length===1?'':'s')+' on the map'+(unplaced?'; '+unplaced+' reservation'+(unplaced===1?'':'s')+' could not be placed.':'.')+' Click the map to zoom with the mouse wheel. The map is drawn from outlines stored in the dashboard; no outside map service is used.';
 }
 function mapView(which){
   if(!map)return;
