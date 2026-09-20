@@ -223,8 +223,13 @@ tr.unit-row.hidden{display:none;}
     </div>
     <input type="file" id="im-file" accept=".csv,text/csv">
     <div class="im-mode-row" id="im-mode-row">
-      <label><input type="radio" name="im-mode" value="replace" checked> <span><strong>Replace all stay data</strong> — erases current stay rows and rebuilds from this file (same as the delete-and-reimport routine)</span></label>
-      <label><input type="radio" name="im-mode" value="add"> <span><strong>Add to existing data</strong> — skips reservations already in the sheet</span></label>
+      <label><input type="radio" name="im-mode" value="range" checked> <span><strong>Replace only the dates in this file</strong> — refreshes every reservation in the file (changed rates and dates included), removes ones cancelled inside its dates, and never touches other years</span></label>
+      <label><input type="radio" name="im-mode" value="add"> <span><strong>Add to existing data</strong> — skips reservations already in the sheet, so a reservation that changed since is NOT updated</span></label>
+      <label><input type="radio" name="im-mode" value="replace"> <span><strong>Replace all stay data</strong> — erases EVERY stay row, all years, and rebuilds from this file alone</span></label>
+    </div>
+    <div class="im-mode-row" id="im-dmode-row" style="display:none;">
+      <label><input type="radio" name="im-dmode" value="range" checked> <span><strong>Replace only the dates in this file</strong> — discounts dated inside the file's range are replaced; other years are never touched</span></label>
+      <label><input type="radio" name="im-dmode" value="replace"> <span><strong>Replace all discount data</strong> — erases every discount row, all years, and rebuilds from this file alone</span></label>
     </div>
     <div class="im-status" id="im-type-hint" style="display:none;margin-bottom:10px;"></div>
     <button class="im-btn" onclick="analyzeImport()">Analyze file</button>
@@ -514,7 +519,11 @@ function buildFilters(){
   staysData.forEach(r=>{if(r.nightDate)months.add(mYr(r.nightDate));});
   const sorted=[...months].sort((a,b)=>new Date(a)-new Date(b));
   const bar=document.getElementById('filter-bar');bar.innerHTML='<span class="filter-label">Period</span>';
-  activeFilter=sorted.length>0?sorted[sorted.length-1]:'';
+  // Open on the CURRENT month. The last month with data is usually December, because future
+  // bookings already sit in the sheet. If this month has no rows yet, fall back to the latest
+  // month that is not in the future, and only then to the last one.
+  const today=new Date(),thisMonth=mYr(today);
+  activeFilter=sorted.includes(thisMonth)?thisMonth:(sorted.filter(m=>new Date(m)<=today).pop()||sorted[sorted.length-1]||'');
   const byYear={};sorted.forEach(m=>{const yr=new Date(m).getFullYear();if(!byYear[yr])byYear[yr]=[];byYear[yr].push(m);});
   Object.keys(byYear).sort().forEach(yr=>{const yl=document.createElement('span');yl.className='filter-year';yl.textContent=yr;bar.appendChild(yl);byYear[yr].forEach(m=>bar.appendChild(mkBtn(m,m,m===activeFilter)));});
 }
@@ -915,9 +924,10 @@ let imPending=null;
 function imTypeChanged(){
   const t=document.querySelector('input[name=im-type]:checked').value;
   document.getElementById('im-mode-row').style.display=t==='stays'?'flex':'none';
+  document.getElementById('im-dmode-row').style.display=t==='discounts'?'flex':'none';
   const h=document.getElementById('im-type-hint');
   if(t==='pace'){h.textContent='Pace imports replace all existing pace data each time — same as the Apps Script.';h.style.display='block';}
-  else if(t==='discounts'){h.textContent='Discount imports replace all existing discount data each time — same as the Apps Script.';h.style.display='block';}
+  else if(t==='discounts'){h.style.display='none';}
   else if(t==='retail'){h.textContent='Retail imports only add new line items — overlapping exports are expected and duplicates are skipped automatically.';h.style.display='block';}
   else h.style.display='none';
 }
@@ -958,7 +968,7 @@ async function analyzeImport(){
   try{
     if(type==='stays')await imAnalyzeStays(rows,status);
     else if(type==='pace')imAnalyzePace(rows,status);
-    else if(type==='discounts')imAnalyzeDiscounts(rows,status);
+    else if(type==='discounts')await imAnalyzeDiscounts(rows,status);
     else if(type==='retail')await imAnalyzeRetail(rows,status);
   }catch(e){status.textContent='Analyze failed: '+e.message;}
 }
@@ -969,6 +979,103 @@ function imShowPreview(lines,note,warnings){
   document.getElementById('im-preview-body').innerHTML=html;
   document.getElementById('im-file-status').textContent='';
   document.getElementById('im-step-preview').style.display='block';
+}
+/* ==================== REPLACE ONLY THE DATES IN THIS FILE ====================
+   "Add to existing" never updates a reservation it has already seen, so a changed rate stays
+   wrong and changed dates land as a second copy. "Replace all" fixes that but erases every
+   other year. This mode refreshes exactly what the file covers and touches nothing else:
+
+     1. Every reservation in the file is replaced whole — all its saved nights go, the file's
+        nights come in. A changed rate, changed dates or a changed unit simply becomes current.
+     2. A saved reservation that has a night inside the dates the file covers, but is NOT in
+        the file, was cancelled or moved away. It is removed — and listed first, for a look.
+     3. Everything else — last year, next year, other dates — is written back exactly as read.
+
+   "The dates the file covers" is deliberately the PROVABLE part, not first night to last night.
+   A reservation is in an export when its stay overlaps the export's range, so the range must
+   reach at least from the earliest check-out in the file to the latest check-in. A New Year
+   straddler therefore cannot stretch the range back into December and take real stays with it.
+
+   Saved rows are read unformatted (exact numbers, not "$333.33"), so writing the untouched
+   rows back cannot shave pennies off them. Pure functions; the test harness runs this block. */
+/*RANGE-START*/
+function imDayKey(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
+function imKeyToDate(k){return new Date(Math.floor(k/10000),Math.floor(k/100)%100-1,k%100);}
+function imKeepBool(v){return v===true?true:v===false?false:/^(true|yes|1|x)$/i.test(String(v==null?'':v).trim());}
+function imStayRowForWrite(r){
+  const nd=imParseFlexDate(r[1]),ro=imParseFlexDate(r[6]);
+  return [r[0],nd?imFmtDate(nd):(r[1]==null?'':r[1]),r[2]==null?'':r[2],typeof r[3]==='number'?r[3]:imToNumber(r[3]),imKeepBool(r[4]),imKeepBool(r[5]),
+    ro?imFmtDate(ro):(r[6]==null?'':r[6]),r[7]==null?'':r[7],"'"+imCleanDateText(r[8]),parseInt(r[9])||1];
+}
+/* existingRows: saved STAYS_CLEAN rows (no header), unformatted.
+   coverage:     one {res,s,e} per file row with readable dates — zero-amount rows included,
+                 because a $0 stay is still "in the file".
+   protectedRes: reservations whose file row could not be read; their saved rows are left alone. */
+function imPlanStayRange(existingRows,coverage,protectedRes){
+  const fileRes=new Set(coverage.map(c=>c.res));
+  let lo=null,hi=null;
+  coverage.forEach(c=>{const e=imDayKey(c.e),s=imDayKey(c.s);if(lo===null||e<lo)lo=e;if(hi===null||s>hi)hi=s;});
+  const hasRange=lo!==null&&lo<=hi;
+  const byRes=new Map();
+  existingRows.forEach((r,i)=>{
+    const res=String(r[0]==null?'':r[0]).trim();if(!res)return;
+    let g=byRes.get(res);if(!g){g={res,idx:[],inRange:false,first:null,last:null,rev:0,units:new Set()};byRes.set(res,g);}
+    g.idx.push(i);g.rev+=imToNumber(r[3]);g.units.add(String(r[2]==null?'':r[2]).trim());
+    const d=imParseFlexDate(r[1]);
+    if(d){const k=imDayKey(d);if(hasRange&&k>=lo&&k<=hi)g.inRange=true;if(!g.first||d<g.first)g.first=d;if(!g.last||d>g.last)g.last=d;}
+  });
+  const drop=new Set(),refreshed=[],absent=[];let inRangeRes=0;
+  byRes.forEach(g=>{
+    if(g.inRange)inRangeRes++;
+    if(protectedRes.has(g.res))return;
+    if(fileRes.has(g.res)){g.idx.forEach(i=>drop.add(i));refreshed.push(g);}
+    else if(g.inRange){g.idx.forEach(i=>drop.add(i));absent.push(g);}
+  });
+  const keptRaw=existingRows.filter((r,i)=>!drop.has(i)&&String(r[0]==null?'':r[0]).trim()!=='');
+  const keepWrite=keptRaw.map(imStayRowForWrite);
+  // what the duplicate check and the metrics read: same rows, without the text-marker apostrophe
+  const keepCheck=keepWrite.map(r=>{const c=r.slice();c[8]=String(c[8]).replace(/^'/,'');return c;});
+  // self-check: rewriting the untouched rows must not move a cent or lose a row
+  const sum=a=>a.reduce((t,r)=>t+imToNumber(r[3]),0);
+  if(keepWrite.length!==keptRaw.length||Math.abs(sum(keptRaw)-sum(keepWrite))>1e-6)throw new Error('Internal check failed: the untouched rows did not survive unchanged. Nothing was written.');
+  absent.sort((a,b)=>b.rev-a.rev);
+  return {keepWrite,keepCheck,refreshed,absent,inRangeRes,range:hasRange?[imKeyToDate(lo),imKeyToDate(hi)]:null,
+    removedRows:drop.size,refreshedRevenue:refreshed.reduce((t,g)=>t+g.rev,0),absentRevenue:absent.reduce((t,g)=>t+g.rev,0),
+    dropRes:new Set(refreshed.concat(absent).map(g=>g.res))};
+}
+/* STAYS_IMPORT (the raw copy behind the partial-payments warning) follows the same decisions. */
+function imPlanImportTabRange(existingImportRows,dropRes){
+  return existingImportRows.filter(r=>{const res=String(r[0]==null?'':r[0]).trim();return res&&!dropRes.has(res);})
+    .map(r=>{const ro=imParseFlexDate(r[7]);return [r[0],"'"+imCleanDateText(r[1]),r[2]==null?'':r[2],typeof r[3]==='number'?r[3]:imToNumber(r[3]),typeof r[4]==='number'?r[4]:imToNumber(r[4]),imKeepBool(r[5]),imKeepBool(r[6]),ro?imFmtDate(ro):(r[7]==null?'':r[7])];});
+}
+/* Discounts: a discount row is in an export when its own date is inside the export's range, so
+   first date to last date in the file IS provably covered. Saved rows inside it go; the rest stay. */
+function imPlanDiscountRange(existingRows,fileRows){
+  let lo=null,hi=null;
+  fileRows.forEach(r=>{const d=imParseFlexDate(r[1]);if(!d)return;const k=imDayKey(d);if(lo===null||k<lo)lo=k;if(hi===null||k>hi)hi=k;});
+  let removed=0,removedTotal=0;const keep=[];
+  existingRows.forEach(r=>{
+    if(String(r[0]==null?'':r[0]).trim()===''&&String(r[2]==null?'':r[2]).trim()==='')return;
+    const d=imParseFlexDate(r[1]),k=d?imDayKey(d):null;
+    if(k!==null&&lo!==null&&k>=lo&&k<=hi){removed++;removedTotal+=imToNumber(r[3]);return;}
+    keep.push([r[0],d?imFmtDate(d):(r[1]==null?'':r[1]),r[2]==null?'':r[2],typeof r[3]==='number'?r[3]:imToNumber(r[3])]);
+  });
+  return {keep,removed,removedTotal,range:lo===null?null:[imKeyToDate(lo),imKeyToDate(hi)]};
+}
+/*RANGE-END*/
+// Saved rows exactly as stored: real numbers rather than "$333.33", dates as their display text.
+async function imFetchRaw(tab){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  if(r.status===400)return [];
+  if(!r.ok)throw new Error(`Cannot load ${tab} (${r.status})`);
+  return (await r.json()).values||[];
+}
+// One write, no clear first: old rows are overwritten in place and leftovers blanked by padding,
+// so there is never a moment where the tab is empty and the new rows have not landed.
+function imPadded(header,rows,previousLength){
+  const out=[header].concat(rows),blank=new Array(header.length).fill('');
+  for(let i=out.length;i<previousLength;i++)out.push(blank.slice());
+  return out;
 }
 async function imAnalyzeStays(rows,status){
   let headerRow=-1,idx=null;
@@ -987,8 +1094,11 @@ async function imAnalyzeStays(rows,status){
   const mode=document.querySelector('input[name=im-mode]:checked').value;
   status.textContent='Loading current sheet data for comparison…';
   let existingRaw;
-  try{existingRaw=await fetchTab(STAYS_TAB);}
-  catch(e){status.textContent='Could not load '+STAYS_TAB+': '+e.message;return;}
+  let existingImportRaw=[];
+  try{
+    if(mode==='range'){existingRaw=await imFetchRaw(STAYS_TAB);existingImportRaw=await imFetchRaw(IMPORT_TAB);}
+    else existingRaw=await fetchTab(STAYS_TAB);
+  }catch(e){status.textContent='Could not load '+STAYS_TAB+': '+e.message;return;}
   const existingRows=existingRaw.length>1?existingRaw.slice(1):[];
   const existingKeys=new Set();
   if(mode==='add'){
@@ -998,6 +1108,7 @@ async function imAnalyzeStays(rows,status){
   }
   const newRows=[],importRows=[];
   let newResCount=0,skippedExisting=0,skippedBad=0,fileRevenue=0;
+  const coverage=[],protectedRes=new Set();   // 'range' mode only
   const seen=new Set(mode==='add'?existingKeys:[]);
   for(let i=headerRow+1;i<rows.length;i++){
     const row=rows[i];
@@ -1009,7 +1120,8 @@ async function imAnalyzeStays(rows,status){
     const bookedOnline=pBool(row[idx.bookedOnline]);
     const directConnect=pBool(row[idx.directConnect]);
     const reservedOn=imParseFlexDate(row[idx.reservedOn]);
-    if(!res||!dateText||!accom){skippedBad++;continue;}
+    if(!res||!dateText||!accom){skippedBad++;if(mode==='range'&&res)protectedRes.add(res);continue;}
+    if(mode==='range'){const span=imExpandDates(dateText);if(span.length===0||span.length>365)protectedRes.add(res);else coverage.push({res,s:span[0],e:span[span.length-1]});}
     if(amount===0)continue;
     const key=res+'|'+accom+'|'+dateText;
     if(seen.has(key)){skippedExisting++;continue;}
@@ -1023,19 +1135,25 @@ async function imAnalyzeStays(rows,status){
     importRows.push([res,"'"+dateText,accom,amount,paid,bookedOnline,directConnect,reservedOn?imFmtDate(reservedOn):'']);
     seen.add(key);newResCount++;fileRevenue+=amount;
   }
-  if(newRows.length===0){
+  if(newRows.length===0&&!(mode==='range'&&coverage.length)){
     status.textContent=mode==='add'
       ?'Nothing new to import — every reservation in this file is already in the sheet ('+skippedExisting+' skipped).'
       :'No usable rows found in this file.';
     return;
   }
-  const finalRows=mode==='replace'?newRows.slice():existingRows.map(r=>[
+  let plan=null;
+  if(mode==='range'){
+    try{plan=imPlanStayRange(existingRows,coverage,protectedRes);}catch(e){status.textContent=e.message;return;}
+  }
+  const finalRows=mode==='range'?plan.keepCheck.concat(newRows.map(r=>{const c=r.slice();c[8]=String(c[8]).replace(/^'/,'');return c;})):mode==='replace'?newRows.slice():existingRows.map(r=>[
     r[0],r[1],r[2],imToNumber(r[3]),pBool(r[4]),pBool(r[5]),r[6],r[7],imCleanDateText(r[8]),parseInt(r[9])||1
   ]).concat(newRows);
   const currentMetrics=imCalcMetrics(existingRows);
   const afterMetrics=imCalcMetrics(finalRows);
   const dupWarnings=imDuplicateCheck(finalRows);
   imPending={type:'stays',mode,newRows,importRows,finalRows,newResCount,skippedExisting,fileRevenue,afterMetrics,existingCount:existingRows.length};
+  if(mode==='range'){imPending.writeRows=plan.keepWrite.concat(newRows);imPending.importWriteRows=imPlanImportTabRange(existingImportRaw.length>1?existingImportRaw.slice(1):[],plan.dropRes).concat(importRows);
+    imPending.prevLen=existingRaw.length;imPending.prevImportLen=existingImportRaw.length;imPending.rangeText=plan.range?imFmtDateLong(plan.range[0])+' – '+imFmtDateLong(plan.range[1]):'';imPending.absentCount=plan.absent.length;}
   const lines=[
     ['Reservations in file (usable)',newResCount.toLocaleString()],
     ['Night rows to write',newRows.length.toLocaleString()],
@@ -1046,10 +1164,31 @@ async function imAnalyzeStays(rows,status){
     ['Period covered',afterMetrics.period]
   ];
   if(mode==='add')lines.splice(3,0,['Skipped (already in sheet)',skippedExisting.toLocaleString()]);
+  if(mode==='range'){
+    lines.splice(3,0,
+      ['Dates this file covers',plan.range?imFmtDateLong(plan.range[0])+' – '+imFmtDateLong(plan.range[1]):'a single stay — no date range'],
+      ['Saved reservations refreshed from this file',plan.refreshed.length.toLocaleString()+' · was '+fmt$(plan.refreshedRevenue)],
+      ['Saved reservations in those dates but NOT in this file — removed',plan.absent.length.toLocaleString()+' · '+fmt$(plan.absentRevenue)],
+      ['Night rows left exactly as they are (other dates, other years)',plan.keepWrite.length.toLocaleString()+' · '+fmt$(plan.keepWrite.reduce((t,r)=>t+imToNumber(r[3]),0))]);
+    if(protectedRes.size)lines.push(['Reservations with an unreadable row — saved copy left alone',protectedRes.size.toLocaleString()]);
+  }
   if(skippedBad>0)lines.push(['Rows skipped (blank/invalid)',skippedBad.toLocaleString()]);
-  imShowPreview(lines,mode==='replace'
+  let note=mode==='replace'
     ?'Confirming will <strong>erase all '+existingRows.length.toLocaleString()+' existing stay rows</strong> and replace them with this file’s data.'
-    :'Confirming will add the new rows to the existing data.',dupWarnings);
+    :'Confirming will add the new rows to the existing data.';
+  let gate=false;
+  if(mode==='range'){
+    note='Confirming replaces <strong>only</strong> the reservations above. Every other saved night — '+plan.keepWrite.length.toLocaleString()+' rows — is written back exactly as it is.';
+    if(plan.absent.length){
+      const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+      note+='<br><br><strong>Not in this file, so treated as cancelled and removed:</strong><br>'+plan.absent.slice(0,12).map(a=>'#'+esc(a.res)+' · '+esc([...a.units].join(', '))+' · '+(a.first?imFmtDate(a.first):'?')+(a.last&&a.first&&a.last>a.first?' – '+imFmtDate(a.last):'')+' · '+fmt$(a.rev)).join('<br>')+(plan.absent.length>12?'<br>… and '+(plan.absent.length-12)+' more':'');
+      // many missing reservations usually means a filtered or partial export, not many cancellations
+      gate=plan.absent.length>Math.max(5,Math.round(plan.inRangeRes*0.15));
+      if(gate)note+='<br><br><span style="color:var(--terra);font-weight:600;">That is '+plan.absent.length+' of the '+plan.inRangeRes+' saved reservations in these dates — far more than cancellations usually explain. Check that this export is not filtered to one unit type or a shorter range.</span><br><label style="display:inline-flex;gap:8px;align-items:center;margin-top:8px;cursor:pointer;"><input type="checkbox" onchange="document.getElementById(\'im-confirm-btn\').disabled=!this.checked"> I have checked — remove them</label>';
+    }
+  }
+  imShowPreview(lines,note,dupWarnings);
+  if(gate)document.getElementById('im-confirm-btn').disabled=true;
 }
 function imAnalyzePace(rows,status){
   const output=[];
@@ -1081,7 +1220,7 @@ function imAnalyzePace(rows,status){
   Object.keys(yearStats).sort().forEach(y=>lines.push([y+' — nights / revenue',yearStats[y].rows.toLocaleString()+' / '+fmt$(yearStats[y].rate)]));
   imShowPreview(lines,'Confirming will <strong>replace all existing pace data</strong> with this file’s rows — same as the Apps Script routine.',[]);
 }
-function imAnalyzeDiscounts(rows,status){
+async function imAnalyzeDiscounts(rows,status){
   let headerRow=-1,idx=null;
   for(let r=0;r<Math.min(rows.length,10);r++){
     const H=rows[r].map(h=>String(h).trim());
@@ -1105,12 +1244,28 @@ function imAnalyzeDiscounts(rows,status){
     total+=amount;packages.add(cleanDetails);
   }
   if(!output.length){status.textContent='No usable discount rows found in this file.';return;}
-  imPending={type:'discounts',rows:output,total};
+  const dmode=document.querySelector('input[name=im-dmode]:checked').value;
+  if(dmode==='range'){
+    status.textContent='Loading current sheet data for comparison…';
+    let raw;try{raw=await imFetchRaw(DISCOUNTS_TAB);}catch(e){status.textContent='Could not load '+DISCOUNTS_TAB+': '+e.message;return;}
+    const plan=imPlanDiscountRange(raw.length>1?raw.slice(1):[],output);
+    imPending={type:'discounts',mode:'range',rows:output,total,writeRows:plan.keep.concat(output),prevLen:raw.length,rangeText:plan.range?imFmtDateLong(plan.range[0])+' – '+imFmtDateLong(plan.range[1]):''};
+    imShowPreview([
+      ['Discount rows in file',output.length.toLocaleString()],
+      ['Distinct packages / discounts',packages.size.toLocaleString()],
+      ['Total discounted in file',fmt$(total)],
+      ['Dates this file covers',imPending.rangeText],
+      ['Saved rows inside those dates — replaced',plan.removed.toLocaleString()+' · '+fmt$(plan.removedTotal)],
+      ['Saved rows left exactly as they are (other dates, other years)',plan.keep.length.toLocaleString()]
+    ],'Confirming replaces <strong>only</strong> the discounts dated inside this file’s range. Everything else is written back exactly as it is.',[]);
+    return;
+  }
+  imPending={type:'discounts',mode:'replace',rows:output,total};
   imShowPreview([
     ['Discount rows to write',output.length.toLocaleString()],
     ['Distinct packages / discounts',packages.size.toLocaleString()],
     ['Total discounted',fmt$(total)]
-  ],'Confirming will <strong>replace all existing discount data</strong> with this file’s rows — same as the Apps Script routine.',[]);
+  ],'Confirming will <strong>replace all existing discount data</strong>, every year, with this file’s rows.',[]);
 }
 function imRetailBucket(item){
   const norm=String(item||'').toLowerCase().replace(/_/g,' ');
@@ -1210,7 +1365,12 @@ async function confirmImportWrite(){
   try{
     let html='';
     if(p.type==='stays'){
-      if(p.mode==='replace'){
+      if(p.mode==='range'){
+        lastStep='writing '+p.writeRows.length+' night rows to '+STAYS_TAB;
+        await imPutValues(STAYS_TAB,imPadded(IM_CLEAN_HEADER,p.writeRows,p.prevLen));
+        lastStep='rebuilding '+IMPORT_TAB;
+        await imPutValues(IMPORT_TAB,imPadded(IM_IMPORT_HEADER,p.importWriteRows,p.prevImportLen));
+      }else if(p.mode==='replace'){
         lastStep='clearing '+STAYS_TAB;
         await imClearTab(STAYS_TAB);
         lastStep='writing '+p.newRows.length+' night rows';
@@ -1227,7 +1387,7 @@ async function confirmImportWrite(){
       lastStep='logging import';
       await imEnsureLogHeader();
       const m=p.afterMetrics;
-      await imAppendValues(LOG_TAB,[[imNowStamp(),'STAYS (dashboard import)',p.newResCount,m.revenue,Math.round(m.adr),Math.round(m.revpar*100)/100,Math.round(m.occupancy*10)/10,m.reservations,m.period,p.mode]]);
+      await imAppendValues(LOG_TAB,[[imNowStamp(),'STAYS (dashboard import)',p.newResCount,m.revenue,Math.round(m.adr),Math.round(m.revpar*100)/100,Math.round(m.occupancy*10)/10,m.reservations,m.period,p.mode==='range'?'replace dates '+p.rangeText+' ('+p.absentCount+' removed as cancelled)':p.mode]]);
       lastStep='saving snapshots';
       let snapRaw=[];
       try{snapRaw=await fetchTab(SNAPSHOTS_TAB);}catch(e){}
@@ -1256,12 +1416,17 @@ async function confirmImportWrite(){
       await imAppendValues(LOG_TAB,[[imNowStamp(),'PACE (dashboard import)',p.rows.length,'','','','','','','replace']]);
       html='<div class="im-ok">Pace report processed ✓\n'+p.rows.length+' rows loaded.</div>';
     }else if(p.type==='discounts'){
-      lastStep='replacing '+DISCOUNTS_TAB;
-      await imClearTab(DISCOUNTS_TAB);
-      await imPutValues(DISCOUNTS_TAB,[IM_DISC_HEADER].concat(p.rows));
+      if(p.mode==='range'){
+        lastStep='writing '+p.writeRows.length+' rows to '+DISCOUNTS_TAB;
+        await imPutValues(DISCOUNTS_TAB,imPadded(IM_DISC_HEADER,p.writeRows,p.prevLen));
+      }else{
+        lastStep='replacing '+DISCOUNTS_TAB;
+        await imClearTab(DISCOUNTS_TAB);
+        await imPutValues(DISCOUNTS_TAB,[IM_DISC_HEADER].concat(p.rows));
+      }
       lastStep='logging import';
       await imEnsureLogHeader();
-      await imAppendValues(LOG_TAB,[[imNowStamp(),'DISCOUNTS (dashboard import)',p.rows.length,'','','','','','','replace']]);
+      await imAppendValues(LOG_TAB,[[imNowStamp(),'DISCOUNTS (dashboard import)',p.rows.length,'','','','','','',p.mode==='range'?'replace dates '+p.rangeText:'replace']]);
       html='<div class="im-ok">Discounts report processed ✓\n'+p.rows.length+' rows loaded.\nTotal discounted: '+fmt$(p.total)+'</div>';
     }else if(p.type==='retail'){
       lastStep='appending to '+IM_RETAIL_CLEAN;
