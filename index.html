@@ -47,7 +47,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .last-updated{font-size:12px;color:var(--text3);}
 .hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
 .hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
-.filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;gap:6px;height:52px;flex-wrap:wrap;overflow:hidden;}
+/* One row per year. The bar used to be a single 52px line with overflow hidden, which clipped
+   the second line of buttons as soon as a second year of data was imported. */
+.filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 40px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:52px;justify-content:center;}
+.filter-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.filter-row .filter-label{display:inline-block;width:52px;margin-right:0;}
+.filter-row .filter-year{margin-left:0;min-width:46px;text-align:center;}
+.filter-row .filter-btn{padding:4px 12px;min-width:48px;}
 .filter-label{font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-right:8px;}
 .filter-year{font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-left:10px;margin-right:4px;padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;}
 .filter-btn{font-size:12px;font-weight:600;font-family:var(--sans);color:var(--text3);background:transparent;border:1px solid var(--border);border-radius:6px;padding:5px 14px;cursor:pointer;}
@@ -525,7 +531,15 @@ function buildFilters(){
   const today=new Date(),thisMonth=mYr(today);
   activeFilter=sorted.includes(thisMonth)?thisMonth:(sorted.filter(m=>new Date(m)<=today).pop()||sorted[sorted.length-1]||'');
   const byYear={};sorted.forEach(m=>{const yr=new Date(m).getFullYear();if(!byYear[yr])byYear[yr]=[];byYear[yr].push(m);});
-  Object.keys(byYear).sort().forEach(yr=>{const yl=document.createElement('span');yl.className='filter-year';yl.textContent=yr;bar.appendChild(yl);byYear[yr].forEach(m=>bar.appendChild(mkBtn(m,m,m===activeFilter)));});
+  // a row per year; the year is on the row, so each button only needs the month
+  bar.innerHTML='';
+  Object.keys(byYear).sort().forEach((yr,i)=>{
+    const row=document.createElement('div');row.className='filter-row';
+    const lab=document.createElement('span');lab.className='filter-label';lab.textContent=i===0?'Period':'';row.appendChild(lab);
+    const yl=document.createElement('span');yl.className='filter-year';yl.textContent=yr;row.appendChild(yl);
+    byYear[yr].forEach(m=>{const b=mkBtn(m.split(' ')[0],m,m===activeFilter);b.title=m;row.appendChild(b);});
+    bar.appendChild(row);
+  });
 }
 function getYoyMonth(){if(!activeFilter)return null;const d=new Date(activeFilter),pk=d.toLocaleString('en-US',{month:'short'})+' '+(d.getFullYear()-1);return staysData.some(r=>r.nightDate&&mYr(r.nightDate)===pk)?pk:null;}
 function getYoyRows(pk){if(!pk)return[];return staysData.filter(r=>r.nightDate&&mYr(r.nightDate)===pk);}
