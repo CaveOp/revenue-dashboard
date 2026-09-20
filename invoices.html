@@ -297,7 +297,7 @@ const INV_HEADER   = ['InvoiceNumber','InvoiceDate','OrderDate','Vendor','Mercha
 const ITEMS_HEADER = ['InvoiceNumber','InvoiceDate','LineNo','ProductCode','MfgCode','Description','Qty','UOM','UnitPrice','Extension','ItemKey'];
 const VENDOR = 'Mendes Supply';
 const PRICE_THRESHOLD = 0.02, QTY_MULT = 2;
-const PDFJS_VER = '3.11.174';
+const PDFJS_VER = '4.10.38';
 
 let tokenClient, accessToken;
 let invoices = [], items = [];
@@ -448,11 +448,25 @@ function isoDate(s){
 const DATE_RE=/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/;
 const FOOTER_WORDS=/MERCHANDISE|FREIGHT|DELIVERY|\bTAX\b|\bTOTAL\b|SUBTOTAL|CONTINUED|\bPAGE\b|REMIT|\bTERMS\b|AMOUNT\s+DUE|PLEASE\s+PAY|THANK\s+YOU|BALANCE/i;
 
+/* Some invoices are printed through a font that reports each letter as its ASCII code
+   shifted into the high byte, so the text arrives as wide CJK-looking glyphs — and the
+   digit 0 arrives as an ideographic space, which a plain split would drop, quietly
+   turning 509.20 into 59.2. Undo it before anything else looks at the text. */
+function deWideAscii(s){
+  let wide=0,other=0;
+  for(const ch of s){const c=ch.codePointAt(0);if(c<0x80)continue;
+    if((c&0xFF)===0&&(c>>8)>=0x20&&(c>>8)<0x7F)wide++;else other++;}
+  if(!wide||other)return s;
+  let out='';
+  for(const ch of s){const c=ch.codePointAt(0);out+=(c>=0x80&&(c&0xFF)===0)?String.fromCharCode(c>>8):ch;}
+  return out;
+}
+
 /* Turns raw positioned text items ({str,x,y,w,page}) into lines of words. */
 function itemsToLines(raw){
   const words=[];
   raw.forEach(it=>{
-    const str=String(it.str||'');if(!str.trim())return;
+    const str=deWideAscii(String(it.str||''));if(!str.trim())return;
     const n=str.length||1,re=/\S+/g;let m;
     while((m=re.exec(str))){
       words.push({t:m[0],x0:it.x+it.w*(m.index/n),x1:it.x+it.w*((m.index+m[0].length)/n),y:it.y,page:it.page});
@@ -523,8 +537,12 @@ function readItemRow(line){
   const head=w.slice(leadEnd,tailStart);
   if(!head.length)return null;
   const product=head[0];
-  if(!/^[A-Za-z0-9][A-Za-z0-9\-\/\.#]{2,}$/.test(product.t))return null;
-  return {line,lineNo,product,descWords:head.slice(1),qty:qty.v,price:price.v,ext:ext.v,uom:uomIdx>=0?w[uomIdx].t.toUpperCase():null};
+  if(!/^[A-Za-z0-9][A-Za-z0-9\-\/\.#*&+_]+$/.test(product.t))return null;
+  let desc=head.slice(1),uom=uomIdx>=0?w[uomIdx].t:null;
+  // PRODUCT then UOM, with the description printed underneath: a lone short word
+  // beside the code is the unit, not the start of the description.
+  if(!uom&&head.length===2&&/^[A-Za-z]{1,4}$/.test(head[1].t)){uom=head[1].t;desc=[];}
+  return {line,lineNo,product,descWords:desc,qty:qty.v,price:price.v,ext:ext.v,uom:uom?uom.toUpperCase():null};
 }
 
 /* Finds a printed label, then the value beside it or boxed underneath it. */
@@ -564,9 +582,28 @@ function parseInvoiceLines(lines,fileName){
   const fail=reason=>({ok:false,fileName,reason,debug:lines.map(l=>l.text)});
   if(!lines.length)return fail('No text could be read from this file. It may be a scanned picture rather than a printed invoice.');
 
+  // A multi-page invoice repeats its address block and column headings on every page.
+  // Mark those so a description running onto the next page can step over them instead
+  // of stopping, which would drop that item's MFG# and split its price history.
+  const skip=new Array(lines.length).fill(false);
+  const noMoney=l=>!l.words.some(wd=>{const n=numTok(wd.t);return n&&n.dec===2;});
+  lines.forEach((l,i)=>{if(/CONTINUED/i.test(l.text.replace(/\s+/g,'')))skip[i]=true;});
+  for(let i=0;i<lines.length;i++){
+    if(i&&lines[i].page===lines[i-1].page)continue;          // page starts only
+    for(let j=i;j<Math.min(lines.length,i+14)&&lines[j].page===lines[i].page;j++){
+      if(!/\bEXTENSION\b/i.test(lines[j].text))continue;      // the column-heading row
+      for(let k=i;k<=j;k++)skip[k]=true;
+      // Headings that wrap onto a second row (ORD / SHIP / B/O / DESCRIPTION / PRICE).
+      // Never a row carrying a figure — that would be the first item.
+      const nx=lines[j+1];
+      if(nx&&nx.page===lines[j].page&&/ORD|SHIP|B\/O|DESCRIPTION|PRICE/i.test(nx.text)&&noMoney(nx))skip[j+1]=true;
+      break;
+    }
+  }
+
   // ---- line items ----
   const rows=[];let lastItemLine=-1;
-  lines.forEach((l,i)=>{const r=readItemRow(l);if(r){r.idx=i;rows.push(r);lastItemLine=i;}});
+  lines.forEach((l,i)=>{if(skip[i])return;const r=readItemRow(l);if(r){r.idx=i;rows.push(r);lastItemLine=i;}});
   if(!rows.length)return fail('No line items were found — no row on this file showed a quantity times a price equal to its line total.');
 
   // An MFG# COLUMN only counts if the word sits on the column-heading line itself.
@@ -576,12 +613,14 @@ function parseInvoiceLines(lines,fileName){
     let words=r.descWords.slice(),mfg=null;
     // continuation lines under the row belong to its description
     const stop=k+1<rows.length?rows[k+1].idx:lines.length;
-    let prevY=r.line.y;
+    let prevY=r.line.y,prevPage=r.line.page;
     const extra=[];
     for(let j=r.idx+1;j<stop;j++){
       const l=lines[j];
-      if(l.page!==r.line.page||prevY-l.y>18||FOOTER_WORDS.test(l.text))break;
-      extra.push(l.text);prevY=l.y;
+      if(skip[j])continue;                                  // repeated page header
+      if(FOOTER_WORDS.test(l.text))break;
+      if(l.page===prevPage&&prevY-l.y>18)break;             // a clear gap ends the item
+      extra.push(l.text);prevY=l.y;prevPage=l.page;
     }
     let desc=words.map(x=>x.t).join(' ');
     let all=(desc+' '+extra.join(' ')).replace(/\s+/g,' ').trim();
@@ -592,8 +631,11 @@ function parseInvoiceLines(lines,fileName){
       if(hit>=0){mfg=words[hit].t;words.splice(hit,1);all=(words.map(x=>x.t).join(' ')+' '+extra.join(' ')).replace(/\s+/g,' ').trim();}
     }
     const productCode=r.product.t.toUpperCase();
+    // An item is tracked by the vendor's own product code, not the MFG#: the same
+    // product code is printed with different MFG#s on different invoices, which would
+    // split one product's price history in two and hide a rise.
     out.push({line_no:r.lineNo!=null?r.lineNo:k+1,product_code:productCode,mfg_code:mfg?mfg.toUpperCase():null,description:all,
-      qty:r.qty,uom:r.uom,unit_price:r.price,extension:r.ext,item_key:(mfg||productCode).toUpperCase()});
+      qty:r.qty,uom:r.uom,unit_price:r.price,extension:r.ext,item_key:productCode});
   });
   const sumExt=Math.round(out.reduce((a,b)=>a+b.extension,0)*100)/100;
 
@@ -608,9 +650,13 @@ function parseInvoiceLines(lines,fileName){
   // ---- footer totals (looked for after the last line item) ----
   const foot={from:Math.max(0,lastItemLine+1),last:true};
   const get=re=>{const v=findLabelled(lines,re,moneyOk,foot);return v==null?null:numTok(v).v;};
-  const merchandise=get(/MERCHANDISE|SUB\s*-?\s*TOTAL/i);
-  const freight=get(/FREIGHT/i)||0;
-  const delivery=get(/DELIVERY/i)||0;
+  // Merchandise only, never "Sub Total" — on these invoices Sub Total already includes
+  // the delivery charge, so checking the lines against it would always be off by it.
+  const merchandise=get(/\bMERCHANDISE\b/i);
+  const freight=get(/\bFREIGHT\b/i)||0;
+  // "Delivery Charge", not the "Signature Proof of Delivery" line, which prints no
+  // figure of its own and would otherwise pick up whatever sits to its right.
+  const delivery=get(/DELIVERY\s+CHARGE/i)||0;
   const tax=get(/\b(SALES\s+)?TAX\b(?!\s*(ID|EXEMPT))/i)||0;
   let total=get(/INVOICE\s+TOTAL|TOTAL\s+DUE|AMOUNT\s+DUE|PLEASE\s+PAY|BALANCE\s+DUE|(?<!SUB\s?-?)\bTOTAL\b/i);
 
@@ -632,22 +678,22 @@ function parseInvoiceLines(lines,fileName){
 /*READER-END*/
 
 /* pdf.js is loaded only when an import starts — viewing the page never needs it. */
-function loadPdfJs(){
-  if(window.pdfjsLib)return Promise.resolve();
-  return new Promise((res,rej)=>{
-    const s=document.createElement('script');
-    s.src=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/build/pdf.min.js`;
-    s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/build/pdf.worker.min.js`;res();};
-    s.onerror=()=>rej(new Error('Could not load the PDF reader. Check the internet connection and try again.'));
-    document.head.appendChild(s);
-  });
+let pdfjsLib=null;
+async function loadPdfJs(){
+  if(pdfjsLib)return;
+  try{
+    pdfjsLib=await import(`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/legacy/build/pdf.min.mjs`);
+    pdfjsLib.GlobalWorkerOptions.workerSrc=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/legacy/build/pdf.worker.min.mjs`;
+  }catch(e){throw new Error('Could not load the PDF reader. Check the internet connection and try again.');}
 }
 async function pdfToLines(buf){
-  const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
+  const pdf=await pdfjsLib.getDocument({data:buf,useSystemFonts:true}).promise;
   const raw=[];
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
-    const tc=await page.getTextContent();
+    /* disableNormalization: these invoices are printed through a font whose "0" the
+       library otherwise rewrites as a space, silently turning 509.20 into 59.2. */
+    const tc=await page.getTextContent({disableNormalization:true});
     tc.items.forEach(it=>{if(it.str)raw.push({str:it.str,x:it.transform[4],y:it.transform[5],w:it.width||0,page:p});});
   }
   return itemsToLines(raw);
@@ -805,6 +851,21 @@ async function loadAll(){
       if(seenLine.has(k))return false;seenLine.add(k);return true;
     });
 
+    /* Two lines are the same product if they share EITHER identifier. Mendes reissues
+       its own product code for an unchanged product (the same glass cleaner, bleach and
+       kitchen towel each appear under two codes with one MFG#), and prints two different
+       MFG#s against one product code. Grouping on either alone splits a product's history
+       and hides a price rise, so the codes are chained together instead. Worked out on
+       load, so the grouping improves as more invoices arrive with nothing to re-import. */
+    const parent={};
+    const find=x=>{while(parent[x]!==x)x=parent[x]=parent[parent[x]];return x;};
+    const add=x=>{if(!(x in parent))parent[x]=x;return x;};
+    items.forEach(it=>{
+      const p=add('P:'+(it.productCode||it.invoice+'#'+it.lineNo));
+      if(it.mfgCode){const m=add('M:'+it.mfgCode),a=find(p),b=find(m);if(a!==b)parent[b]=a;}
+    });
+    items.forEach(it=>{it.key=find('P:'+(it.productCode||it.invoice+'#'+it.lineNo));});
+
     itemsByInvoice={};historyByKey={};
     items.forEach(it=>{
       (itemsByInvoice[invKey(it.invoice)]=itemsByInvoice[invKey(it.invoice)]||[]).push(it);
@@ -902,12 +963,14 @@ function renderSpendChart(dated){
 }
 
 function keyAttr(k){return encodeURIComponent(k).replace(/'/g,'%27');}
+// Grouping keys carry a P:/M: tag so a product code can never collide with an MFG#.
+function codeOf(k){return String(k||'').replace(/^[PM]:/,'');}
 function renderPriceAlerts(list){
   const el=document.getElementById('price-alerts');
   if(!list.length){el.innerHTML='<div class="empty-state">No price changes over 2% on the latest invoices.</div>';return;}
   el.innerHTML=list.map(a=>{const up=a.pct>=0;
-    return '<div class="alert-row" onclick="openItemHistory(\''+keyAttr(a.key)+'\')"><div style="min-width:0;"><div class="alert-name">'+esc(a.description||a.key)+'</div>'+
-      '<div class="alert-sub">'+esc(a.mfgCode?'MFG# '+a.mfgCode:a.key)+' · '+esc(fmtDay(a.date))+'</div></div>'+
+    return '<div class="alert-row" onclick="openItemHistory(\''+keyAttr(a.key)+'\')"><div style="min-width:0;"><div class="alert-name">'+esc(a.description||codeOf(a.key))+'</div>'+
+      '<div class="alert-sub">'+esc(a.mfgCode?'MFG# '+a.mfgCode:codeOf(a.key))+' · '+esc(fmtDay(a.date))+'</div></div>'+
       '<div class="alert-right"><span class="alert-from">'+money(a.from)+'</span> → <b>'+money(a.to)+'</b><span class="pill '+(up?'up':'down')+'">'+(up?'+':'')+a.pct.toFixed(1)+'%</span></div></div>';
   }).join('');
 }
@@ -915,7 +978,7 @@ function renderQtyAlerts(list){
   const el=document.getElementById('qty-alerts');
   if(!list.length){el.innerHTML='<div class="empty-state">No unusual order quantities on the latest invoices.</div>';return;}
   el.innerHTML=list.map(a=>
-    '<div class="alert-row" onclick="openItemHistory(\''+keyAttr(a.key)+'\')"><div style="min-width:0;"><div class="alert-name">'+esc(a.description||a.key)+'</div>'+
+    '<div class="alert-row" onclick="openItemHistory(\''+keyAttr(a.key)+'\')"><div style="min-width:0;"><div class="alert-name">'+esc(a.description||codeOf(a.key))+'</div>'+
     '<div class="alert-sub">Typically '+a.typical+' · ordered '+a.ordered+' · '+esc(fmtDay(a.date))+'</div></div>'+
     '<span class="pill qty">▲ '+a.mult+'× typical</span></div>').join('');
 }
@@ -929,7 +992,7 @@ function renderTopItems(){
   const top=[...topData].sort((a,b)=>(b[topSort]||0)-(a[topSort]||0)).slice(0,10);
   if(!top.length){el.innerHTML='<div class="empty-state">No items in the last 12 months yet.</div>';return;}
   el.innerHTML='<table class="data-table"><thead><tr><th>Item</th><th class="right">Spend 12 mo</th><th class="right">Quantity</th><th class="right">Orders</th></tr></thead><tbody>'+
-    top.map(x=>'<tr onclick="openItemHistory(\''+keyAttr(x.key)+'\')"><td><div style="font-weight:600;">'+esc(x.description||x.key)+'</div><div class="cell-sub">'+esc(x.mfgCode?'MFG# '+x.mfgCode:x.key)+'</div></td>'+
+    top.map(x=>'<tr onclick="openItemHistory(\''+keyAttr(x.key)+'\')"><td><div style="font-weight:600;">'+esc(x.description||codeOf(x.key))+'</div><div class="cell-sub">'+esc(x.mfgCode?'MFG# '+x.mfgCode:codeOf(x.key))+'</div></td>'+
       '<td class="right" style="font-weight:600;">'+money0(x.spend)+'</td><td class="right">'+(Math.round(x.qty*10)/10)+'</td><td class="right">'+x.orders+'</td></tr>').join('')+
     '</tbody></table>';
 }
