@@ -4,7 +4,8 @@
      data/area-codes.json   area code     ->  [label, state, lat, lng]
 
    Run from a folder holding these downloads:
-     cities500.txt, admin1CodesASCII.txt   https://download.geonames.org/export/dump/  (CC BY 4.0)
+     US.txt (from US.zip), cities500.txt, admin1CodesASCII.txt
+                                           https://download.geonames.org/export/dump/  (CC BY 4.0)
      ac.csv, ac_ca.csv                     area code -> cities it serves (public NANPA / CNA facts),
                                            used ONLY to pick each code's principal city. Coordinates
                                            always come from GeoNames, never from that list.
@@ -34,17 +35,37 @@ fs.readFileSync(path.join(src,'admin1CodesASCII.txt'),'utf8').split('\n').forEac
 stateCode['washington dc']='DC';stateCode['district of columbia']='DC';
 
 // ---- cities ----
-const cities={},pop={};   // cities[ST][normName]=[lat,lng]
-fs.readFileSync(path.join(src,'cities500.txt'),'utf8').split('\n').forEach(l=>{
-  const f=l.split('\t');if(f.length<15)return;
-  const cc=f[8];if(cc!=='US'&&cc!=='CA')return;
-  const st=cc==='US'?f[10]:CA_PROV[f[10]];if(!st)return;
-  const p=parseInt(f[14])||0,ll=[Math.round(f[4]*1000)/1000,Math.round(f[5]*1000)/1000];
-  [f[1],f[2]].forEach(n=>{const k=norm(n);if(!k)return;const id=st+'|'+k;
-    if(pop[id]===undefined||p>pop[id]){pop[id]=p;(cities[st]=cities[st]||{})[k]=ll;}});
+/* Guests come from small places. cities500 alone missed Igo, Castella, Lakehead and Hoopa, so:
+     - every named populated place in the western states (where most guests drive from),
+     - elsewhere in the US, places of 500+ people and every county seat or capital,
+     - Canada from cities500,
+     - plus alternate spellings ("New York" for New York City, "Suisun City" for Suisun).
+   A real name always beats an alternate spelling; between two real names the larger place wins. */
+const WEST=new Set(['CA','OR','WA','NV','AZ','ID','UT','MT','CO','NM','WY','AK','HI']);
+const DEAD=new Set(['PPLH','PPLQ','PPLW','PPLCH']);          // historical, abandoned, destroyed
+const cities={},pop={},alts=[];   // cities[ST][normName]=[lat,lng]
+const put=(st,k,ll,p)=>{if(!k)return;const id=st+'|'+k;if(pop[id]===undefined||p>pop[id]){pop[id]=p;(cities[st]=cities[st]||{})[k]=ll;}};
+const r2=n=>Math.round(n*100)/100;                            // two decimals is about half a mile
+fs.readFileSync(path.join(src,'US.txt'),'utf8').split('\n').forEach(l=>{
+  const f=l.split('\t');if(f.length<15||f[6]!=='P'||DEAD.has(f[7]))return;
+  const st=f[10];if(!/^[A-Z]{2}$/.test(st))return;
+  const p=parseInt(f[14])||0,seat=/^PPL(A|A2|C)$/.test(f[7]);
+  if(!(WEST.has(st)||p>=500||seat))return;
+  // a neighbourhood (PPLX) never outranks a town of the same name
+  const rank=p+(f[7]==='PPLX'?-0.5:0),ll=[r2(+f[4]),r2(+f[5])];
+  put(st,norm(f[1]),ll,rank);put(st,norm(f[2]),ll,rank);
+  if(p>=1000||(WEST.has(st)&&p>=200))f[3].split(',').forEach(n=>{if(/^[A-Za-z][A-Za-z .'-]{2,39}$/.test(n)&&!/^[A-Z]{2,4}$/.test(n))alts.push([st,norm(n),ll,p]);});
 });
+fs.readFileSync(path.join(src,'cities500.txt'),'utf8').split('\n').forEach(l=>{
+  const f=l.split('\t');if(f.length<15||f[8]!=='CA')return;
+  const st=CA_PROV[f[10]];if(!st)return;
+  const p=parseInt(f[14])||0,ll=[r2(+f[4]),r2(+f[5])];
+  put(st,norm(f[1]),ll,p);put(st,norm(f[2]),ll,p);
+});
+const real=new Set(Object.keys(pop));
+alts.sort((x,y)=>y[3]-x[3]).forEach(([st,k,ll,p])=>{const id=st+'|'+k;if(k&&!real.has(id)&&pop[id]===undefined){pop[id]=p;(cities[st]=cities[st]||{})[k]=ll;}});
 let nCities=0;Object.values(cities).forEach(o=>nCities+=Object.keys(o).length);
-fs.writeFileSync(path.join(outDir,'us-cities.json'),JSON.stringify({source:'GeoNames cities500, CC BY 4.0 (geonames.org)',states:stateCode,cities}));
+fs.writeFileSync(path.join(outDir,'us-cities.json'),JSON.stringify({source:'GeoNames (US populated places, cities500 for Canada), CC BY 4.0 (geonames.org)',states:stateCode,cities}));
 
 // ---- area codes ----
 function csv(line){const out=[];let cur='',q=false;for(const ch of line){if(ch==='"'){q=!q;continue;}if(ch===','&&!q){out.push(cur);cur='';continue;}cur+=ch;}out.push(cur);return out;}

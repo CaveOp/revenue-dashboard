@@ -105,6 +105,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 #map{height:540px;width:100%;background:#d3e2ea;}
 .map-lbl{white-space:nowrap;font-family:var(--sans);pointer-events:none;}
 .map-lbl.st{font-size:12px;font-weight:700;letter-spacing:0.14em;color:#c3b8aa;transform:translate(-50%,-50%);}
+.map-lbl.cl{font-size:11px;font-weight:600;color:#3a4d5c;transform:translate(0,-50%);text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 4px #fff;}
+.map-lbl.cl b{font-weight:700;color:#1a2530;}
 .map-lbl.ct{font-size:10px;font-weight:600;color:#6a7e8d;transform:translate(5px,-7px);text-shadow:0 0 3px #faf8f4,0 0 3px #faf8f4;}
 .map-legend{display:flex;gap:18px;flex-wrap:wrap;align-items:center;}
 .lg{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:var(--text2);}
@@ -287,6 +289,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
       </div>
     </div>
 
+    <div class="panel" id="unplaced-panel" style="display:none;">
+      <div class="panel-header"><span class="panel-title">Places not on the map</span><span class="panel-sub"><span id="unplaced-sub"></span> &nbsp;<button class="link-btn" onclick="copyUnplaced(this)">Copy list</button></span></div>
+      <div class="panel-body" id="unplaced" style="font-size:12px;color:var(--text2);line-height:1.9;max-height:150px;overflow-y:auto;"></div>
+      <div class="panel-foot">These are counted everywhere else on this page; they only lack a spot on the map. The list holds a city and state only. It is usually a town spelled two ways, the wrong state picked, or a place outside the US and Canada.</div>
+    </div>
+
     <div class="panel">
       <div class="panel-header"><span class="panel-title">Cities and regions</span><span class="panel-sub" id="city-sub"></span></div>
       <div class="table-scroll" id="cities"></div>
@@ -455,6 +463,48 @@ async function loadGeo(){
   if(!c.ok||!a.ok||!b.ok)throw new Error('Could not load the bundled city, area-code and map files.');
   GEO=await c.json();AREA=(await a.json()).codes;BASE=await b.json();
 }
+/* Finding a typed city in the list. Exact first. Then a near miss — "Santa Barbra" — but only
+   when exactly ONE place in that state is that close; two candidates means no guess at all.
+   One slip is allowed from 6 letters, two from 11. Answers are remembered per spelling. */
+const _cityMemo={};
+function editDistance(a,b,max){
+  if(Math.abs(a.length-b.length)>max)return max+1;
+  let prev=[],cur=[],pp=[];
+  for(let j=0;j<=b.length;j++)prev[j]=j;
+  for(let i=1;i<=a.length;i++){
+    cur=[i];let rowMin=i;
+    for(let j=1;j<=b.length;j++){
+      const c=a[i-1]===b[j-1]?0:1;
+      let v=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+c);
+      if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])v=Math.min(v,pp[j-2]+1);   // two letters swapped
+      cur[j]=v;if(v<rowMin)rowMin=v;
+    }
+    if(rowMin>max)return max+1;
+    pp=prev;prev=cur;
+  }
+  return prev[b.length];
+}
+function findCity(st,typed){
+  const k=normCity(typed);if(!k)return null;
+  const id=st+'|'+k;if(id in _cityMemo)return _cityMemo[id];
+  const list=GEO.cities[st]||{};
+  let out=null;
+  if(list[k])out={key:k,ll:list[k],fuzzy:false};
+  else{
+    const max=k.length>=11?2:k.length>=6?1:0;
+    if(max){
+      let best=max+1,found=null,ties=0;
+      for(const name in list){
+        if(name[0]!==k[0])continue;                         // a misspelling almost never changes the first letter
+        const d=editDistance(k,name,max);
+        if(d<best){best=d;found=name;ties=1;}else if(d===best&&d<=max)ties++;
+      }
+      if(found&&best<=max&&ties===1)out={key:found,ll:list[found],fuzzy:true};
+    }
+  }
+  return _cityMemo[id]=out;
+}
+function titleCase(s){return String(s).replace(/\b[a-z]/g,c=>c.toUpperCase());}
 function stateCodeOf(s){const k=normCity(s);return k?(GEO.states[k]||null):null;}
 function miles(aLat,aLng,bLat,bLng){
   const R=3958.8,t=Math.PI/180,dLat=(bLat-aLat)*t,dLng=(bLng-aLng)*t;
@@ -478,8 +528,9 @@ function resolve(g){
   g.stCode=st;
   let loc=null;
   if(g.city&&st){
-    const ll=(GEO.cities[st]||{})[normCity(g.city)];
-    if(ll)loc={kind:'city',lat:ll[0],lng:ll[1],label:g.city+', '+st};
+    const hit=findCity(st,g.city);
+    // key = the matched place, so "St. Helena", "Saint Helena" and a misspelling all count as one
+    if(hit)loc={kind:'city',lat:hit.ll[0],lng:hit.ll[1],key:st+'|'+hit.key,typed:hit.fuzzy?null:g.city,st,label:g.city+', '+st};
   }
   const ac=g.areaCode&&AREA[g.areaCode];
   if(!loc&&ac){
@@ -757,6 +808,11 @@ async function loadAll(){
         rev:s?s.rev:0,inStays:!!s,booked:s?s.booked:null,stayKey:mKey(start),bookedKey:s?mKey(s.booked):null};
       resolve(g);return g;
     });
+    const votes={};
+    guests.forEach(g=>{const l=g.loc;if(l&&l.kind==='city'&&l.typed){const t=l.typed.replace(/\s+/g,' ').trim(),v=votes[l.key]||(votes[l.key]={});v[t]=(v[t]||0)+1;}});
+    guests.forEach(g=>{const l=g.loc;if(!l||l.kind!=='city')return;
+      const v=votes[l.key],best=v?Object.entries(v).sort((a,b)=>b[1]-a[1]||(/[a-z]/.test(b[0])&&/[A-Z]/.test(b[0])?1:0)-(/[a-z]/.test(a[0])&&/[A-Z]/.test(a[0])?1:0))[0][0]:titleCase(l.key.split('|')[1]);
+      l.label=best+', '+l.st;g.place=l.label;});
     // Show the page BEFORE drawing: the map measures its own box, and a hidden box measures
     // zero, which makes it zoom out to the whole world.
     showDash();
@@ -821,12 +877,18 @@ function render(){
   document.getElementById('sc-out').textContent=known.length?pct(out.reduce((a,g)=>a+val(g),0)/(known.reduce((a,g)=>a+val(g),0)||1)):'—';
   document.getElementById('sc-out-meta').textContent=known.length?out.length+' of '+known.length+' with a known state':'';
 
-  renderMap(view);renderHeat();renderBands(view);renderStates(view);renderCities(view);
+  renderUnplaced();renderMap(view);renderHeat();renderBands(view);renderStates(view);renderCities(view);
 }
 
+/* The map groups places that would overlap on screen into one bubble, and splits them apart
+   again as you zoom in. With hundreds of towns, one bubble per town is an unreadable pile; at
+   the opening view you see markets (Bay Area, Sacramento, Southern Oregon…), and a click on
+   any bubble zooms into the towns inside it. */
+const CLUSTER_PX=46;
+let mapSpots=[],refLayer=null,firstDraw=true;
 function renderMap(view){
   if(!map){
-    map=L.map('map',{scrollWheelZoom:false,minZoom:3,maxZoom:9,zoomSnap:0.25,maxBounds:[[8,-179],[78,-40]]});map.fitBounds(WEST);
+    map=L.map('map',{scrollWheelZoom:false,minZoom:3,maxZoom:10,zoomSnap:0.25,maxBounds:[[8,-179],[78,-40]]});map.fitBounds(WEST);
     /* No map tiles: the background is drawn here from outlines bundled in data/basemap.json
        (Natural Earth, public domain). Nothing about the map is fetched from an outside service. */
     map.attributionControl.setPrefix(false).addAttribution('Map: Natural Earth · city locations: GeoNames');
@@ -835,36 +897,83 @@ function renderMap(view){
       :{color:f.properties.c==='US'?'#c9bfb2':'#d6cec3',weight:1,fillColor:f.properties.c==='US'?'#faf8f4':'#efebe4',fillOpacity:1};
     const order={land:0,state:1,lake:2};
     L.geoJSON({type:'FeatureCollection',features:BASE.features.slice().sort((a,b)=>order[a.properties.k]-order[b.properties.k])},{style,interactive:false}).addTo(map);
-    // state codes and a few reference cities, so the map reads without street tiles
-    const lbl=(lat,lng,text,cls)=>L.marker([lat,lng],{interactive:false,keyboard:false,icon:L.divIcon({className:'map-lbl '+cls,html:esc(text),iconSize:[0,0]})}).addTo(map);
-    STATE_LABELS.forEach(([code,lat,lng])=>lbl(lat,lng,code,'st'));
-    REF_CITIES.forEach(([name,lat,lng])=>{L.circleMarker([lat,lng],{radius:1.6,stroke:false,fillColor:'#8a9bb0',fillOpacity:1,interactive:false}).addTo(map);lbl(lat,lng,name,'ct');});
+    STATE_LABELS.forEach(([code,lat,lng])=>mapLabel(lat,lng,code,'st').addTo(map));
+    // reference towns only once you are zoomed in far enough for them not to fight the bubbles
+    refLayer=L.layerGroup();
+    REF_CITIES.forEach(([name,lat,lng])=>{L.circleMarker([lat,lng],{radius:1.6,stroke:false,fillColor:'#8a9bb0',fillOpacity:1,interactive:false}).addTo(refLayer);mapLabel(lat,lng,name,'ct').addTo(refLayer);});
+    map.on('zoomend',drawClusters);
     map.on('click',()=>map.scrollWheelZoom.enable());map.on('mouseout',()=>map.scrollWheelZoom.disable());
   }
+  mapSpots=groupBy(view.filter(g=>g.loc),g=>g.loc.kind+'|'+(g.loc.key||g.loc.label)).map(s=>{
+    const loc=s.items[0].loc;
+    return {lat:loc.lat,lng:loc.lng,label:loc.label,area:loc.kind==='area',market:s.items[0].market,miles:s.items[0].miles,res:s.res,rev:s.rev,nights:s.nights};
+  });
+  const pts=mapSpots.map(s=>[s.lat,s.lng]);
+  lastBounds=pts.length?L.latLngBounds(pts.concat([[HOME.lat,HOME.lng]])):null;
+  if(firstDraw){firstDraw=false;map.invalidateSize();map.fitBounds(WEST);}
+  drawClusters();
+  const unplaced=view.length-view.filter(g=>g.loc).length;
+  document.getElementById('map-foot').textContent='Bubble size shows '+(metric==='rev'?'revenue':'reservations')+'. Nearby places share one bubble — click a bubble to zoom into the towns inside it. '+
+    mapSpots.length.toLocaleString('en-US')+' place'+(mapSpots.length===1?'':'s')+' on the map'+(unplaced?'; '+unplaced+' reservation'+(unplaced===1?'':'s')+' could not be placed.':'.')+
+    ' The map is drawn from outlines stored in the dashboard; no outside map service is used.';
+}
+function mapLabel(lat,lng,text,cls){return L.marker([lat,lng],{interactive:false,keyboard:false,icon:L.divIcon({className:'map-lbl '+cls,html:esc(text),iconSize:[0,0]})});}
+function drawClusters(){
+  if(!map)return;
   if(layer)layer.remove();
   layer=L.layerGroup().addTo(map);
-  const spots=groupBy(view.filter(g=>g.loc),g=>g.loc.kind+'|'+g.loc.label);
-  const max=Math.max(1,...spots.map(s=>metric==='rev'?s.rev:s.res));
-  const pts=[];
-  // largest first, so small bubbles stay on top and stay hoverable
-  spots.sort((a,b)=>(metric==='rev'?b.rev-a.rev:b.res-a.res)).forEach(s=>{
-    const loc=s.items[0].loc,v=metric==='rev'?s.rev:s.res,area=loc.kind==='area';
-    const m=L.circleMarker([loc.lat,loc.lng],{radius:4+19*Math.sqrt(v/max),color:area?'#b87c2a':'#4a5e6d',weight:1.5,dashArray:area?'4 3':null,fillColor:area?'#b87c2a':'#4a5e6d',fillOpacity:area?0.10:0.5});
-    m.bindTooltip('<b>'+esc(loc.label)+'</b>'+(area?' <i>(estimate)</i>':'')+'<br>'+s.res+' reservation'+(s.res===1?'':'s')+' · '+fmt$(s.rev)+(s.nights?' · '+s.nights+' nights':'')+'<br>'+Math.round(s.items[0].miles)+' miles away',{className:'gt',direction:'top',sticky:true});
-    m.addTo(layer);pts.push([loc.lat,loc.lng]);
+  const z=map.getZoom(),v=s=>metric==='rev'?s.rev:s.res;
+  if(z>=6.5){if(!map.hasLayer(refLayer))refLayer.addTo(map);}else if(map.hasLayer(refLayer))refLayer.remove();
+  // biggest first: each place joins the first bubble within reach — but only a bubble of its OWN
+  // market, so "Bay Area" can never quietly swallow Sacramento and show a number that is not true
+  const clusters=[];
+  mapSpots.slice().sort((a,b)=>v(b)-v(a)).forEach(s=>{
+    const p=map.project([s.lat,s.lng],z);
+    let c=null;for(const k of clusters){const dx=k.p.x-p.x,dy=k.p.y-p.y;if(k.market===s.market&&dx*dx+dy*dy<CLUSTER_PX*CLUSTER_PX){c=k;break;}}
+    if(!c){c={p,lat:s.lat,lng:s.lng,market:s.market,members:[],res:0,rev:0,nights:0,est:0};clusters.push(c);}
+    c.members.push(s);c.res+=s.res;c.rev+=s.rev;c.nights+=s.nights;if(s.area)c.est+=v(s);
   });
-  L.circleMarker([HOME.lat,HOME.lng],{radius:7,color:'#fff',weight:2,fillColor:'#c4572a',fillOpacity:1}).bindTooltip('<b>'+esc(HOME.name)+'</b>',{className:'gt',direction:'top'}).addTo(layer);
-  lastBounds=pts.length?L.latLngBounds(pts.concat([[HOME.lat,HOME.lng]])):null;
-  const unplaced=view.length-view.filter(g=>g.loc).length;
-  document.getElementById('map-foot').textContent='Bubble size shows '+(metric==='rev'?'revenue':'reservations')+'. '+spots.length+' place'+(spots.length===1?'':'s')+' on the map'+(unplaced?'; '+unplaced+' reservation'+(unplaced===1?'':'s')+' could not be placed.':'.')+' Click the map to zoom with the mouse wheel. The map is drawn from outlines stored in the dashboard; no outside map service is used.';
+  const max=Math.max(1,...clusters.map(v));
+  const boxes=[];let labelled=0;
+  clusters.sort((a,b)=>v(b)-v(a)).forEach(c=>{
+    const val=v(c),r=5+25*Math.sqrt(val/max),mostlyEst=val>0&&c.est/val>=0.5,many=c.members.length>1;
+    // name: a single town keeps its name; a group takes the market most of it belongs to
+    let name=c.members[0].label;
+    if(many)name=/^(Elsewhere|Unknown)/.test(c.market)?c.members[0].label.replace(/^\d{3} area — /,'')+' area':c.market;
+    const m=L.circleMarker([c.lat,c.lng],{radius:r,color:mostlyEst?'#b87c2a':'#4a5e6d',weight:1.5,dashArray:mostlyEst?'4 3':null,fillColor:mostlyEst?'#b87c2a':'#4a5e6d',fillOpacity:mostlyEst?0.12:0.5});
+    const inside=many?'<br><span style="color:#8a9bb0;">'+c.members.length+' places: '+esc(c.members.slice(0,4).map(s=>s.label.replace(/^\d{3} area — /,'')).join(' · '))+(c.members.length>4?' · …':'')+'</span>':'';
+    m.bindTooltip('<b>'+esc(name)+'</b><br>'+c.res.toLocaleString('en-US')+' reservation'+(c.res===1?'':'s')+' · '+fmt$(c.rev)+(c.nights?' · '+c.nights.toLocaleString('en-US')+' nights':'')+
+      (c.est?'<br>'+pct(c.est/(val||1))+' of this is estimated from area codes':'')+inside+(many?'<br><i>Click to zoom in</i>':'<br>'+Math.round(c.members[0].miles)+' miles away'),{className:'gt',direction:'top',sticky:true});
+    if(many)m.on('click',e=>{L.DomEvent.stopPropagation(e);map.fitBounds(L.latLngBounds(c.members.map(s=>[s.lat,s.lng])).pad(0.35),{maxZoom:Math.min(10,z+2.5)});});
+    m.addTo(layer);
+    // permanent name + figure on the biggest bubbles, skipped wherever it would sit on another label
+    if(labelled<14){
+      const text=name+'  '+fmtVal(val),w=text.length*6.3+8,box={x0:c.p.x+r+3,y0:c.p.y-9,x1:c.p.x+r+3+w,y1:c.p.y+9};
+      if(!boxes.some(b=>box.x0<b.x1&&box.x1>b.x0&&box.y0<b.y1&&box.y1>b.y0)){
+        boxes.push(box);labelled++;
+        L.marker([c.lat,c.lng],{interactive:false,keyboard:false,icon:L.divIcon({className:'map-lbl cl',html:'<span style="margin-left:'+(r+4).toFixed(0)+'px;">'+esc(name)+' <b>'+fmtVal(val)+'</b></span>',iconSize:[0,0]})}).addTo(layer);
+      }
+    }
+  });
+  L.circleMarker([HOME.lat,HOME.lng],{radius:6,color:'#fff',weight:2,fillColor:'#c4572a',fillOpacity:1}).bindTooltip('<b>'+esc(HOME.name)+'</b>',{className:'gt',direction:'top'}).addTo(layer);
 }
 function mapView(which){
   if(!map)return;
   if(which==='west')map.fitBounds(WEST);
-  else if(which==='usa')map.setView([39.5,-98.5],4);
-  else if(lastBounds)map.fitBounds(lastBounds.pad(0.12));
+  else if(which==='usa')map.fitBounds([[24.5,-125],[49.5,-66.5]]);
+  else if(lastBounds)map.fitBounds(lastBounds.pad(0.08));
 }
-
+let unplacedText='';
+function renderUnplaced(){
+  // every saved reservation whose typed city was not found, whatever the period
+  const by={};guests.forEach(g=>{if(g.city&&!(g.loc&&g.loc.kind==='city')){const k=g.city+', '+(g.stCode||g.state||'?');by[k]=(by[k]||0)+1;}});
+  const list=Object.entries(by).sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:1));
+  document.getElementById('unplaced-panel').style.display=list.length?'block':'none';
+  document.getElementById('unplaced-sub').textContent=list.length+' spelling'+(list.length===1?'':'s')+' · '+list.reduce((a,x)=>a+x[1],0)+' reservations';
+  unplacedText=list.map(([n,c])=>n+(c>1?' x'+c:'')).join('\n');
+  document.getElementById('unplaced').textContent=list.map(([n,c])=>n+(c>1?' ×'+c:'')).join('  ·  ');
+}
+function copyUnplaced(btn){navigator.clipboard.writeText(unplacedText).then(()=>{btn.textContent='Copied';setTimeout(()=>btn.textContent='Copy list',1500);}).catch(()=>{});}
 function renderHeat(){
   const el=document.getElementById('heat');
   const now=new Date(),end=now.getFullYear()*12+now.getMonth(),cols=[];for(let k=end-11;k<=end;k++)cols.push(k);
