@@ -127,7 +127,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .data-table .right{text-align:right;}
 .data-table tbody tr:hover td{background:var(--surface2);}
 .cell-sub{font-size:11px;color:var(--text3);}
-.est{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:2px 7px;border-radius:20px;background:var(--amber-bg);color:var(--amber);margin-left:6px;vertical-align:middle;}
 .bar-wrap{height:6px;background:var(--surface2);border-radius:3px;min-width:70px;}
 .bar-fill{height:6px;border-radius:3px;background:var(--slate);}
 .heat td.h{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
@@ -1030,8 +1029,8 @@ function renderCities(view){
   if(!list.length){el.innerHTML='<div class="empty-state">No places yet.</div>';return;}
   const tr=view.length,tv=view.reduce((a,g)=>a+g.rev,0),shown=showAllCities?list:list.slice(0,25);
   el.innerHTML='<table class="data-table"><thead><tr><th>Place</th><th>Market</th><th class="right">Miles</th>'+SHARE_HEAD+'</tr></thead><tbody>'+
-    shown.map(o=>{const g=o.items[0],est=g.loc&&g.loc.kind==='area';
-      return '<tr><td style="font-weight:600;">'+esc(o.key)+(est?'<span class="est">estimate</span>':'')+'</td><td class="cell-sub">'+esc(g.market)+'</td><td class="right">'+(g.miles!=null?Math.round(g.miles).toLocaleString('en-US'):'—')+'</td>'+shareCells(o,tr,tv)+'</tr>';}).join('')+
+    shown.map(o=>{const g=o.items[0];
+      return '<tr><td style="font-weight:600;">'+esc(o.key)+'</td><td class="cell-sub">'+esc(g.market)+'</td><td class="right">'+(g.miles!=null?Math.round(g.miles).toLocaleString('en-US'):'—')+'</td>'+shareCells(o,tr,tv)+'</tr>';}).join('')+
     '</tbody></table>'+(list.length>25?'<div style="padding:12px 24px;"><button class="link-btn" onclick="showAllCities=!showAllCities;render();">'+(showAllCities?'Show the top 25 only':'Show all '+list.length+' places')+'</button></div>':'');
 }
 </script>
