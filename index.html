@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cave Springs — Revenue Dashboard</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- This page shows revenue figures. It loads NOTHING from outside: the chart library, the font and everything else
+     live in this repo (vendor/). The rule below makes the browser enforce that — the only outside
+     addresses allowed are Google sign-in and the Google Sheet. Anything else is blocked. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://sheets.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<script src="vendor/chartjs/chart.umd.js"></script>
+<style>@font-face{font-family:'Raleway';font-style:normal;font-weight:300 700;font-display:swap;src:url(vendor/fonts/raleway-latin.woff2) format('woff2');}</style>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -246,7 +250,7 @@ tr.unit-row.hidden{display:none;}
     <div class="header-right">
       <div class="last-updated" id="last-updated-text"></div>
       <a class="hdr-btn" href="call-ads.html" style="text-decoration:none;display:inline-flex;align-items:center;">&#128222; Call Ads</a>
-      <a class="hdr-btn" href="invoices.html" style="text-decoration:none;display:inline-flex;align-items:center;">&#129534; Invoices</a>
+      <a class="hdr-btn" href="invoices.html" style="text-decoration:none;display:inline-flex;align-items:center;">&#129534; Mendes Invoices</a>
       <a class="hdr-btn" href="guests.html" style="text-decoration:none;display:inline-flex;align-items:center;">&#128205; Guests</a>
       <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import CSV</button>

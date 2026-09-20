@@ -3,10 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cave Springs — Invoices</title>
+<title>Cave Springs — Mendes Invoices</title>
 <link rel="icon" type="image/png" href="favicon-32x32.png">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- This page opens vendor invoice PDFs. It loads NOTHING from outside: the chart library, the font and everything else
+     live in this repo (vendor/). The rule below makes the browser enforce that — the only outside
+     addresses allowed are Google sign-in and the Google Sheet. Anything else is blocked. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://sheets.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; img-src 'self' data:; font-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<script src="vendor/chartjs/chart.umd.js"></script>
+<style>@font-face{font-family:'Raleway';font-style:normal;font-weight:300 700;font-display:swap;src:url(vendor/fonts/raleway-latin.woff2) format('woff2');}</style>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -230,7 +234,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
   <div class="nav-bar">
     <a class="nav-tab" href="index.html">Revenue</a>
     <a class="nav-tab" href="call-ads.html">Call Ads</a>
-    <a class="nav-tab active" href="invoices.html">Invoices</a>
+    <a class="nav-tab active" href="invoices.html">Mendes Invoices</a>
     <a class="nav-tab" href="guests.html">Guests</a>
   </div>
 
@@ -683,12 +687,13 @@ let pdfjsLib=null;
 async function loadPdfJs(){
   if(pdfjsLib)return;
   try{
-    pdfjsLib=await import(`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/legacy/build/pdf.min.mjs`);
-    pdfjsLib.GlobalWorkerOptions.workerSrc=`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/legacy/build/pdf.worker.min.mjs`;
-  }catch(e){throw new Error('Could not load the PDF reader. Check the internet connection and try again.');}
+    // pdf.js (version in PDFJS_VER), served from this repo (vendor/pdfjs), never from a CDN
+    pdfjsLib=await import('./vendor/pdfjs/pdf.min.mjs');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.mjs';
+  }catch(e){throw new Error('Could not load the PDF reader. Refresh the page and try again.');}
 }
 async function pdfToLines(buf){
-  const pdf=await pdfjsLib.getDocument({data:buf,useSystemFonts:true}).promise;
+  const pdf=await pdfjsLib.getDocument({data:buf,useSystemFonts:true,isEvalSupported:false}).promise;
   const raw=[];
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
