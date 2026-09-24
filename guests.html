@@ -337,6 +337,7 @@ const MARKETS = [
 let tokenClient, accessToken;
 let GEO=null, AREA=null, BASE=null;      // bundled lookups and map background, loaded once
 let guests=[];                            // one entry per reservation, location resolved
+let cancelledCount=0;                     // saved reservations the stay report shows were cancelled — left out
 let basis='stay', metric='res', period='ALL', showAllCities=false, heatRange='YEAR';   // heatRange: 'YEAR' = this year until chosen, a year number, or 'LAST12'
 let map=null, layer=null, lastBounds=null;
 let pendingImport=null;
@@ -795,18 +796,34 @@ async function loadAll(){
       const H=stayRaw[0].map(h=>String(h).trim()),iRes=H.indexOf('Res#')!==-1?H.indexOf('Res#'):H.indexOf('Res'),iRev=H.indexOf('NightRevenue'),iNight=H.indexOf('NightDate'),iBooked=H.indexOf('ReservedOn');
       for(let r=1;r<stayRaw.length;r++){
         const row=stayRaw[r],k=resKey(row[iRes]);if(!k)continue;
-        const s=stays[k]||(stays[k]={rev:0,nights:0,first:null,booked:null});
+        const s=stays[k]||(stays[k]={rev:0,nights:0,first:null,last:null,booked:null});
         s.rev+=pMoney(row[iRev]);s.nights++;
-        const n=parseDay(row[iNight]);if(n&&(!s.first||n<s.first))s.first=n;
+        const n=parseDay(row[iNight]);if(n&&(!s.first||n<s.first))s.first=n;if(n&&(!s.last||n>s.last))s.last=n;
         const b=parseDay(row[iBooked]);if(b&&(!s.booked||b<s.booked))s.booked=b;
       }
     }
+    /* Cancelled reservations. A guest import only ever adds or updates — the Guests by Date export
+       does not pick its rows by a clean date range, so "missing from the file" cannot prove a
+       cancellation. The stay report can: its import removes cancelled stays. A saved guest is
+       treated as cancelled, and left out, only when the stay report should hold it and does not:
+       its start date lies inside the nights the stay report covers, AND its Res# is no newer than
+       the newest one there (ResNexus numbers run in order, so a higher number was booked after the
+       last stay import and is simply not in it yet). Nothing is deleted; if a reservation shows up
+       in the stay report again, it counts again. */
+    let stayLo=null,stayHi=null,stayMaxRes=0;
+    Object.entries(stays).forEach(([k,s])=>{
+      if(s.first&&(!stayLo||s.first<stayLo))stayLo=s.first;
+      if(s.last&&(!stayHi||s.last>stayHi))stayHi=s.last;
+      if(/^\d+$/.test(k))stayMaxRes=Math.max(stayMaxRes,+k);
+    });
+    cancelledCount=0;
     guests=readStored(originRaw).map(x=>{
       const s=stays[x.res]||null,start=parseDay(x.start)||(s&&s.first)||null;
+      if(!s&&start&&stayLo&&start>=stayLo&&start<=stayHi&&/^\d+$/.test(x.res)&&+x.res<=stayMaxRes){cancelledCount++;return null;}
       const g={res:x.res,city:x.city,state:x.state,areaCode:x.areaCode,start,nights:x.nights||(s?s.nights:0)||0,
         rev:s?s.rev:0,inStays:!!s,booked:s?s.booked:null,stayKey:mKey(start),bookedKey:s?mKey(s.booked):null};
       resolve(g);return g;
-    });
+    }).filter(Boolean);
     const votes={};
     guests.forEach(g=>{const l=g.loc;if(l&&l.kind==='city'&&l.typed){const t=l.typed.replace(/\s+/g,' ').trim(),v=votes[l.key]||(votes[l.key]={});v[t]=(v[t]||0)+1;}});
     guests.forEach(g=>{const l=g.loc;if(!l||l.kind!=='city')return;
@@ -859,7 +876,8 @@ function render(){
   document.getElementById('status-line').innerHTML=empty?'':
     '<b>'+pct(cCity/(n||1))+'</b> placed by the city on the reservation · <b>'+pct(cArea/(n||1))+'</b> estimated from the area code · <b>'+pct(cNone/(n||1))+'</b> not placed'+
     (both.length>=10?'<br>How far to trust an area code: on the '+both.length+' reservations that carry both a city and a phone, the area code points within 150 miles of the city <b>'+pct(agree/both.length)+'</b> of the time.':'')+
-    (noStay?'<br>'+noStay+' saved reservation'+(noStay===1?' is':'s are')+' not in the stay report yet, so '+(noStay===1?'it shows':'they show')+' no revenue and no booking date. Importing the stay report for the same dates fills that in.':'');
+    (noStay?'<br>'+noStay+' saved reservation'+(noStay===1?' is':'s are')+' not in the stay report yet, so '+(noStay===1?'it shows':'they show')+' no revenue and no booking date. Importing the stay report for the same dates fills that in.':'')+
+    (cancelledCount?'<br>'+cancelledCount+' saved reservation'+(cancelledCount===1?' is':'s are')+' no longer in the stay report for '+(cancelledCount===1?'its':'their')+' dates — cancelled — and '+(cancelledCount===1?'is':'are')+' left out of every count.':'');
   const missingBasis=basis==='booked'?guests.filter(g=>g.bookedKey==null).length:guests.filter(g=>g.stayKey==null).length;
   document.getElementById('filter-note').textContent=(period!=='ALL'&&missingBasis)?missingBasis+' reservation'+(missingBasis===1?'':'s')+' with no '+(basis==='booked'?'booking':'start')+' date are left out of single-month views':'';
 
