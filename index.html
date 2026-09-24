@@ -237,6 +237,10 @@ tr.unit-row.hidden{display:none;}
       <label><input type="radio" name="im-dmode" value="range" checked> <span><strong>Replace only the dates in this file</strong> — discounts dated inside the file's range are replaced; other years are never touched</span></label>
       <label><input type="radio" name="im-dmode" value="replace"> <span><strong>Replace all discount data</strong> — erases every discount row, all years, and rebuilds from this file alone</span></label>
     </div>
+    <div class="im-mode-row" id="im-rmode-row" style="display:none;">
+      <label><input type="radio" name="im-rmode" value="range" checked> <span><strong>Replace only the dates in this file</strong> — line items dated inside the file's range are replaced, so cancelled or changed fees drop out; other dates are never touched</span></label>
+      <label><input type="radio" name="im-rmode" value="add"> <span><strong>Add new line items only</strong> — skips items already in the sheet, so a cancelled or changed item is NOT removed</span></label>
+    </div>
     <div class="im-status" id="im-type-hint" style="display:none;margin-bottom:10px;"></div>
     <button class="im-btn" onclick="analyzeImport()">Analyze file</button>
     <button class="im-btn ghost" onclick="closeImport()">Close</button>
@@ -939,10 +943,9 @@ function imTypeChanged(){
   const t=document.querySelector('input[name=im-type]:checked').value;
   document.getElementById('im-mode-row').style.display=t==='stays'?'flex':'none';
   document.getElementById('im-dmode-row').style.display=t==='discounts'?'flex':'none';
+  document.getElementById('im-rmode-row').style.display=t==='retail'?'flex':'none';
   const h=document.getElementById('im-type-hint');
   if(t==='pace'){h.textContent='Pace imports replace all existing pace data each time — same as the Apps Script.';h.style.display='block';}
-  else if(t==='discounts'){h.style.display='none';}
-  else if(t==='retail'){h.textContent='Retail imports only add new line items — overlapping exports are expected and duplicates are skipped automatically.';h.style.display='block';}
   else h.style.display='none';
 }
 function openImport(){
@@ -1075,6 +1078,40 @@ function imPlanDiscountRange(existingRows,fileRows){
     keep.push([r[0],d?imFmtDate(d):(r[1]==null?'':r[1]),r[2]==null?'':r[2],typeof r[3]==='number'?r[3]:imToNumber(r[3])]);
   });
   return {keep,removed,removedTotal,range:lo===null?null:[imKeyToDate(lo),imKeyToDate(hi)]};
+}
+/* Retail: a line item is in the "retail by date" export when its own date is inside the export's
+   range, so first date to last date in the file is provably covered — same as discounts. Adding
+   only new items never removed a fee whose stay was cancelled, and a fee whose amount changed was
+   kept twice (old amount and new). Saved items inside the range go; the file's items replace them.
+   "Not in this file" counts saved items with no identical item in the file (Res#, date, item,
+   total), matched one for one — those are the cancelled, changed or doubled-up ones. */
+function imRetailRowForWrite(r){
+  const d=imParseFlexDate(r[1]),num=v=>typeof v==='number'?v:imToNumber(v),txt=v=>v==null?'':v;
+  return [txt(r[0]),d?imFmtDate(d):txt(r[1]),txt(r[2]),txt(r[3]),r[4]===''||r[4]==null?'':num(r[4]),num(r[5]),num(r[6]),num(r[7]),num(r[8]),r[9]?r[9]:imRetailBucket(r[2])];
+}
+function imRetailKey(r){return String(r[0]==null?'':r[0]).trim()+'|'+imDayKey(imParseFlexDate(r[1]))+'|'+String(r[2]==null?'':r[2]).trim()+'|'+Math.round(imToNumber(r[7])*100);}
+function imPlanRetailRange(existingRows,fileRows){
+  let lo=null,hi=null;
+  fileRows.forEach(r=>{const d=imParseFlexDate(r[1]);if(!d)return;const k=imDayKey(d);if(lo===null||k<lo)lo=k;if(hi===null||k>hi)hi=k;});
+  const fileKeys=new Map();
+  fileRows.forEach(r=>{if(!imParseFlexDate(r[1]))return;const k=imRetailKey(r);fileKeys.set(k,(fileKeys.get(k)||0)+1);});
+  let removed=0,removedTotal=0,unmatched=0,unmatchedTotal=0;const keepRaw=[];
+  existingRows.forEach(r=>{
+    if(String(r[0]==null?'':r[0]).trim()===''&&String(r[2]==null?'':r[2]).trim()==='')return;
+    const d=imParseFlexDate(r[1]),k=d?imDayKey(d):null;
+    if(k!==null&&lo!==null&&k>=lo&&k<=hi){
+      removed++;removedTotal+=imToNumber(r[7]);
+      const key=imRetailKey(r),n=fileKeys.get(key)||0;
+      if(n>0)fileKeys.set(key,n-1);else{unmatched++;unmatchedTotal+=imToNumber(r[7]);}
+      return;
+    }
+    keepRaw.push(r);
+  });
+  const keep=keepRaw.map(imRetailRowForWrite);
+  // self-check: rewriting the untouched rows must not move a cent or lose a row
+  const sum=a=>a.reduce((t,r)=>t+imToNumber(r[7]),0);
+  if(keep.length!==keepRaw.length||Math.abs(sum(keepRaw)-sum(keep))>1e-6)throw new Error('Internal check failed: the untouched retail rows did not survive unchanged. Nothing was written.');
+  return {keep,removed,removedTotal,unmatched,unmatchedTotal,range:lo===null?null:[imKeyToDate(lo),imKeyToDate(hi)]};
 }
 /*RANGE-END*/
 // Saved rows exactly as stored: real numbers rather than "$333.33", dates as their display text.
@@ -1314,6 +1351,7 @@ async function imAnalyzeRetail(rows,status){
     if(t.res!==-1&&t.date!==-1&&t.item!==-1&&(t.total!==-1||t.amount!==-1)){headerRow=r;idx=t;break;}
   }
   if(headerRow===-1){status.textContent='Could not find the expected columns (Res#, Date, Item, Total/Amount). Is this the retail report export?';return;}
+  if(document.querySelector('input[name=im-rmode]:checked').value==='range')return imAnalyzeRetailRange(rows,headerRow,idx,status);
   status.textContent='Loading current retail data for duplicate check…';
   let existingRaw=[];
   try{existingRaw=await fetchTab(IM_RETAIL_CLEAN);}catch(e){existingRaw=[];}
@@ -1364,6 +1402,53 @@ async function imAnalyzeRetail(rows,status){
   let note='Confirming will <strong>add only the new line items</strong> and rebuild the monthly retail summary. Existing rows are never touched.';
   if(imPending.zeroOverlap)note+='<br><br>⚠️ None of these rows matched existing data — if you expected overlap with last week’s export, double-check you picked the right file.';
   imShowPreview(lines,note,[]);
+}
+async function imAnalyzeRetailRange(rows,headerRow,idx,status){
+  const fileRows=[];
+  let skippedBad=0;
+  for(let i=headerRow+1;i<rows.length;i++){
+    const row=rows[i];
+    const res=String(row[idx.res]||'').trim();
+    const item=String(row[idx.item]||'').trim();
+    const group=idx.group!==-1?String(row[idx.group]||'').trim():'';
+    const qty=idx.qty!==-1?imToNumber(row[idx.qty]):1;
+    const amount=idx.amount!==-1?imToNumber(row[idx.amount]):0;
+    const discount=idx.discount!==-1?imToNumber(row[idx.discount]):0;
+    const total=idx.total!==-1?imToNumber(row[idx.total]):amount-discount;
+    const tax=idx.tax!==-1?imToNumber(row[idx.tax]):0;
+    if(!res||!item)continue;
+    if(total===0)continue;
+    const d=imParseFlexDate(row[idx.date]);
+    if(!d){skippedBad++;continue;}
+    // identical items on the same reservation and date are real (two of the same hat) — all kept
+    fileRows.push([res,imFmtDate(d),item,group,qty,amount,discount,total,tax,imRetailBucket(item)]);
+  }
+  if(!fileRows.length){status.textContent='No usable retail rows found in this file.';return;}
+  status.textContent='Loading current retail data for comparison…';
+  let raw;try{raw=await imFetchRaw(IM_RETAIL_CLEAN);}catch(e){status.textContent='Could not load '+IM_RETAIL_CLEAN+': '+e.message;return;}
+  let plan;try{plan=imPlanRetailRange(raw.length>1?raw.slice(1):[],fileRows);}catch(e){status.textContent=e.message;return;}
+  const writeRows=plan.keep.concat(fileRows);
+  const summary=imBuildRetailMonthly(writeRows);
+  const fileTotal=fileRows.reduce((t,r)=>t+r[7],0);
+  const rangeText=plan.range?imFmtDateLong(plan.range[0])+' – '+imFmtDateLong(plan.range[1]):'';
+  imPending={type:'retail',mode:'range',newRows:fileRows,writeRows,prevLen:raw.length,rangeText,removed:plan.removed,unmatched:plan.unmatched,
+    monthlyRows:summary.monthlyRows,resortFeeTotal:summary.resortFeeTotal,otherTotal:summary.otherTotal};
+  const lines=[
+    ['Line items in file',fileRows.length.toLocaleString()+' · '+fmt$(fileTotal)],
+    ['Dates this file covers',rangeText],
+    ['Saved line items inside those dates — replaced',plan.removed.toLocaleString()+' · '+fmt$(plan.removedTotal)],
+    ['…of which are NOT in this file (cancelled, changed or doubled up) — removed',plan.unmatched.toLocaleString()+' · '+fmt$(plan.unmatchedTotal)],
+    ['Saved line items left exactly as they are (other dates)',plan.keep.length.toLocaleString()],
+    ['Resort fee revenue after import (all dates)',fmt$(summary.resortFeeTotal)],
+    ['Retail / other revenue after import (all dates)',fmt$(summary.otherTotal)]
+  ];
+  if(skippedBad)lines.push(['Rows skipped (unreadable date)',skippedBad.toLocaleString()]);
+  let note='Confirming replaces <strong>only</strong> the line items dated inside this file’s range with the file’s own items, and rebuilds the monthly retail summary. Everything else is written back exactly as it is.';
+  // many unmatched items usually means a filtered or partial export, not cancellations
+  const gate=plan.unmatched>Math.max(10,Math.round(plan.removed*0.15));
+  if(gate)note+='<br><br><span style="color:var(--terra);font-weight:600;">That is '+plan.unmatched+' of the '+plan.removed+' saved line items in these dates with no match in this file — more than cancellations usually explain. Check that this export is not filtered to one retail group or a shorter range. (The first import after this change can legitimately remove many, if earlier imports doubled up.)</span><br><label style="display:inline-flex;gap:8px;align-items:center;margin-top:8px;cursor:pointer;"><input type="checkbox" onchange="document.getElementById(\'im-confirm-btn\').disabled=!this.checked"> I have checked — replace them</label>';
+  imShowPreview(lines,note,[]);
+  if(gate)document.getElementById('im-confirm-btn').disabled=true;
 }
 async function imEnsureLogHeader(){
   let logRaw=[];
@@ -1442,6 +1527,20 @@ async function confirmImportWrite(){
       await imEnsureLogHeader();
       await imAppendValues(LOG_TAB,[[imNowStamp(),'DISCOUNTS (dashboard import)',p.rows.length,'','','','','','',p.mode==='range'?'replace dates '+p.rangeText:'replace']]);
       html='<div class="im-ok">Discounts report processed ✓\n'+p.rows.length+' rows loaded.\nTotal discounted: '+fmt$(p.total)+'</div>';
+    }else if(p.type==='retail'&&p.mode==='range'){
+      lastStep='writing '+p.writeRows.length+' rows to '+IM_RETAIL_CLEAN;
+      await imPutValues(IM_RETAIL_CLEAN,imPadded(IM_RETAIL_HEADER,p.writeRows,p.prevLen));
+      lastStep='rebuilding '+RETAIL_TAB;
+      await imClearTab(RETAIL_TAB);
+      await imPutValues(RETAIL_TAB,[IM_RETAIL_MONTHLY_HEADER].concat(p.monthlyRows));
+      lastStep='logging import';
+      await imEnsureLogHeader();
+      await imAppendValues(LOG_TAB,[[imNowStamp(),'RETAIL (dashboard import)',p.newRows.length,'','','','','','','replace dates '+p.rangeText+' ('+p.unmatched+' removed as not in file)']]);
+      html='<div class="im-ok">Retail report processed ✓\n'
+        +p.newRows.length+' line item(s) written for '+p.rangeText+'.\n'
+        +p.removed+' saved item(s) in those dates replaced, '+p.unmatched+' of them not in the file.\n\n'
+        +'Resort fee revenue: '+fmt$(p.resortFeeTotal)+'\n'
+        +'Retail/Other revenue: '+fmt$(p.otherTotal)+'</div>';
     }else if(p.type==='retail'){
       lastStep='appending to '+IM_RETAIL_CLEAN;
       if(p.retailEmpty)await imPutValues(IM_RETAIL_CLEAN,[IM_RETAIL_HEADER]);
@@ -1466,7 +1565,7 @@ async function confirmImportWrite(){
     imPending=null;
     try{await loadAll();}catch(e){}
   }catch(e){
-    document.getElementById('im-result-body').innerHTML='<div class="im-err">Import failed while '+lastStep+':\n'+e.message+'\n\nThe sheet may be partially written. Re-run the import once the issue is fixed (stays/pace/discounts imports fully rebuild their data, so re-running cleans up any partial write), or use the Apps Script menu (Revenue Tools) as a fallback.</div>';
+    document.getElementById('im-result-body').innerHTML='<div class="im-err">Import failed while '+lastStep+':\n'+e.message+'\n\nThe sheet may be partially written. Re-run the import once the issue is fixed (stays/pace/discounts imports, and retail with "Replace only the dates", rebuild their data, so re-running cleans up any partial write), or use the Apps Script menu (Revenue Tools) as a fallback.</div>';
     document.getElementById('im-step-result').style.display='block';
   }finally{
     btn.disabled=false;btn.textContent='Confirm — write to sheet';
