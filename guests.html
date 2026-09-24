@@ -287,6 +287,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
     <div class="panel">
       <div class="panel-header">
+        <span class="panel-title">Map</span>
+        <div class="map-legend">
+          <span class="lg"><i class="city"></i>City on the reservation</span>
+          <span class="lg"><i class="area"></i>Estimated from area code</span>
+          <span class="lg"><i class="home"></i>Cave Springs</span>
+          <span class="seg"><button onclick="mapView('west')">West</button><button onclick="mapView('usa')">USA</button><button onclick="mapView('fit')">Fit all</button></span>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="panel-foot" id="map-foot"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
         <span class="panel-title" id="yoy-title">This year vs last year</span>
         <span class="panel-sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <span id="yoy-sub"></span>
@@ -316,19 +330,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
       <div class="panel-foot" id="prof-foot"></div>
     </div>
 
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">Map</span>
-        <div class="map-legend">
-          <span class="lg"><i class="city"></i>City on the reservation</span>
-          <span class="lg"><i class="area"></i>Estimated from area code</span>
-          <span class="lg"><i class="home"></i>Cave Springs</span>
-          <span class="seg"><button onclick="mapView('west')">West</button><button onclick="mapView('usa')">USA</button><button onclick="mapView('fit')">Fit all</button></span>
-        </div>
-      </div>
-      <div id="map"></div>
-      <div class="panel-foot" id="map-foot"></div>
-    </div>
 
     <div class="panel">
       <div class="panel-header"><span class="panel-title">Markets by month</span><span class="panel-sub"><span id="heat-sub"></span> &nbsp;<select class="filter-select" id="heat-range" onchange="heatRange=this.value;renderHeat();" style="padding:4px 8px;font-size:12px;"></select></span></div>
