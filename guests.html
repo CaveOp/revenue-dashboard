@@ -259,6 +259,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
     <div class="panel">
       <div class="panel-header">
+        <span class="panel-title" id="yoy-title">This year vs last year</span>
+        <span class="panel-sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span id="yoy-sub"></span>
+          <span class="seg" id="seg-yoy-group"><button data-v="market" class="active" onclick="setYoyGroup('market')">Markets</button><button data-v="state" onclick="setYoyGroup('state')">States</button><button data-v="band" onclick="setYoyGroup('band')">Distance</button></span>
+          <span class="seg" id="seg-yoy-cut"><button data-v="todate" class="active" onclick="setYoyCut(true)">To date</button><button data-v="whole" onclick="setYoyCut(false)">Whole period</button></span>
+        </span>
+      </div>
+      <div class="table-scroll" id="yoy"></div>
+      <div class="panel-foot">Follows the Period filter: a year is compared with the year before, a month with the same month a year earlier. "To date" stops both years at today's date, so this year's bookings still to come do not count against a finished last year. "Whole period" includes everything already on the books.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
         <span class="panel-title">Map</span>
         <div class="map-legend">
           <span class="lg"><i class="city"></i>City on the reservation</span>
@@ -338,7 +351,7 @@ let tokenClient, accessToken;
 let GEO=null, AREA=null, BASE=null;      // bundled lookups and map background, loaded once
 let guests=[];                            // one entry per reservation, location resolved
 let cancelledCount=0;                     // saved reservations the stay report shows were cancelled — left out
-let basis='stay', metric='res', period='ALL', showAllCities=false, heatRange='YEAR';   // heatRange: 'YEAR' = this year until chosen, a year number, or 'LAST12'
+let basis='stay', metric='res', period='', showAllCities=false, heatRange='YEAR';   // heatRange: 'YEAR' = this year until chosen, a year number, or 'LAST12'
 let map=null, layer=null, lastBounds=null;
 let pendingImport=null;
 
@@ -843,17 +856,87 @@ async function loadAll(){
 
 /* ---------- Filters ---------- */
 function keyOf(g){return basis==='booked'?g.bookedKey:g.stayKey;}
+/* Period values: 'ALL', 'Y2026' for a whole year, or a month key (year*12+month). The page opens
+   on this year — "All years" adds every year together, which is no way to read a year. */
 function buildPeriods(){
   const keys=[...new Set(guests.map(keyOf).filter(k=>k!=null))].sort((a,b)=>b-a);
+  const years=[...new Set(keys.map(k=>Math.floor(k/12)))];
   const sel=document.getElementById('period-select');
-  sel.innerHTML='<option value="ALL">All time</option>'+keys.map(k=>'<option value="'+k+'">'+mLabel(k)+'</option>').join('');
-  if(period!=='ALL'&&!keys.includes(+period))period='ALL';
+  sel.innerHTML=years.map(y=>'<option value="Y'+y+'">'+y+' — whole year</option>').join('')+'<option value="ALL">All years combined</option>'+
+    '<option disabled>──────────</option>'+keys.map(k=>'<option value="'+k+'">'+mLabel(k)+'</option>').join('');
+  const thisYear='Y'+new Date().getFullYear();
+  if(!period)period=years.length?(years.includes(+thisYear.slice(1))?thisYear:'Y'+years[0]):'ALL';
+  if(period!=='ALL'&&!(String(period).startsWith('Y')?years.includes(+String(period).slice(1)):keys.includes(+period)))period=years.length?'Y'+years[0]:'ALL';
   sel.value=period;
 }
-function onPeriodChange(){period=document.getElementById('period-select').value;render();}
+function onPeriodChange(){period=document.getElementById('period-select').value;if(periodYear())heatRange=String(periodYear());render();}
 function setBasis(v){basis=v;document.querySelectorAll('#seg-basis button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));buildPeriods();render();}
 function setMetric(v){metric=v;document.querySelectorAll('#seg-metric button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));render();}
-function inView(){return period==='ALL'?guests:guests.filter(g=>keyOf(g)===+period);}
+function periodYear(){return String(period).startsWith('Y')?+String(period).slice(1):null;}
+function periodLabel(){return period==='ALL'?'all years':periodYear()?String(periodYear()):mLabel(+period);}
+function inView(){
+  if(period==='ALL')return guests;
+  const y=periodYear();
+  return y?guests.filter(g=>{const k=keyOf(g);return k!=null&&Math.floor(k/12)===y;}):guests.filter(g=>keyOf(g)===+period);
+}
+
+/* ---------- This year vs last year ---------- */
+let yoyGroup='market',yoyToDate=true;
+function setYoyGroup(v){yoyGroup=v;document.querySelectorAll('#seg-yoy-group button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));renderYoy();}
+function setYoyCut(v){yoyToDate=v;document.querySelectorAll('#seg-yoy-cut button').forEach(b=>b.classList.toggle('active',b.dataset.v===(v?'todate':'whole')));renderYoy();}
+function dateOf(g){return basis==='booked'?g.booked:g.start;}
+function lastYear(d){return new Date(d.getFullYear()-1,d.getMonth(),d.getDate());}
+// The window the Period filter points at, and the same window a year earlier. "All years" compares this year.
+function yoyWindows(){
+  const now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  let lo,hi,name;
+  if(period==='ALL'||periodYear()){const y=periodYear()||today.getFullYear();lo=new Date(y,0,1);hi=new Date(y+1,0,1);name=String(y);}
+  else{const k=+period;lo=new Date(Math.floor(k/12),k%12,1);hi=new Date(Math.floor(k/12),k%12+1,1);name=mLabel(k);}
+  let cut=false;
+  if(yoyToDate&&lo<=today&&today<hi){hi=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1);cut=true;}
+  const prevName=periodYear()||period==='ALL'?String(lo.getFullYear()-1):mLabel(lo.getFullYear()*12+lo.getMonth()-12);
+  return {cur:[lo,hi],prev:[lastYear(lo),lastYear(hi)],name,prevName,cut,today};
+}
+function yoyKey(g){
+  if(yoyGroup==='state')return g.stCode||'Unknown';
+  if(yoyGroup==='band'){if(g.miles==null)return 'Not placed';const b=BANDS.find(([lo,hi])=>g.miles>=lo&&g.miles<hi);return b?b[2]:'Not placed';}
+  return g.market||'Unknown';
+}
+function yoyCounts(){
+  const w=yoyWindows(),inW=(g,[lo,hi])=>{const d=dateOf(g);return d&&d>=lo&&d<hi;};
+  const cur=guests.filter(g=>inW(g,w.cur)),prev=guests.filter(g=>inW(g,w.prev));
+  return {w,cur,prev,curTot:cur.reduce((a,g)=>a+val(g),0),prevTot:prev.reduce((a,g)=>a+val(g),0)};
+}
+function fmtChange(c,p){
+  if(!p&&!c)return '<span style="color:var(--text3);">—</span>';
+  if(!p)return '<span style="color:var(--green);font-weight:600;">new</span>';
+  const d=c-p,r=d/p,col=d>0?'var(--green)':d<0?'var(--terra)':'var(--text3)';
+  return '<span style="color:'+col+';font-weight:600;">'+(d>0?'+':d<0?'−':'')+fmtVal(Math.abs(d))+' · '+(d>0?'+':d<0?'−':'')+Math.abs(r*100).toFixed(0)+'%</span>';
+}
+function renderYoy(){
+  const el=document.getElementById('yoy');
+  const {w,cur,prev,curTot,prevTot}=yoyCounts();
+  const fmtD=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const endShown=new Date(w.cur[1].getFullYear(),w.cur[1].getMonth(),w.cur[1].getDate()-1);
+  document.getElementById('yoy-title').textContent=w.name+' vs '+w.prevName;
+  document.getElementById('yoy-sub').textContent=(metric==='rev'?'Revenue':'Reservations')+' by '+(basis==='booked'?'date booked':'date of stay')+(w.cut?' · '+fmtD(w.cur[0])+' – '+fmtD(endShown)+' in both years':'');
+  if(!cur.length&&!prev.length){el.innerHTML='<div class="empty-state">No reservations in either period yet.</div>';return;}
+  if(!prev.length){el.innerHTML='<div class="empty-state">Nothing saved for '+esc(w.prevName)+' yet — import the Guests by Date export for that period to compare.</div>';return;}
+  const by={};
+  const add=(g,side)=>{const k=yoyKey(g),o=by[k]||(by[k]={name:k,cur:0,prev:0});o[side]+=val(g);};
+  cur.forEach(g=>add(g,'cur'));prev.forEach(g=>add(g,'prev'));
+  const unknown=['Unknown','Not placed'];
+  let list=Object.values(by).filter(o=>!unknown.includes(o.name)).sort((a,b)=>(b.cur+b.prev)-(a.cur+a.prev));
+  const rows=list.slice(0,12);
+  if(list.length>12){const o={name:'Everywhere else ('+(list.length-12)+')',cur:0,prev:0};list.slice(12).forEach(r=>{o.cur+=r.cur;o.prev+=r.prev;});rows.push(o);}
+  Object.values(by).filter(o=>unknown.includes(o.name)).forEach(o=>rows.push(Object.assign({muted:true},o)));
+  const share=(v,t)=>t?(v/t*100):0;
+  const pts=(c,p)=>{const d=c-p;if(Math.abs(d)<0.5)return '<span style="color:var(--text3);">±0</span>';return '<span style="color:'+(d>0?'var(--green)':'var(--terra)')+';">'+(d>0?'+':'−')+Math.abs(d).toFixed(0)+' pts</span>';};
+  el.innerHTML='<table class="data-table"><thead><tr><th>'+(yoyGroup==='state'?'State':yoyGroup==='band'?'Distance':'Market')+'</th><th class="right">'+esc(w.prevName)+'</th><th class="right">'+esc(w.name)+'</th><th class="right">Change</th><th class="right">Share '+esc(w.prevName)+'</th><th class="right">Share '+esc(w.name)+'</th><th class="right">Share change</th></tr></thead><tbody>'+
+    rows.map(o=>{const sp=share(o.prev,prevTot),sc=share(o.cur,curTot);
+      return '<tr'+(o.muted?' style="color:var(--text3);"':'')+'><td style="font-weight:600;">'+esc(o.name)+'</td><td class="right">'+(o.prev?fmtVal(o.prev):'—')+'</td><td class="right">'+(o.cur?fmtVal(o.cur):'—')+'</td><td class="right">'+fmtChange(o.cur,o.prev)+'</td><td class="right">'+sp.toFixed(0)+'%</td><td class="right">'+sc.toFixed(0)+'%</td><td class="right">'+pts(sc,sp)+'</td></tr>';}).join('')+
+    '<tr class="total" style="font-weight:700;"><td>All</td><td class="right">'+fmtVal(prevTot)+'</td><td class="right">'+fmtVal(curTot)+'</td><td class="right">'+fmtChange(curTot,prevTot)+'</td><td></td><td></td><td></td></tr></tbody></table>';
+}
 function val(g){return metric==='rev'?g.rev:1;}
 function fmtVal(n){return metric==='rev'?fmt$(n):Math.round(n).toLocaleString('en-US');}
 
@@ -883,7 +966,7 @@ function render(){
 
   // scorecards
   document.getElementById('sc-res').textContent=empty?'—':n.toLocaleString('en-US');
-  document.getElementById('sc-res-meta').textContent=empty?'':fmt$(view.reduce((a,g)=>a+g.rev,0))+' revenue · '+(period==='ALL'?'all time':mLabel(+period))+' by '+(basis==='booked'?'month booked':'month of stay');
+  document.getElementById('sc-res-meta').textContent=empty?'':fmt$(view.reduce((a,g)=>a+g.rev,0))+' revenue · '+periodLabel()+' by '+(basis==='booked'?'month booked':'month of stay');
   const mk=groupBy(view.filter(g=>g.market!=='Unknown'),g=>g.market).sort((a,b)=>(metric==='rev'?b.rev-a.rev:b.res-a.res));
   document.getElementById('sc-top').textContent=mk.length?mk[0].key:'—';
   document.getElementById('sc-top-meta').textContent=mk.length?mk[0].res+' reservation'+(mk[0].res===1?'':'s')+' · '+fmt$(mk[0].rev)+' · '+pct((metric==='rev'?mk[0].rev:mk[0].res)/(total||1))+' of '+(metric==='rev'?'revenue':'reservations'):'';
@@ -894,7 +977,8 @@ function render(){
   document.getElementById('sc-out').textContent=known.length?pct(out.reduce((a,g)=>a+val(g),0)/(known.reduce((a,g)=>a+val(g),0)||1)):'—';
   document.getElementById('sc-out-meta').textContent=known.length?out.length+' of '+known.length+' with a known state':'';
 
-  renderUnplaced();renderMap(view);renderHeat();renderBands(view);renderStates(view);renderCities(view);
+  if(!empty){const y=yoyCounts(),c=y.cur.length,p=y.prev.length,d=c-p;if(p)document.getElementById('sc-res-meta').innerHTML+='<br>'+esc(y.w.name)+(y.w.cut?' to date':'')+': '+c.toLocaleString('en-US')+' vs '+p.toLocaleString('en-US')+' in '+esc(y.w.prevName)+' <span style="color:'+(d>0?'var(--green)':d<0?'var(--terra)':'var(--text3)')+';font-weight:600;">'+(d>=0?'+':'−')+Math.abs(d/p*100).toFixed(0)+'%</span>';}
+  renderUnplaced();renderYoy();renderMap(view);renderHeat();renderBands(view);renderStates(view);renderCities(view);
 }
 
 /* The map groups places that would overlap on screen into one bubble, and splits them apart
