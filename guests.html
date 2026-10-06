@@ -54,7 +54,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .header-title{font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
 .header-sub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
 .header-right{display:flex;align-items:center;gap:12px;}
-.last-updated{font-size:12px;color:var(--text3);}
 .hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
 .hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
 
@@ -190,7 +189,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .im-privacy{font-size:11px;color:var(--text3);margin-top:16px;line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
 
 @media(max-width:1000px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
-@media(max-width:700px){.header,.nav-bar,.filter-bar{padding-left:16px;padding-right:16px;}.content{padding:20px 16px;}.scorecards{grid-template-columns:1fr;}.nav-bar{overflow-x:auto;}.nav-tab{flex-shrink:0;padding:0 10px;}.prof-tabs,.prof-insight,.prof-tools{padding-left:16px;padding-right:16px;}.prof-insight{margin-left:16px;margin-right:16px;}.header{height:auto;min-height:64px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px;}.last-updated{display:none;}#map{height:400px;}.filter-note{margin-left:0;width:100%;}}
+@media(max-width:700px){.header,.nav-bar,.filter-bar{padding-left:16px;padding-right:16px;}.content{padding:20px 16px;}.scorecards{grid-template-columns:1fr;}.nav-bar{overflow-x:auto;}.nav-tab{flex-shrink:0;padding:0 10px;}.prof-tabs,.prof-insight,.prof-tools{padding-left:16px;padding-right:16px;}.prof-insight{margin-left:16px;margin-right:16px;}.header{height:auto;min-height:64px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px;}#map{height:400px;}.filter-note{margin-left:0;width:100%;}}
 @media print{.header-right,.nav-bar,.import-overlay,.import-modal,.filter-bar{display:none!important;}.header{position:static;}}
 </style>
 </head>
@@ -245,7 +244,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
   <div class="header">
     <div><div class="header-title">Cave Springs</div><div class="header-sub">Where Guests Come From · Dunsmuir, CA</div></div>
     <div class="header-right">
-      <div class="last-updated" id="last-updated-text"></div>
       <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import Guests</button>
       <button class="hdr-btn" onclick="signOut()">Sign out</button>
@@ -909,7 +907,6 @@ async function loadAll(){
     showDash();
     if(map)map.invalidateSize();
     buildPeriods();render();
-    document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }catch(e){
     if(e.auth){clearToken();accessToken=null;showAuth();return;}   // cached token expired
     showErr('Error loading data: '+e.message);showDash();

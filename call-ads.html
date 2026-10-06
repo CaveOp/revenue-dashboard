@@ -50,7 +50,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .header-title{font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
 .header-sub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
 .header-right{display:flex;align-items:center;gap:12px;}
-.last-updated{font-size:12px;color:var(--text3);}
 .hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
 .hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
 
@@ -235,7 +234,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
   <div class="header">
     <div><div class="header-title">Cave Springs</div><div class="header-sub">Call Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
-      <div class="last-updated" id="last-updated-text"></div>
       <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import Call Data</button>
       <button class="hdr-btn" onclick="signOut()">Sign out</button>
@@ -911,7 +909,6 @@ async function loadAll(){
     callsData=parseStoredCalls(callRaw);
     buildPeriods();
     render();
-    document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     showDash();
   }catch(e){
     if(e.auth){clearToken();accessToken=null;showAuth();return;}   // cached token expired

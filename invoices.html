@@ -51,7 +51,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .header-title{font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
 .header-sub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
 .header-right{display:flex;align-items:center;gap:12px;}
-.last-updated{font-size:12px;color:var(--text3);}
 .hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
 .hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
 
@@ -158,10 +157,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .detail-totals{margin-top:14px;font-size:13px;color:var(--text2);text-align:right;line-height:1.8;}
 .detail-totals strong{font-size:15px;color:var(--text);}
 .spark-row{display:flex;gap:32px;flex-wrap:wrap;margin:10px 0 16px;}
+.yoy-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);}
+.yoy-stat{background:var(--surface);padding:16px 24px;}
+.yoy-stat-label{font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);}
+.yoy-stat-value{font-size:20px;font-weight:700;color:var(--text);margin-top:4px;}
+.yoy-stat-meta{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.5;}
+.yoy-up{color:var(--terra);}
+.yoy-down{color:var(--green);}
+.yoy-more{padding:12px 24px 16px;font-size:12px;color:var(--text3);}
+.yoy-more button{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--slate);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;}
 .spark-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);}
 
-@media(max-width:1000px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
-@media(max-width:700px){.header,.nav-bar{padding:0 16px;}.content{padding:20px 16px;}.scorecards{grid-template-columns:1fr;}.header{height:auto;min-height:64px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px;}.last-updated{display:none;}}
+@media(max-width:1000px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}.yoy-summary{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:700px){.header,.nav-bar{padding:0 16px;}.content{padding:20px 16px;}.scorecards{grid-template-columns:1fr;}.yoy-summary{grid-template-columns:1fr;}.yoy-stat{padding:14px 16px;}.header{height:auto;min-height:64px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px;}}
 @media print{.header-right,.nav-bar,.import-overlay,.import-modal{display:none!important;}.header{position:static;}.list-scroll{max-height:none;}}
 </style>
 </head>
@@ -224,7 +232,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
   <div class="header">
     <div><div class="header-title">Cave Springs</div><div class="header-sub">Supply Invoices · Dunsmuir, CA</div></div>
     <div class="header-right">
-      <div class="last-updated" id="last-updated-text"></div>
       <button class="hdr-btn" onclick="window.print()">&#128438; Print / PDF</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import Invoices</button>
       <button class="hdr-btn" onclick="signOut()">Sign out</button>
@@ -253,8 +260,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
     </div>
 
     <div class="panel">
-      <div class="panel-header"><span class="panel-title">Monthly spend</span><span class="panel-sub" id="spend-sub"></span></div>
+      <div class="panel-header"><span class="panel-title" id="spend-title">Monthly spend</span><span class="panel-sub" id="spend-sub"></span></div>
       <div class="panel-body"><div class="chart-wrap"><canvas id="spend-chart"></canvas></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title" id="yoy-title">Items year over year</span>
+        <div class="tog-row">
+          <button class="tog active" data-yoy="change" onclick="setYoySort('change')">Biggest change</button>
+          <button class="tog" data-yoy="price" onclick="setYoySort('price')">Price moves</button>
+          <button class="tog" data-yoy="spend" onclick="setYoySort('spend')">By spend</button>
+        </div>
+      </div>
+      <div class="yoy-summary" id="yoy-summary"></div>
+      <div class="table-scroll" id="yoy-items"></div>
+      <div class="yoy-more" id="yoy-more"></div>
     </div>
 
     <div class="grid-2">
@@ -308,6 +329,7 @@ let tokenClient, accessToken;
 let invoices = [], items = [];
 let itemsByInvoice = {}, historyByKey = {};
 let topData = [], topSort = 'spend';
+let yoyData = null, yoySort = 'change', yoyShowAll = false;
 let spendChart;
 let pendingImport = null;
 
@@ -882,7 +904,6 @@ async function loadAll(){
     invoices.sort((a,b)=>((b.date?b.date.getTime():0)-(a.date?a.date.getTime():0)));
 
     render();
-    document.getElementById('last-updated-text').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     showDash();
   }catch(e){
     if(e.auth){clearToken();accessToken=null;showAuth();return;}   // cached token expired
@@ -926,16 +947,18 @@ function render(){
   const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
   const dated=invoices.filter(v=>v.date);
   const sumWhere=f=>dated.filter(f).reduce((a,v)=>a+v.total,0);
+  // Last year is cut at today's date, so both years cover the same stretch of the calendar.
+  const cutLY=new Date(yr-1,mo,now.getDate());
   const ytd=sumWhere(v=>v.date.getFullYear()===yr);
-  const thisMonth=sumWhere(v=>v.date.getFullYear()===yr&&v.date.getMonth()===mo);
-  const lastYearMonth=sumWhere(v=>v.date.getFullYear()===yr-1&&v.date.getMonth()===mo);
+  const ytdLY=sumWhere(v=>v.date.getFullYear()===yr-1&&v.date<=cutLY);
   const totals=invoices.map(v=>v.total).filter(n=>n>0);
   const {priceAlerts,qtyAlerts}=computeAlerts();
 
   document.getElementById('sc-ytd-label').textContent='Spend YTD '+yr;
   document.getElementById('sc-ytd').textContent=empty?'—':money0(ytd);
-  const monthName=now.toLocaleString('en-US',{month:'short'});
-  document.getElementById('sc-ytd-meta').textContent=empty?'':monthName+' so far '+money0(thisMonth)+' · '+monthName+' '+(yr-1)+' '+money0(lastYearMonth);
+  document.getElementById('sc-ytd-meta').innerHTML=empty?'':ytdLY>0
+    ?pctSpan((ytd-ytdLY)/ytdLY)+' vs '+money0(ytdLY)+' same period '+(yr-1)
+    :'No '+(yr-1)+' invoices to compare';
   document.getElementById('sc-avg').textContent=totals.length?money0(totals.reduce((a,b)=>a+b,0)/totals.length):'—';
   document.getElementById('sc-avg-meta').textContent=invoices.length?invoices.length+' invoice'+(invoices.length===1?'':'s')+' saved':'';
   const al=document.getElementById('sc-alerts');al.textContent=empty?'—':priceAlerts.length;al.classList.toggle('warn',priceAlerts.length>0);
@@ -950,20 +973,37 @@ function render(){
   renderPriceAlerts(priceAlerts);
   renderQtyAlerts(qtyAlerts);
   topData=computeTop();renderTopItems();
+  yoyData=computeYoy(now,cutLY);yoyShowAll=false;renderYoy();
   renderInvoiceRows();
 }
 
+// "▲ 12%" in terra for more spending, "▼ 12%" in green for less.
+function pctSpan(p){
+  const r=Math.round(p*1000)/10;
+  if(r===0)return '<span>0%</span>';
+  return '<span class="'+(r>0?'yoy-up':'yoy-down')+'" style="font-weight:700;">'+(r>0?'▲ ':'▼ ')+Math.abs(r).toFixed(1)+'%</span>';
+}
+function signedMoney0(n){const r=Math.round(n);return (r>0?'+':r<0?'−':'')+money0(Math.abs(r));}
+
 function renderSpendChart(dated){
-  const now=new Date(),labels=[],vals=[],idx={};
-  for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);idx[d.getFullYear()+'-'+d.getMonth()]=labels.length;labels.push(d.toLocaleString('en-US',{month:'short'})+' '+String(d.getFullYear()).slice(2));vals.push(0);}
-  dated.forEach(v=>{const k=v.date.getFullYear()+'-'+v.date.getMonth();if(idx[k]!==undefined)vals[idx[k]]+=v.total;});
-  const total=vals.reduce((a,b)=>a+b,0);
-  document.getElementById('spend-sub').textContent='Last 12 months · '+money0(total);
+  const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
+  const labels=[],cur=Array(12).fill(0),prev=Array(12).fill(0);
+  for(let m=0;m<12;m++)labels.push(new Date(yr,m,1).toLocaleString('en-US',{month:'short'}));
+  dated.forEach(v=>{const y=v.date.getFullYear();if(y===yr)cur[v.date.getMonth()]+=v.total;else if(y===yr-1)prev[v.date.getMonth()]+=v.total;});
+  const sum=a=>a.reduce((x,y)=>x+y,0);
+  document.getElementById('spend-title').textContent='Monthly spend · '+yr+' vs '+(yr-1);
+  document.getElementById('spend-sub').textContent=yr+' so far '+money0(sum(cur))+' · '+(yr-1)+' full year '+money0(sum(prev));
+  const round=a=>a.map(v=>Math.round(v*100)/100);
   if(spendChart)spendChart.destroy();
   spendChart=new Chart(document.getElementById('spend-chart'),{type:'bar',
-    data:{labels,datasets:[{data:vals.map(v=>Math.round(v*100)/100),backgroundColor:'#4a5e6d',borderRadius:5,maxBarThickness:46}]},
+    data:{labels,datasets:[
+      {label:String(yr-1),data:round(prev),backgroundColor:'#c9d3db',borderRadius:5,maxBarThickness:34},
+      // Months still ahead are left blank rather than drawn as $0.
+      {label:String(yr),data:round(cur).map((v,m)=>m>mo?null:v),backgroundColor:'#4a5e6d',borderRadius:5,maxBarThickness:34}]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>money(c.parsed.y)}}},
+      plugins:{legend:{display:true,position:'top',align:'end',labels:{boxWidth:10,boxHeight:10,font:{family:'Raleway',size:11},color:'#4a5568'}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+money(c.parsed.y),
+          afterBody:items=>{const m=items[0].dataIndex;if(m>mo||!prev[m])return '';return 'Change: '+signedMoney0(cur[m]-prev[m])+' ('+(Math.round((cur[m]-prev[m])/prev[m]*1000)/10)+'%)'+(m===mo?'\nThis month is still in progress':'');}}}},
       scales:{x:{grid:{display:false},ticks:{font:{family:'Raleway',size:10},color:'#8a9bb0'}},
         y:{beginAtZero:true,grid:{color:'#f0ece6'},ticks:{font:{family:'Raleway',size:10},color:'#8a9bb0',callback:v=>'$'+Number(v).toLocaleString('en-US')}}}}});
 }
@@ -990,8 +1030,84 @@ function renderQtyAlerts(list){
 }
 function setTopSort(sort){
   topSort=sort;
-  document.querySelectorAll('.tog').forEach(t=>t.classList.toggle('active',t.dataset.sort===sort));
+  document.querySelectorAll('.tog[data-sort]').forEach(t=>t.classList.toggle('active',t.dataset.sort===sort));
   renderTopItems();
+}
+
+/* Items year over year: Jan 1 to today this year against Jan 1 to the same date last year.
+   Merchandise lines only, so freight, delivery and tax are left out. The change in spend
+   splits exactly into four parts:
+     price    — items bought in both years: (this year's avg price − last year's) × this year's qty
+     quantity — the same items: (this year's qty − last year's) × last year's avg price
+     new      — items bought this year but not in last year's period
+     dropped  — items bought last year but not yet this year
+   Average price is spend ÷ quantity, so several orders at different prices blend fairly. */
+function computeYoy(now,cutLY){
+  const yr=now.getFullYear();
+  const rows=Object.keys(historyByKey).map(key=>{
+    const h=historyByKey[key].filter(x=>x.date);
+    const prev=h.filter(x=>x.date.getFullYear()===yr-1&&x.date<=cutLY),cur=h.filter(x=>x.date.getFullYear()===yr);
+    const s0=prev.reduce((a,b)=>a+b.extension,0),q0=prev.reduce((a,b)=>a+b.qty,0);
+    const s1=cur.reduce((a,b)=>a+b.extension,0),q1=cur.reduce((a,b)=>a+b.qty,0);
+    const lastRow=h[h.length-1]||historyByKey[key][historyByKey[key].length-1];
+    const p0=q0>0?s0/q0:null,p1=q1>0?s1/q1:null;
+    return {key,description:lastRow.description,mfgCode:lastRow.mfgCode,uom:lastRow.uom,
+      s0,s1,q0,q1,p0,p1,pricePct:(p0&&p1)?(p1-p0)/p0:null,change:s1-s0,
+      n0:prev.length,n1:cur.length};
+  }).filter(r=>r.n0||r.n1);
+  const out={yr,cutLY,rows,s0:0,s1:0,price:0,qty:0,newSpend:0,newCount:0,dropSpend:0,dropCount:0};
+  rows.forEach(r=>{
+    out.s0+=r.s0;out.s1+=r.s1;
+    if(!r.n0){out.newSpend+=r.s1;out.newCount++;}
+    else if(!r.n1){out.dropSpend+=r.s0;out.dropCount++;}
+    else if(r.p0!==null&&r.p1!==null){out.price+=(r.p1-r.p0)*r.q1;out.qty+=(r.q1-r.q0)*r.p0;}
+    else out.qty+=r.s1-r.s0;   // bought both years but no usable quantity (credits) — count it with quantity
+  });
+  return out;
+}
+function setYoySort(sort){
+  yoySort=sort;yoyShowAll=false;
+  document.querySelectorAll('.tog[data-yoy]').forEach(t=>t.classList.toggle('active',t.dataset.yoy===sort));
+  renderYoy();
+}
+function showAllYoy(){yoyShowAll=true;renderYoy();}
+function renderYoy(){
+  const d=yoyData,sumEl=document.getElementById('yoy-summary'),el=document.getElementById('yoy-items'),more=document.getElementById('yoy-more');
+  if(!d)return;
+  const y0=d.yr-1,y1=d.yr;
+  const thru=d.cutLY.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  document.getElementById('yoy-title').textContent='Items · '+y1+' vs '+y0;
+  if(!d.rows.length){sumEl.innerHTML='';el.innerHTML='<div class="empty-state">No items saved for '+y0+' or '+y1+' yet.</div>';more.innerHTML='';return;}
+  if(!d.s0){sumEl.innerHTML='';el.innerHTML='<div class="empty-state">No '+y0+' invoices from Jan 1 – '+esc(thru)+' are saved, so there is nothing to compare against yet.</div>';more.innerHTML='';return;}
+
+  const cls=n=>Math.round(n)>0?'yoy-up':Math.round(n)<0?'yoy-down':'';
+  const stat=(label,value,valueCls,meta)=>'<div class="yoy-stat"><div class="yoy-stat-label">'+label+'</div><div class="yoy-stat-value '+valueCls+'">'+value+'</div><div class="yoy-stat-meta">'+meta+'</div></div>';
+  const net=d.newSpend-d.dropSpend;
+  sumEl.innerHTML=
+    stat('Item spend '+y1,money0(d.s1),'',pctSpan((d.s1-d.s0)/d.s0)+' vs '+money0(d.s0)+' in '+y0+' · '+signedMoney0(d.s1-d.s0))+
+    stat('From price changes',signedMoney0(d.price),cls(d.price),'Same items, paying '+(Math.round(d.price)>=0?'more':'less')+' per unit')+
+    stat('From buying more / less',signedMoney0(d.qty),cls(d.qty),'Same items, '+(Math.round(d.qty)>=0?'larger':'smaller')+' quantities')+
+    stat('New vs no longer bought',signedMoney0(net),cls(net),d.newCount+' new '+money0(d.newSpend)+' · '+d.dropCount+' not bought '+money0(d.dropSpend));
+
+  let list=d.rows.slice();
+  if(yoySort==='price')list=list.filter(r=>r.pricePct!==null).sort((a,b)=>Math.abs(b.pricePct)-Math.abs(a.pricePct));
+  else if(yoySort==='spend')list.sort((a,b)=>(b.s1-a.s1)||(b.s0-a.s0));
+  else list.sort((a,b)=>Math.abs(b.change)-Math.abs(a.change));
+  const total=list.length,LIMIT=15,shown=yoyShowAll?list:list.slice(0,LIMIT);
+
+  const priceCell=r=>{
+    if(r.pricePct===null)return '<td class="right cell-sub">'+(r.n1?'new':'not bought')+'</td>';
+    return '<td class="right">'+money(r.p0)+' → <b>'+money(r.p1)+'</b> '+pctSpan(r.pricePct)+'</td>';
+  };
+  el.innerHTML=shown.length?'<table class="data-table"><thead><tr><th>Item</th><th class="right">'+y0+'</th><th class="right">'+y1+'</th><th class="right">Change</th><th class="right">Qty '+y0+' → '+y1+'</th><th class="right">Avg price '+y0+' → '+y1+'</th></tr></thead><tbody>'+
+    shown.map(r=>'<tr onclick="openItemHistory(\''+keyAttr(r.key)+'\')"><td><div style="font-weight:600;">'+esc(r.description||codeOf(r.key))+'</div><div class="cell-sub">'+esc(r.mfgCode?'MFG# '+r.mfgCode:codeOf(r.key))+'</div></td>'+
+      '<td class="right">'+(r.n0?money0(r.s0):'—')+'</td><td class="right" style="font-weight:600;">'+(r.n1?money0(r.s1):'—')+'</td>'+
+      '<td class="right '+cls(r.change)+'" style="font-weight:600;">'+signedMoney0(r.change)+'</td>'+
+      '<td class="right">'+(Math.round(r.q0*10)/10)+' → '+(Math.round(r.q1*10)/10)+(r.uom?' <span class="cell-sub">'+esc(r.uom)+'</span>':'')+'</td>'+
+      priceCell(r)+'</tr>').join('')+'</tbody></table>'
+    :'<div class="empty-state">No items were bought in both years, so there are no price moves to show.</div>';
+  more.innerHTML=(total>shown.length?'Showing '+shown.length+' of '+total+' · <button onclick="showAllYoy()">Show all</button><br>':'')+
+    'Both years Jan 1 – '+esc(thru)+'. Item lines only — freight, delivery and tax are not included. Average price is spend ÷ quantity.';
 }
 function renderTopItems(){
   const el=document.getElementById('top-items');
