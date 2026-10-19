@@ -106,7 +106,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .data-table td{padding:12px 14px;border-bottom:1px solid var(--surface2);}
 .data-table tr:last-child td{border-bottom:none;}
 .data-table .right{text-align:right;}
-.data-table tfoot td{border-top:2px solid var(--border);border-bottom:none;font-weight:700;color:var(--text);}
+.data-table tfoot td{border-bottom:none;font-weight:600;color:var(--text2);padding-top:8px;padding-bottom:8px;}
+.data-table tfoot .foot-first td{border-top:2px solid var(--border);padding-top:14px;}
+.data-table tfoot .foot-total td{border-top:1px solid var(--border);font-weight:700;color:var(--text);}
 .data-table tfoot .foot-note{font-weight:400;font-size:12px;color:var(--text3);border-top:none;padding-top:0;}
 .data-table tr:hover td{background:var(--surface2);}
 .pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;}
@@ -1334,13 +1336,20 @@ function renderConvTable(rows){
   const list=shown.length?shown:rows;
   const tf=document.getElementById('conv-tfoot');tf.innerHTML='';
   if(!list.length){tb.innerHTML='<tr><td colspan="6" class="empty-state">No matched reservations in this view</td></tr>';document.getElementById('conv-sub').textContent='';return;}
-  // Subtotal counts Conversion rows only, so it always equals the Attributed Revenue card.
-  const conv=rows.filter(r=>r.type==='Conversion');
-  const convTotal=conv.reduce((t,r)=>t+(r.revenue||0),0);
-  const others=list.length-conv.length;
-  tf.innerHTML='<tr><td colspan="5">Total from conversions · '+conv.length+' reservation'+(conv.length===1?'':'s')+'</td>'+
-    '<td class="right">'+fmt$(convTotal)+'</td></tr>'+
-    (others>0?'<tr><td colspan="6" class="foot-note">Rows marked Existing or No stay data are listed for reference and are not included in this total.</td></tr>':'');
+  // Totals cover every matched reservation in this view, including any not listed above.
+  // "New guest bookings" is the same figure as the Attributed Revenue card.
+  const sum=list=>list.reduce((t,r)=>t+(r.revenue||0),0);
+  const plural=n=>n+' reservation'+(n===1?'':'s');
+  const conv=rows.filter(r=>r.type==='Conversion'),exist=rows.filter(r=>r.type==='Existing guest');
+  const unknown=rows.length-conv.length-exist.length;
+  const line=(label,list,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><td colspan="5">'+label+' · '+plural(list.length)+'</td><td class="right">'+fmt$(sum(list))+'</td></tr>';
+  tf.innerHTML=line('New guest bookings',conv,'foot-first')+
+    line('Existing guests',exist)+
+    line('All matched callers',conv.concat(exist),'foot-total')+
+    ((exist.length&&shown.length)||unknown?'<tr><td colspan="6" class="foot-note">'+
+      [exist.length&&shown.length?'Existing-guest reservations are counted here but not listed above.':'',
+       unknown?plural(unknown)+' without stay data yet '+(unknown===1?'is':'are')+' not included in these totals.':''].filter(Boolean).join(' ')+
+    '</td></tr>':'');
   document.getElementById('conv-sub').textContent=rows.filter(r=>r.type==='Conversion').length+' conversions · '+rows.filter(r=>r.type==='Existing guest').length+' existing';
   tb.innerHTML=list.map(r=>{
     const pill=r.type==='Conversion'?'<span class="pill g">Conversion</span>':r.type==='Existing guest'?'<span class="pill a">Existing</span>':'<span class="pill a">No stay data</span>';
