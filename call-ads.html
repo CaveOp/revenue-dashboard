@@ -106,6 +106,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .data-table td{padding:12px 14px;border-bottom:1px solid var(--surface2);}
 .data-table tr:last-child td{border-bottom:none;}
 .data-table .right{text-align:right;}
+.data-table tfoot td{border-top:2px solid var(--border);border-bottom:none;font-weight:700;color:var(--text);}
+.data-table tfoot .foot-note{font-weight:400;font-size:12px;color:var(--text3);border-top:none;padding-top:0;}
 .data-table tr:hover td{background:var(--surface2);}
 .pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;}
 .pill.g{background:var(--green-bg);color:var(--green);}
@@ -373,6 +375,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
             <th class="right">Stay Revenue</th>
           </tr></thead>
           <tbody id="conv-tbody"></tbody>
+          <tfoot id="conv-tfoot"></tfoot>
         </table>
       </div>
     </div>
@@ -578,7 +581,7 @@ async function readText(file){
     for(let i=0;i<n;i++)if(b[i]===0){if(i%2)odd++;else even++;}
     if(odd>n/4)enc='utf-16le';else if(even>n/4)enc='utf-16be';
   }
-  return new TextDecoder(enc).decode(b).replace(/^﻿/,'').replace(/ /g,'');
+  return new TextDecoder(enc).decode(b).replace(/^\uFEFF/,'').replace(/\u0000/g,'');
 }
 
 /* ---------- CSV parse ---------- */
@@ -1329,7 +1332,15 @@ function renderConvTable(rows){
   const tb=document.getElementById('conv-tbody');
   const shown=rows.filter(r=>r.type!=='Existing guest');   // lead with conversions + unknowns
   const list=shown.length?shown:rows;
+  const tf=document.getElementById('conv-tfoot');tf.innerHTML='';
   if(!list.length){tb.innerHTML='<tr><td colspan="6" class="empty-state">No matched reservations in this view</td></tr>';document.getElementById('conv-sub').textContent='';return;}
+  // Subtotal counts Conversion rows only, so it always equals the Attributed Revenue card.
+  const conv=rows.filter(r=>r.type==='Conversion');
+  const convTotal=conv.reduce((t,r)=>t+(r.revenue||0),0);
+  const others=list.length-conv.length;
+  tf.innerHTML='<tr><td colspan="5">Total from conversions · '+conv.length+' reservation'+(conv.length===1?'':'s')+'</td>'+
+    '<td class="right">'+fmt$(convTotal)+'</td></tr>'+
+    (others>0?'<tr><td colspan="6" class="foot-note">Rows marked Existing or No stay data are listed for reference and are not included in this total.</td></tr>':'');
   document.getElementById('conv-sub').textContent=rows.filter(r=>r.type==='Conversion').length+' conversions · '+rows.filter(r=>r.type==='Existing guest').length+' existing';
   tb.innerHTML=list.map(r=>{
     const pill=r.type==='Conversion'?'<span class="pill g">Conversion</span>':r.type==='Existing guest'?'<span class="pill a">Existing</span>':'<span class="pill a">No stay data</span>';
