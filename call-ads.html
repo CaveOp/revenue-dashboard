@@ -154,6 +154,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .im-stat:last-child{border-bottom:none;}
 .im-stat b{font-weight:700;color:var(--text);}
 .im-privacy{font-size:11px;color:var(--text3);margin-top:16px;line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
+.im-check{margin-top:18px;border-top:1px solid var(--border);padding-top:14px;}
+.im-check label{display:block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.im-check-row{display:flex;gap:8px;}
+.im-check-row input{flex:1;font-family:var(--sans);font-size:13px;padding:10px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);min-width:0;}
+.im-check-hint{font-size:11px;color:var(--text3);margin-top:6px;line-height:1.6;}
+.im-check-out{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--text2);margin-top:10px;white-space:pre-wrap;line-height:1.7;}
+.im-check-out b{color:var(--text);}
 .im-modes{display:flex;flex-direction:column;gap:8px;}
 .im-mode{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border:1px solid var(--border2);border-radius:9px;cursor:pointer;}
 .im-mode:hover{border-color:var(--slate3);}
@@ -226,6 +233,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
   </div>
 
   <div id="im-result" style="display:none;"></div>
+
+  <div class="im-check">
+    <label for="im-check-num">Check one number</label>
+    <div class="im-check-row">
+      <input type="text" id="im-check-num" placeholder="e.g. 530-555-1234" autocomplete="off" onkeydown="if(event.key==='Enter')checkNumber()">
+      <button class="im-btn ghost" onclick="checkNumber()">Look up</button>
+    </div>
+    <div class="im-check-hint">Type a phone number to see whether it is in the call log, whether it is in the reservations export, and which Res# it belongs to. Both files are re-read here in your browser; nothing is saved.</div>
+    <div id="im-check-out"></div>
+  </div>
 
   <div class="im-privacy">Privacy: this page reads the caller number from the call log and the phone columns from the reservations export only to match them in your browser. What gets saved to the sheet for each call is: date and time, reporting period, campaign, call source and type, status, duration, area code, and the matched reservation number (if any). No names, no full phone numbers, no emails ever leave this computer.</div>
 </div>
@@ -526,11 +543,25 @@ function parsePeriodLabel(label){
 }
 function daysBetween(a,b){return Math.round((startOfDay(b)-startOfDay(a))/86400000);}
 
-/* ---------- Phone normalise ---------- */
+/* ---------- Phone normalise ----------
+   A number is keyed by its ten digits (area code + local). "+1 (530) 555-1234",
+   "1-530-555-1234" and "5305551234" all key the same. Anything typed after the
+   number — "x12", "ext 4", a second number — must not change the key, which is
+   why the leading country code is removed and the FIRST ten digits are kept. */
 function normPhone(s){
   let d=String(s||'').replace(/\D/g,'');
-  if(d.length>10)d=d.slice(-10);            // drop country code / extras, keep last 10
+  if(d.length>10&&d[0]==='1')d=d.slice(1);  // US/Canada country code
+  if(d.length>10)d=d.slice(0,10);            // extension or other trailing digits
   return d.length===10?d:'';
+}
+// A reservation's phone cell sometimes holds two numbers ("530-555-1234 / 916-555-9876",
+// "... or ...", "... ext 2"). Every number in the cell gets its own key.
+function phoneKeys(cell){
+  const parts=String(cell||'').split(/[\/;,|]|\s(?:or|and)\s|\b(?:ext|extension|x)\.?\s*(?=\d)/i);
+  const keys=[];
+  parts.forEach(pt=>{const k=normPhone(pt);if(k&&keys.indexOf(k)===-1)keys.push(k);});
+  if(!keys.length){const k=normPhone(cell);if(k)keys.push(k);}
+  return keys;
 }
 
 /* ---------- CSV parse ---------- */
@@ -627,9 +658,9 @@ function parseReservations(rows){
   let resCount=0;
   for(let i=hIdx+1;i<rows.length;i++){
     const r=rows[i];const res=String(r[resIx]||'').trim();if(!res)continue;resCount++;
-    phoneCols.forEach(ci=>{const p=normPhone(r[ci]);if(p){(map[p]=map[p]||new Set()).add(res);}});
+    phoneCols.forEach(ci=>{phoneKeys(r[ci]).forEach(p=>{(map[p]=map[p]||new Set()).add(res);});});
   }
-  return {map,resCount,phoneColCount:phoneCols.length};
+  return {map,resCount,phoneColCount:phoneCols.length,resIx,phoneCols,hIdx};
 }
 
 /* ---------- Stored history: read, key, merge ---------- */
@@ -748,6 +779,8 @@ function openImport(){
   document.querySelectorAll('#im-modes .im-mode').forEach(m=>m.classList.toggle('sel',m.dataset.mode==='add'));
   document.getElementById('im-calls').value='';
   document.getElementById('im-res').value='';
+  document.getElementById('im-check-num').value='';
+  document.getElementById('im-check-out').textContent='';
   document.getElementById('im-status').textContent='';
   document.getElementById('im-preview-wrap').style.display='none';
   document.getElementById('im-result').style.display='none';
@@ -756,6 +789,57 @@ function openImport(){
 }
 function closeImport(){pendingImport=null;document.getElementById('import-overlay').style.display='none';document.getElementById('import-modal').style.display='none';}
 function cancelPreview(){pendingImport=null;document.getElementById('im-preview-wrap').style.display='none';document.getElementById('im-status').textContent='Cancelled — nothing was saved.';}
+
+/* Trace one phone number through both files. Reads the files again on demand so the
+   page never has to hold phone numbers after matching. Nothing here is saved. */
+async function checkNumber(){
+  const out=document.getElementById('im-check-out');
+  const typed=document.getElementById('im-check-num').value;
+  const key=normPhone(typed);
+  out.className='im-check-out';
+  if(!key){out.textContent=typed.replace(/\D/g,'').length?'That is not a ten-digit number. Enter the area code and number, like 530-555-1234.':'Enter a phone number first.';return;}
+  const cf=document.getElementById('im-calls').files[0];
+  const rf=document.getElementById('im-res').files[0];
+  if(!cf&&!rf){out.textContent='Choose the call log and the reservations export first.';return;}
+  const lines=[];
+  try{
+    if(cf){
+      const rows=parseCSV(await cf.text());
+      const {calls}=parseCallLog(rows);
+      const hits=calls.filter(c=>c.phone===key);
+      if(hits.length)lines.push('<b>Call log:</b> '+hits.length+' call'+(hits.length===1?'':'s')+' from this number — '+
+        hits.map(c=>fmtDay(c.date)+(c.campaign?' ('+esc(c.campaign)+')':'')).join(', ')+'.');
+      else lines.push('<b>Call log:</b> no call from this number'+(calls.length?' among the '+calls.length+' calls in the file.':'.'));
+    }else lines.push('<b>Call log:</b> no file chosen.');
+    if(rf){
+      const rows=parseCSV(await rf.text());
+      const {map,resCount,resIx,phoneCols,hIdx}=parseReservations(rows);
+      const exact=map[key]?[...map[key]]:[];
+      if(exact.length){
+        lines.push('<b>Reservations export:</b> found — Res# '+exact.map(esc).join(', ')+'. A call from this number will match.');
+      }else{
+        // Look for a near miss: the same last seven digits, but a stored value the
+        // normaliser could not read (nine digits, a different area code, a typo).
+        const last7=key.slice(-7);const near=[];
+        for(let i=hIdx+1;i<rows.length;i++){
+          const r=rows[i];const res=String(r[resIx]||'').trim();if(!res)continue;
+          phoneCols.forEach(ci=>{const raw=String(r[ci]||'');const d=raw.replace(/\D/g,'');
+            if(d.length>=7&&d.indexOf(last7)!==-1&&!phoneKeys(raw).includes(key))near.push({res,raw});});
+        }
+        if(near.length){
+          lines.push('<b>Reservations export:</b> not stored this way. A similar number is on '+
+            near.map(n=>'Res# '+esc(n.res)+' as “'+esc(n.raw)+'”').join('; ')+
+            '. The digits differ from what the caller dialled from, so the match cannot be made automatically — fix the phone on the reservation in ResNexus and export again.');
+        }else{
+          lines.push('<b>Reservations export:</b> not in this file ('+resCount+' reservations, '+Object.keys(map).length+' distinct numbers). '+
+            'If the reservation exists in ResNexus, the export does not cover it — Guests by Date is filtered by arrival date, so a reservation for a later stay is left out. '+
+            'Export a range wide enough to include when that guest arrives, or check that the number is on the reservation record itself (not only on a guest profile).');
+        }
+      }
+    }else lines.push('<b>Reservations export:</b> no file chosen.');
+  }catch(e){out.textContent='Could not read the files: '+e.message;return;}
+  out.innerHTML=lines.join('\n');
+}
 
 async function analyzeImport(){
   const status=document.getElementById('im-status');
