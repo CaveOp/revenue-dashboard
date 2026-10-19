@@ -564,6 +564,23 @@ function phoneKeys(cell){
   return keys;
 }
 
+/* ---------- File reading ----------
+   Some ResNexus exports are saved as UTF-16 text, not UTF-8. Read as UTF-8, every
+   letter comes out with a hidden null after it: "Res#" still matches, but "Phone"
+   does not, so not a single phone number is found. Detect the encoding instead. */
+async function readText(file){
+  const b=new Uint8Array(await file.arrayBuffer());
+  let enc='utf-8';
+  if(b[0]===0xFF&&b[1]===0xFE)enc='utf-16le';
+  else if(b[0]===0xFE&&b[1]===0xFF)enc='utf-16be';
+  else if(!(b[0]===0xEF&&b[1]===0xBB)){        // no BOM: look for UTF-16's tell-tale zero bytes
+    let even=0,odd=0;const n=Math.min(b.length,2000);
+    for(let i=0;i<n;i++)if(b[i]===0){if(i%2)odd++;else even++;}
+    if(odd>n/4)enc='utf-16le';else if(even>n/4)enc='utf-16be';
+  }
+  return new TextDecoder(enc).decode(b).replace(/^﻿/,'').replace(/ /g,'');
+}
+
 /* ---------- CSV parse ---------- */
 function parseCSV(text){
   const rows=[];let row=[],cur='',inQ=false;
@@ -804,7 +821,7 @@ async function checkNumber(){
   const lines=[];
   try{
     if(cf){
-      const rows=parseCSV(await cf.text());
+      const rows=parseCSV(await readText(cf));
       const {calls}=parseCallLog(rows);
       const hits=calls.filter(c=>c.phone===key);
       if(hits.length)lines.push('<b>Call log:</b> '+hits.length+' call'+(hits.length===1?'':'s')+' from this number — '+
@@ -812,7 +829,7 @@ async function checkNumber(){
       else lines.push('<b>Call log:</b> no call from this number'+(calls.length?' among the '+calls.length+' calls in the file.':'.'));
     }else lines.push('<b>Call log:</b> no file chosen.');
     if(rf){
-      const rows=parseCSV(await rf.text());
+      const rows=parseCSV(await readText(rf));
       const {map,resCount,resIx,phoneCols,hIdx}=parseReservations(rows);
       const exact=map[key]?[...map[key]]:[];
       if(exact.length){
@@ -852,8 +869,8 @@ async function analyzeImport(){
   if(!rf){status.textContent='Choose the ResNexus reservations export too.';return;}
   status.textContent='Reading files…';
   try{
-    const callRows=parseCSV(await cf.text());
-    const resRows=parseCSV(await rf.text());
+    const callRows=parseCSV(await readText(cf));
+    const resRows=parseCSV(await readText(rf));
     const parsed=parseCallLog(callRows);
     const {calls,period,periodStart,periodEnd,dataStart,dataEnd}=parsed;
     const {map,resCount,phoneColCount}=parseReservations(resRows);
@@ -920,6 +937,8 @@ async function analyzeImport(){
       warn+=(warn?'\n\n':'')+(
         !withPhone
           ? 'None of the '+calls.length+' calls in this log carry a readable phone number, so nothing can be matched. Saving still records the call volume, but there will be no conversions or revenue for this period.'
+          : !Object.keys(map).length
+          ? 'The reservations export was read, but no phone numbers could be found in it ('+phoneColCount+' phone column'+(phoneColCount===1?'':'s')+'). Check that the file has Phone or Cell Phone columns with numbers in them, then try again. Saving now records the calls with zero conversions.'
           : 'None of the '+withPhone+' callers appear in this reservations export. Usually that means the export does not cover them — if it was filtered by arrival or booking date, re-run it wide enough to include anyone who called between '+fmtDay(span.start)+' and '+fmtDay(span.end)+'. Saving now records the calls with zero conversions.');
     }
     if(importMode==='all'&&existing.length){
