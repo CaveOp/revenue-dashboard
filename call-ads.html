@@ -904,11 +904,17 @@ async function buildAudit(kind){
     ordered.forEach(c=>{const set=c.phone?map[c.phone]:null;if(!set)return;[...set].forEach(res=>{if(c.date&&(!first[res]||c.date<first[res].date))first[res]={date:c.date,call:c};});});
     // last-seven-digit index for near misses
     const last7={};Object.keys(map).forEach(k=>{(last7[k.slice(-7)]=last7[k.slice(-7)]||[]).push(k);});
+    // every line number each caller number appears on, so repeat callers are visible
+    const linesByPhone={};ordered.forEach((c,i)=>{if(c.phone)(linesByPhone[c.phone]=linesByPhone[c.phone]||[]).push(i+1);});
+    const distinctCallers=Object.keys(linesByPhone).length;
+    const repeatCallers=Object.keys(linesByPhone).filter(k=>linesByPhone[k].length>1).length;
     const rows=[];let n=0;
     ordered.forEach(c=>{
       n++;
+      const others=c.phone?linesByPhone[c.phone].filter(x=>x!==n):[];
+      const repeats=c.phone?(others.length?(others.length+1)+' (also line'+(others.length===1?' ':'s ')+others.join(', ')+')':'1'):'';
       const base={n,when:fmtStamp(c.dateTime,c.hasTime),campaign:c.campaign,source:c.source,type:c.type,status:c.status,duration:c.duration,
-        dialled:c.rawPhone,key:c.phone?c.phone.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3'):''};
+        dialled:c.rawPhone,key:c.phone?c.phone.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3'):'',repeats};
       const blank={res:'',guest:'',arrival:'',nights:'',via:'',booked:'',rule:'',revenue:''};
       const set=c.phone?map[c.phone]:null;
       if(!c.phone){rows.push(Object.assign({},base,blank,{result:'No usable phone number on the call'}));return;}
@@ -933,7 +939,7 @@ async function buildAudit(kind){
     });
     const conv=rows.filter(r=>/^Conversion/.test(r.rule)),exist=rows.filter(r=>/^Existing/.test(r.rule)),nodata=rows.filter(r=>/^No stay/.test(r.rule));
     const rev=conv.reduce((a,r)=>a+(r.revenue||0),0);
-    const cols=[['n','#'],['when','Call'],['campaign','Campaign'],['source','Source'],['type','Type'],['status','Status'],['duration','Secs'],['dialled','Caller (as logged)'],['key','Matched on'],
+    const cols=[['n','#'],['when','Call'],['campaign','Campaign'],['source','Source'],['type','Type'],['status','Status'],['duration','Secs'],['dialled','Caller (as logged)'],['key','Matched on'],['repeats','Calls from this number'],
       ['result','Result'],['guest','Guest'],['arrival','Arrival'],['nights','Nights'],['via','Reservation phone'],['booked','Booked on'],['rule','Rule applied'],['revenue','Revenue counted']];
     if(kind==='csv'){
       const q=v=>{v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
@@ -948,16 +954,16 @@ async function buildAudit(kind){
       'body{font-family:Segoe UI,Arial,sans-serif;font-size:12px;color:#1a2530;margin:24px;}h1{font-size:18px;margin:0 0 4px;}p{color:#4a5568;margin:0 0 14px;line-height:1.5;max-width:900px;}'+
       '.sums{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 16px;}.s{border:1px solid #dde3ea;border-radius:8px;padding:8px 12px;}.s span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8a9bb0;}.s b{font-size:15px;}'+
       'table{border-collapse:collapse;width:100%;}th,td{border:1px solid #dde3ea;padding:5px 7px;text-align:left;vertical-align:top;}th{background:#f3f6f9;font-size:10px;text-transform:uppercase;letter-spacing:.06em;position:sticky;top:0;}'+
-      'tr.conv td{background:#eef7f1;}tr.exist td{background:#fbf6ee;}tr.nodata td{background:#fdf1ef;}td.num{text-align:right;white-space:nowrap;}'+
+      'tr.conv td{background:#eef7f1;}tr.exist td{background:#fbf6ee;}tr.nodata td{background:#fdf1ef;}td.num{text-align:right;white-space:nowrap;}td.rep{font-weight:600;}'+
       '.bar{margin:0 0 14px;}button{font:inherit;padding:6px 12px;margin-right:8px;}@media print{.bar{display:none}body{margin:8mm}th{position:static}}'+
       '</style></head><body><h1>Call Ads audit · '+esc(period||'')+'</h1>'+
       '<p>Every call in the agency log, in time order. A call matches a reservation when the caller number equals a number on the reservation in the ResNexus export ('+resCount+' reservations). '+
       'Generated '+esc(nowStamp())+' in the browser; this page is not saved anywhere.</p>'+
-      '<div class="sums">'+sum('Calls',calls.length)+sum('Matched calls',new Set(rows.filter(r=>r.res).map(r=>r.n)).size)+sum('Conversions',conv.length)+sum('Existing guests',exist.length)+sum('No stay data',nodata.length)+sum('Revenue counted',fmt$(rev))+'</div>'+
+      '<div class="sums">'+sum('Calls',calls.length)+sum('Distinct callers',distinctCallers+(repeatCallers?' ('+repeatCallers+' called more than once)':''))+sum('Matched calls',new Set(rows.filter(r=>r.res).map(r=>r.n)).size)+sum('Conversions',conv.length)+sum('Existing guests',exist.length)+sum('No stay data',nodata.length)+sum('Revenue counted',fmt$(rev))+'</div>'+
       '<div class="bar"><button onclick="window.print()">Print / PDF</button></div>'+
       '<table><thead><tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'</tr></thead><tbody>'+
       rows.map(r=>{const cls=/^Conversion/.test(r.rule)?'conv':/^Existing/.test(r.rule)?'exist':/^No stay/.test(r.rule)?'nodata':'';
-        return '<tr class="'+cls+'">'+cols.map(c=>'<td'+(c[0]==='revenue'||c[0]==='duration'||c[0]==='n'?' class="num"':'')+'>'+esc(c[0]==='revenue'&&r.revenue!==''?fmt$(r.revenue):r[c[0]])+'</td>').join('')+'</tr>';}).join('')+
+        return '<tr class="'+cls+'">'+cols.map(c=>'<td'+(c[0]==='revenue'||c[0]==='duration'||c[0]==='n'?' class="num"':c[0]==='repeats'&&/also/.test(r.repeats)?' class="rep"':'')+'>'+esc(c[0]==='revenue'&&r.revenue!==''?fmt$(r.revenue):r[c[0]])+'</td>').join('')+'</tr>';}).join('')+
       '</tbody></table></body></html>';
     const w=window.open('','_blank');
     if(!w){out.textContent='The browser blocked the new tab. Allow pop-ups for this page, or use Download audit CSV instead.';return;}
