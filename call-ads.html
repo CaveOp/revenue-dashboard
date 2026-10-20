@@ -248,6 +248,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
     <div id="im-check-out"></div>
   </div>
 
+  <div class="im-check">
+    <label>Audit every call</label>
+    <div class="im-row" style="margin-top:0;">
+      <button class="im-btn ghost" onclick="buildAudit('page')">Open audit page</button>
+      <button class="im-btn ghost" onclick="buildAudit('csv')">Download audit CSV</button>
+    </div>
+    <div class="im-check-hint">One line per call in the call log: the number dialled from, the reservation it matched (guest, arrival, which phone column), the booked-on date from the stays sheet, and the conversion rule applied. Built here in your browser from the two files above and the stays already loaded; the page opens in a new tab and nothing is saved to the sheet.</div>
+    <div id="im-audit-out"></div>
+  </div>
+
   <div class="im-privacy">Privacy: this page reads the caller number from the call log and the phone columns from the reservations export only to match them in your browser. What gets saved to the sheet for each call is: date and time, reporting period, campaign, call source and type, status, duration, area code, and the matched reservation number (if any). No names, no full phone numbers, no emails ever leave this computer.</div>
 </div>
 
@@ -644,6 +654,7 @@ function parseCallLog(rows){
     if(!phone && !dateTime)continue;
     calls.push({
       phone,
+      rawPhone:String(rawPhone||'').trim(),
       dateTime,
       date:dateTime?startOfDay(dateTime):null,
       hasTime:!!dateTime&&hasTimePart(rawTime),
@@ -663,7 +674,9 @@ function parseCallLog(rows){
 }
 
 /* ---------- Reservations parsing (browser only, never stored) ---------- */
-const RES_ALIASES={res:['Res#','Res','Reservation','Reservation #','Reservation Number','Confirmation','Confirmation #']};
+const RES_ALIASES={res:['Res#','Res','Reservation','Reservation #','Reservation Number','Confirmation','Confirmation #'],
+  guest:['Guest','Guest Name','Name','Primary Guest'],arrival:['Arrival','Arrival Date','Check In','Check-In','Checkin'],
+  departure:['Departure','Departure Date','Check Out','Check-Out','Checkout'],nights:['# Nights','Nights','Night Count']};
 function parseReservations(rows){
   let hIdx=-1;
   for(let i=0;i<Math.min(rows.length,15);i++){
@@ -677,12 +690,18 @@ function parseReservations(rows){
   const resIx=findIdx(H,RES_ALIASES.res);
   const phoneCols=[];H.forEach((h,i)=>{if(/phone|cell|mobile/i.test(String(h)))phoneCols.push(i);});
   const map={};                              // normalizedPhone -> Set(Res#)
+  const info={};                             // Res# -> guest/arrival/phones, for the audit page only
+  const gIx=findIdx(H,RES_ALIASES.guest),aIx=findIdx(H,RES_ALIASES.arrival),dIx=findIdx(H,RES_ALIASES.departure),nIx=findIdx(H,RES_ALIASES.nights);
   let resCount=0;
   for(let i=hIdx+1;i<rows.length;i++){
     const r=rows[i];const res=String(r[resIx]||'').trim();if(!res)continue;resCount++;
-    phoneCols.forEach(ci=>{phoneKeys(r[ci]).forEach(p=>{(map[p]=map[p]||new Set()).add(res);});});
+    const rec=info[res]||(info[res]={guest:gIx>=0?String(r[gIx]||'').trim():'',arrival:aIx>=0?String(r[aIx]||'').trim():'',
+      departure:dIx>=0?String(r[dIx]||'').trim():'',nights:nIx>=0?String(r[nIx]||'').trim():'',phones:[]});
+    phoneCols.forEach(ci=>{const raw=String(r[ci]||'').trim();const ks=phoneKeys(raw);
+      const col=String(H[ci]).trim();if(ks.length&&!rec.phones.some(p=>p.col===col&&p.raw===raw))rec.phones.push({col,raw,keys:ks});
+      ks.forEach(p=>{(map[p]=map[p]||new Set()).add(res);});});
   }
-  return {map,resCount,phoneColCount:phoneCols.length,resIx,phoneCols,hIdx};
+  return {map,info,resCount,phoneColCount:phoneCols.length,resIx,phoneCols,hIdx};
 }
 
 /* ---------- Stored history: read, key, merge ---------- */
@@ -863,6 +882,91 @@ async function checkNumber(){
   out.innerHTML=lines.join('\n');
 }
 
+/* ---------- Audit: every call, line by line (browser only, never stored) ----------
+   The dashboard counts a reservation once, against the earliest call that matched it,
+   and calls it a conversion when the booked-on date (STAYS_CLEAN) is on or after that
+   call. The audit shows every call, repeats that rule, and says where each number
+   came from so a reviewer can check any line against the source files. */
+async function buildAudit(kind){
+  const out=document.getElementById('im-audit-out');
+  out.className='im-check-out';
+  const cf=document.getElementById('im-calls').files[0];
+  const rf=document.getElementById('im-res').files[0];
+  if(!cf||!rf){out.textContent='Choose the call log and the reservations export first.';return;}
+  if(!Object.keys(staysByRes).length){out.textContent='The stays sheet has not loaded yet, so booked-on dates would be blank. Wait for the dashboard to finish loading and try again.';return;}
+  out.textContent='Building…';
+  try{
+    const {calls,period}=parseCallLog(parseCSV(await readText(cf)));
+    const {map,info,resCount}=parseReservations(parseCSV(await readText(rf)));
+    const ordered=calls.slice().sort((a,b)=>(a.dateTime||0)-(b.dateTime||0));
+    // earliest call per reservation, the same attribution the dashboard uses
+    const first={};
+    ordered.forEach(c=>{const set=c.phone?map[c.phone]:null;if(!set)return;[...set].forEach(res=>{if(c.date&&(!first[res]||c.date<first[res].date))first[res]={date:c.date,call:c};});});
+    // last-seven-digit index for near misses
+    const last7={};Object.keys(map).forEach(k=>{(last7[k.slice(-7)]=last7[k.slice(-7)]||[]).push(k);});
+    const rows=[];let n=0;
+    ordered.forEach(c=>{
+      n++;
+      const base={n,when:fmtStamp(c.dateTime,c.hasTime),campaign:c.campaign,source:c.source,type:c.type,status:c.status,duration:c.duration,
+        dialled:c.rawPhone,key:c.phone?c.phone.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3'):''};
+      const blank={res:'',guest:'',arrival:'',nights:'',via:'',booked:'',rule:'',revenue:''};
+      const set=c.phone?map[c.phone]:null;
+      if(!c.phone){rows.push(Object.assign({},base,blank,{result:'No usable phone number on the call'}));return;}
+      if(!set){
+        const near=(last7[c.phone.slice(-7)]||[]).filter(k=>k!==c.phone);
+        const why=near.length?'Not in export; similar number on Res# '+near.map(k=>[...map[k]].join('/')).join(', ')+' (different area code or typo)':'Number not in the reservations export';
+        rows.push(Object.assign({},base,blank,{result:why}));return;
+      }
+      [...set].forEach(res=>{
+        const i=info[res]||{phones:[]};
+        const via=i.phones.filter(p=>p.keys.includes(c.phone)).map(p=>p.col+' = '+p.raw).join('; ');
+        const f=first[res];const isFirst=f&&f.call===c;
+        const cl=classify(res,f?f.date:c.date);
+        let rule,counted='';
+        if(!isFirst)rule='Not counted here — reservation already attributed to the earlier call on '+fmtDay(f.date);
+        else if(cl.bucket==='conv'){rule='Conversion — booked '+fmtDay(cl.reservedOn)+', on/after this call';counted=cl.revenue;}
+        else if(cl.bucket==='exist')rule='Existing guest — booked '+fmtDay(cl.reservedOn)+', before this call';
+        else rule='No stay data — Res# not in STAYS_CLEAN, not counted';
+        rows.push(Object.assign({},base,{result:'Matched Res# '+res,res,guest:i.guest||'',arrival:i.arrival||'',nights:i.nights||'',via,
+          booked:cl.reservedOn?fmtDay(cl.reservedOn):'',rule,revenue:counted===''?'':Math.round(counted)}));
+      });
+    });
+    const conv=rows.filter(r=>/^Conversion/.test(r.rule)),exist=rows.filter(r=>/^Existing/.test(r.rule)),nodata=rows.filter(r=>/^No stay/.test(r.rule));
+    const rev=conv.reduce((a,r)=>a+(r.revenue||0),0);
+    const cols=[['n','#'],['when','Call'],['campaign','Campaign'],['source','Source'],['type','Type'],['status','Status'],['duration','Secs'],['dialled','Caller (as logged)'],['key','Matched on'],
+      ['result','Result'],['guest','Guest'],['arrival','Arrival'],['nights','Nights'],['via','Reservation phone'],['booked','Booked on'],['rule','Rule applied'],['revenue','Revenue counted']];
+    if(kind==='csv'){
+      const q=v=>{v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+      const csv=[cols.map(c=>c[1]).join(',')].concat(rows.map(r=>cols.map(c=>q(r[c[0]])).join(','))).join('\r\n');
+      const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv'}));
+      a.download='call-ads-audit '+(period||'').replace(/[^\w .-]+/g,'-')+'.csv';document.body.appendChild(a);a.click();a.remove();
+      out.textContent='Downloaded '+rows.length+' lines. This file holds phone numbers and guest names — keep it with the auditor, not on the shared drive.';
+      return;
+    }
+    const sum=(label,v)=>'<div class="s"><span>'+esc(label)+'</span><b>'+esc(v)+'</b></div>';
+    const html='<!doctype html><html><head><meta charset="utf-8"><title>Call Ads audit — '+esc(period||'')+'</title><style>'+
+      'body{font-family:Segoe UI,Arial,sans-serif;font-size:12px;color:#1a2530;margin:24px;}h1{font-size:18px;margin:0 0 4px;}p{color:#4a5568;margin:0 0 14px;line-height:1.5;max-width:900px;}'+
+      '.sums{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 16px;}.s{border:1px solid #dde3ea;border-radius:8px;padding:8px 12px;}.s span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8a9bb0;}.s b{font-size:15px;}'+
+      'table{border-collapse:collapse;width:100%;}th,td{border:1px solid #dde3ea;padding:5px 7px;text-align:left;vertical-align:top;}th{background:#f3f6f9;font-size:10px;text-transform:uppercase;letter-spacing:.06em;position:sticky;top:0;}'+
+      'tr.conv td{background:#eef7f1;}tr.exist td{background:#fbf6ee;}tr.nodata td{background:#fdf1ef;}td.num{text-align:right;white-space:nowrap;}'+
+      '.bar{margin:0 0 14px;}button{font:inherit;padding:6px 12px;margin-right:8px;}@media print{.bar{display:none}body{margin:8mm}th{position:static}}'+
+      '</style></head><body><h1>Call Ads audit · '+esc(period||'')+'</h1>'+
+      '<p>Every call in the agency log, in time order. A call matches a reservation when the caller number equals a number on the reservation in the ResNexus export ('+resCount+' reservations). '+
+      'A reservation is counted once, against its earliest call, and is a <b>conversion</b> when its booked-on date in STAYS_CLEAN is on or after that call; booked before the call means an <b>existing guest</b>. '+
+      'Generated '+esc(nowStamp())+' in the browser; this page is not saved anywhere.</p>'+
+      '<div class="sums">'+sum('Calls',calls.length)+sum('Matched calls',new Set(rows.filter(r=>r.res).map(r=>r.n)).size)+sum('Conversions',conv.length)+sum('Existing guests',exist.length)+sum('No stay data',nodata.length)+sum('Revenue counted',fmt$(rev))+'</div>'+
+      '<div class="bar"><button onclick="window.print()">Print / PDF</button></div>'+
+      '<table><thead><tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'</tr></thead><tbody>'+
+      rows.map(r=>{const cls=/^Conversion/.test(r.rule)?'conv':/^Existing/.test(r.rule)?'exist':/^No stay/.test(r.rule)?'nodata':'';
+        return '<tr class="'+cls+'">'+cols.map(c=>'<td'+(c[0]==='revenue'||c[0]==='duration'||c[0]==='n'?' class="num"':'')+'>'+esc(c[0]==='revenue'&&r.revenue!==''?fmt$(r.revenue):r[c[0]])+'</td>').join('')+'</tr>';}).join('')+
+      '</tbody></table></body></html>';
+    const w=window.open('','_blank');
+    if(!w){out.textContent='The browser blocked the new tab. Allow pop-ups for this page, or use Download audit CSV instead.';return;}
+    w.document.open();w.document.write(html);w.document.close();
+    out.textContent='Opened in a new tab: '+rows.length+' lines, '+conv.length+' conversion'+(conv.length===1?'':'s')+', '+fmt$(rev)+' counted. Compare those two figures with the scorecards for this period.';
+  }catch(e){out.textContent='Could not build the audit: '+e.message;}
+}
+
 async function analyzeImport(){
   const status=document.getElementById('im-status');
   enableConfirm();
@@ -889,7 +993,7 @@ async function analyzeImport(){
       c.matched=set?[...set]:[];
       if(c.matched.length)matchedCalls++;
       c.period=period;c.periodStart=periodStart;c.periodEnd=periodEnd;
-      delete c.phone;                        // drop it the moment matching is done
+      delete c.phone;delete c.rawPhone;      // drop them the moment matching is done
     });
     const matchedRes=new Set();calls.forEach(c=>c.matched.forEach(r=>matchedRes.add(r)));
 
