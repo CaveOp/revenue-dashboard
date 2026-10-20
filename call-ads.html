@@ -952,7 +952,6 @@ async function buildAudit(kind){
       '.bar{margin:0 0 14px;}button{font:inherit;padding:6px 12px;margin-right:8px;}@media print{.bar{display:none}body{margin:8mm}th{position:static}}'+
       '</style></head><body><h1>Call Ads audit · '+esc(period||'')+'</h1>'+
       '<p>Every call in the agency log, in time order. A call matches a reservation when the caller number equals a number on the reservation in the ResNexus export ('+resCount+' reservations). '+
-      'A reservation is counted once, against its earliest call, and is a <b>conversion</b> when its booked-on date in STAYS_CLEAN is on or after that call; booked before the call means an <b>existing guest</b>. '+
       'Generated '+esc(nowStamp())+' in the browser; this page is not saved anywhere.</p>'+
       '<div class="sums">'+sum('Calls',calls.length)+sum('Matched calls',new Set(rows.filter(r=>r.res).map(r=>r.n)).size)+sum('Conversions',conv.length)+sum('Existing guests',exist.length)+sum('No stay data',nodata.length)+sum('Revenue counted',fmt$(rev))+'</div>'+
       '<div class="bar"><button onclick="window.print()">Print / PDF</button></div>'+
