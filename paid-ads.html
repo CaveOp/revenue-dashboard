@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cave Springs — Paid Ads</title>
+<!-- This page loads NOTHING from outside: the chart library and the font live in this repo (vendor/).
+     The rule below makes the browser enforce that — the only outside addresses allowed are Google
+     sign-in and the Google Sheet. Anything else is blocked. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://sheets.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<script src="vendor/chartjs/chart.umd.js"></script>
+<style>@font-face{font-family:'Raleway';font-style:normal;font-weight:300 700;font-display:swap;src:url(vendor/fonts/raleway-latin.woff2) format('woff2');}</style>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f2ee;--surface:#fff;--surface2:#f9f7f4;
+  --border:#e8e2da;--border2:#d6cec3;
+  --slate:#4a5e6d;--slate2:#3a4d5c;--slate3:#6a7e8d;--slate-bg:#eef2f5;
+  --terra:#c4572a;--terra2:#a8451f;--terra-bg:#faf0eb;
+  --green:#3a7d5c;--green-bg:#edf6f1;
+  --amber:#b87c2a;--amber-bg:#fdf5e8;
+  --purple:#6b5b8c;--purple-bg:#f2f0f7;
+  --text:#1a2530;--text2:#4a5568;--text3:#8a9bb0;
+  --sans:'Raleway',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+  --shadow2:0 2px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.06);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* AUTH */
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+.auth-card{background:var(--surface);border-radius:20px;box-shadow:var(--shadow2);padding:60px 56px;text-align:center;max-width:460px;width:90%;}
+.auth-logo-title{font-size:22px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--slate);}
+.auth-logo-sub{font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--text3);}
+.auth-divider{width:40px;height:2px;background:var(--terra);margin:20px auto 28px;}
+.auth-desc{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.7;}
+.auth-btn{display:inline-flex;align-items:center;gap:10px;background:var(--slate);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.auth-btn:hover{background:var(--slate2);}
+
+/* LOADING */
+#loading-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;}
+.spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--slate);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:12px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;}
+#dashboard{display:none;}
+
+/* HEADER / NAV / FILTER */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;}
+.header-title{font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
+.header-sub{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.hdr-btn{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
+.hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
+.nav-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;height:44px;gap:4px;}
+.nav-tab{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:0 16px;height:44px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;}
+.nav-tab:hover{color:var(--slate);}
+.nav-tab.active{color:var(--slate);border-bottom-color:var(--slate);}
+.filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;gap:10px;min-height:52px;flex-wrap:wrap;}
+.filter-label{font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-right:4px;}
+.filter-select{font-family:var(--sans);font-size:13px;color:var(--text);background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;cursor:pointer;}
+.filter-sep{width:1px;height:24px;background:var(--border2);margin:0 6px;}
+.chip{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--text2);background:var(--surface2);margin-right:4px;}
+.chip.ok{color:var(--green);background:var(--green-bg);border-color:transparent;}
+.chip.no{color:var(--amber);background:var(--amber-bg);border-color:transparent;}
+.filter-note{font-size:11px;color:var(--text3);margin-left:auto;}
+
+/* CONTENT */
+.content{padding:32px 40px;max-width:1600px;margin:0 auto;}
+.error-banner{display:none;background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-bottom:20px;}
+.info-banner{background:var(--slate-bg);border:1px solid var(--border2);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.7;}
+.info-banner strong{color:var(--slate);}
+.scorecards{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:20px;}
+.scorecard{border-radius:16px;padding:22px 24px;box-shadow:var(--shadow);border:1px solid var(--border);background:var(--surface);position:relative;overflow:hidden;}
+.scorecard::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--slate);}
+.scorecard.spend::after{background:var(--slate);}
+.scorecard.book::after{background:var(--green);}
+.scorecard.rn::after{background:var(--terra);}
+.scorecard.ga4::after{background:var(--purple);}
+.scorecard.ret::after{background:var(--amber);}
+.scorecard-label{font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:10px;color:var(--text3);}
+.scorecard-value{font-size:30px;font-weight:700;letter-spacing:-0.01em;color:var(--text);}
+.scorecard-meta{font-size:12px;color:var(--text3);margin-top:6px;}
+.scorecard-sub{font-size:12px;color:var(--text2);margin-top:4px;}
+.scorecard-delta{font-size:12px;font-weight:600;margin-top:6px;min-height:18px;}
+.scorecard-delta.up{color:var(--green);}
+.scorecard-delta.down{color:var(--terra);}
+.scorecard-delta.flat{color:var(--text3);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px;}
+.panel-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.panel-title{font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);}
+.panel-sub{font-size:11px;color:var(--text3);}
+.panel-body{padding:22px 24px;}
+.panel-foot{padding:12px 24px 16px;font-size:12px;color:var(--text3);line-height:1.6;border-top:1px solid var(--surface2);}
+.chart-wrap{position:relative;}
+.legend{display:flex;gap:18px;font-size:12px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;}
+.legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c);}
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{text-align:left;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:bottom;}
+.data-table td{padding:12px 14px;border-bottom:1px solid var(--surface2);vertical-align:top;}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table .right{text-align:right;}
+.data-table tfoot td{border-top:2px solid var(--border);font-weight:700;color:var(--text);}
+.data-table tr:hover td{background:var(--surface2);}
+.data-table .dim{color:var(--text3);}
+.data-table .muted td{color:var(--text3);}
+.pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+.pill.g{background:var(--green-bg);color:var(--green);}
+.pill.a{background:var(--amber-bg);color:var(--amber);}
+.pill.t{background:var(--terra-bg);color:var(--terra);}
+.pill.s{background:var(--slate-bg);color:var(--slate);}
+.table-scroll{overflow-x:auto;}
+.empty-state{text-align:center;color:var(--text3);font-size:13px;padding:40px 20px;}
+.inv-input{font-family:var(--sans);font-size:13px;width:120px;padding:6px 10px;border:1px solid var(--border2);border-radius:8px;}
+
+/* MODAL */
+.import-overlay{display:none;position:fixed;inset:0;background:rgba(26,37,48,0.4);z-index:200;}
+.import-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border-radius:18px;box-shadow:var(--shadow2);width:92%;max-width:680px;max-height:88vh;overflow-y:auto;z-index:201;padding:32px 34px;}
+.import-modal h3{font-size:16px;font-weight:700;letter-spacing:0.04em;color:var(--slate);margin-bottom:6px;}
+.im-desc{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.7;}
+.im-field{margin-bottom:16px;}
+.im-field>label{display:block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.im-field input[type=file]{font-family:var(--sans);font-size:13px;width:100%;padding:10px;border:1px dashed var(--border2);border-radius:8px;background:var(--surface2);}
+.im-field select{font-family:var(--sans);font-size:13px;color:var(--text);background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;}
+.im-btn{font-family:var(--sans);font-size:13px;font-weight:600;padding:11px 20px;border-radius:9px;border:none;cursor:pointer;background:var(--slate);color:#fff;}
+.im-btn:hover{background:var(--slate2);}
+.im-btn.ghost{background:transparent;color:var(--text3);border:1px solid var(--border2);}
+.im-btn.ghost:hover{color:var(--slate);border-color:var(--slate3);}
+.im-btn.confirm{background:var(--green);}
+.im-btn.confirm:hover{background:#2f6b4d;}
+.im-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.im-row{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
+.im-status{font-size:13px;color:var(--text2);margin-top:12px;min-height:20px;}
+.im-err{background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-top:14px;white-space:pre-wrap;}
+.im-ok{background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--green);margin-top:14px;white-space:pre-wrap;}
+.im-warn{background:var(--amber-bg);border:1px solid rgba(184,124,42,0.3);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--amber);margin-top:14px;white-space:pre-wrap;}
+.im-preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:16px;}
+.im-stat{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);gap:12px;}
+.im-stat:last-child{border-bottom:none;}
+.im-stat b{font-weight:700;color:var(--text);text-align:right;}
+.im-privacy{font-size:11px;color:var(--text3);margin-top:16px;line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}
+.im-modes{display:flex;flex-direction:column;gap:8px;}
+.im-mode{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border:1px solid var(--border2);border-radius:9px;cursor:pointer;}
+.im-mode:hover{border-color:var(--slate3);}
+.im-mode.sel{border-color:var(--slate);background:var(--slate-bg);}
+.im-mode input{margin-top:4px;cursor:pointer;}
+.im-mode>span{display:flex;flex-direction:column;}
+.im-mode-t{font-size:13px;font-weight:600;color:var(--text);}
+.im-mode-d{font-size:12px;color:var(--text3);line-height:1.5;margin-top:2px;}
+.cheat{margin-top:18px;border-top:1px solid var(--border);padding-top:14px;}
+.cheat summary{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--slate);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;}
+.cheat summary::before{content:'▸';font-size:12px;color:var(--text3);}
+.cheat[open] summary::before{content:'▾';}
+.cheat-body{font-size:13px;color:var(--text2);line-height:1.7;margin-top:10px;}
+.cheat-body h5{font-size:12px;font-weight:700;color:var(--text);margin:12px 0 4px;}
+.cheat-body ol{padding-left:20px;margin:4px 0;}
+.cheat-body li{margin:2px 0;}
+.cheat-body .note{font-size:12px;color:var(--text3);margin-top:4px;}
+
+@media(max-width:1100px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
+@media(max-width:700px){.header,.nav-bar,.filter-bar,.content{padding-left:16px;padding-right:16px;}.scorecards{grid-template-columns:1fr;}}
+@media print{.hdr-btn,.nav-bar,.import-overlay,.import-modal,.error-banner{display:none !important;}.header{position:static;}.panel{break-inside:avoid;box-shadow:none;}.content{padding:12px 0;}body{background:#fff;}}
+</style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo-title">Cave Springs</div>
+    <div class="auth-logo-sub">Paid Ads</div>
+    <div class="auth-divider"></div>
+    <div class="auth-desc">Sign in with the Google account that owns the dashboard sheet to see Google Ads spend against the bookings in ResNexus.</div>
+    <button class="auth-btn" onclick="signIn()">Sign in with Google</button>
+  </div>
+</div>
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Loading paid ads</div></div>
+
+<!-- IMPORT MODAL -->
+<div class="import-overlay" id="import-overlay" onclick="closeImport()"></div>
+<div class="import-modal" id="import-modal">
+  <h3>Import Cycle Data</h3>
+  <div class="im-desc">Two downloads per billing cycle: the <b>Google Ads campaigns report</b> (spend per campaign) and the <b>GA4 transactions</b> export (each web booking's reservation number with its source and campaign). Bookings are matched to ResNexus by reservation number from the stays already on this dashboard. Neither file holds names, phone numbers or emails.</div>
+
+  <div class="im-field">
+    <label>1 · Billing cycle these files cover</label>
+    <select id="im-cycle"></select>
+    <div class="cheat-body note" id="im-cycle-hint">Cycles run from the 15th of one month through the 14th of the next.</div>
+  </div>
+  <div class="im-field">
+    <label>2 · Google Ads campaigns report (CSV)</label>
+    <input type="file" id="im-ads" accept=".csv,text/csv">
+  </div>
+  <div class="im-field">
+    <label>3 · GA4 transactions export (CSV, one or more files)</label>
+    <input type="file" id="im-ga4" accept=".csv,text/csv" multiple>
+    <div class="cheat-body note">If you downloaded the Transactions report twice, once with Session source / medium and once with Session campaign, choose both files. They are merged by Transaction ID.</div>
+  </div>
+  <div class="im-field">
+    <label>4 · How should this be saved?</label>
+    <div class="im-modes" id="im-modes">
+      <label class="im-mode sel" data-mode="cycle">
+        <input type="radio" name="im-mode" value="cycle" checked onchange="onModeChange()">
+        <span><span class="im-mode-t">Replace this cycle</span><span class="im-mode-d">Removes what is saved for the chosen cycle, then saves these files. Re-running a corrected download is safe.</span></span>
+      </label>
+      <label class="im-mode" data-mode="add">
+        <input type="radio" name="im-mode" value="add" onchange="onModeChange()">
+        <span><span class="im-mode-t">Add to what is saved</span><span class="im-mode-d">Keeps everything already saved and adds these rows. Transactions already in the sheet are skipped.</span></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="im-row">
+    <button class="im-btn" id="im-analyze-btn" onclick="analyzeImport()">Check &amp; preview</button>
+    <button class="im-btn ghost" onclick="closeImport()">Close</button>
+  </div>
+  <div class="im-status" id="im-status"></div>
+  <div id="im-preview-wrap" style="display:none;">
+    <div class="im-preview" id="im-preview"></div>
+    <div class="im-row" style="margin-top:16px;">
+      <button class="im-btn confirm" id="im-confirm-btn" onclick="confirmImport()">Confirm — save to sheet</button>
+      <button class="im-btn ghost" onclick="cancelPreview()">Cancel</button>
+    </div>
+  </div>
+  <div id="im-result" style="display:none;"></div>
+
+  <details class="cheat">
+    <summary>Where to get each file</summary>
+    <div class="cheat-body">
+      <h5>Google Ads · campaigns report</h5>
+      <ol>
+        <li>In Google Ads, click <b>Campaigns</b> in the left menu.</li>
+        <li>Click the date range in the upper right, choose <b>Custom</b>, and set the 15th through the 14th of the cycle. Apply.</li>
+        <li>Make sure the table shows the columns you want saved: Campaign, Cost, Clicks, Impr., Conversions, Conv. value and, if you use it, Phone calls. The download contains the columns in the table.</li>
+        <li>Click the <b>download icon</b> above the table and choose <b>.csv</b>.</li>
+      </ol>
+      <h5>GA4 · transactions, the Reports route</h5>
+      <ol>
+        <li>In GA4, open <b>Reports › Monetization › Transactions</b>.</li>
+        <li>Set the date range in the upper right to the cycle.</li>
+        <li>Click the <b>+</b> next to <b>Transaction ID</b> at the top of the table and add the secondary dimension <b>Session source / medium</b>.</li>
+        <li>Click <b>Share this report</b> in the upper right, then <b>Download file › Download CSV</b>.</li>
+        <li>Repeat steps 3 and 4 with <b>Session campaign</b> as the secondary dimension. A standard report takes one secondary dimension at a time, so this is two downloads. Choose both files above.</li>
+      </ol>
+      <h5>GA4 · transactions, the Explore route (one file)</h5>
+      <ol>
+        <li>Click <b>Explore</b> in the left navigation and start a blank exploration (the Create icon).</li>
+        <li>In the Variables panel, click <b>+</b> beside DIMENSIONS and import <b>Transaction ID</b>, <b>Session source / medium</b> and <b>Session campaign</b>; beside METRICS import <b>Purchase revenue</b>. Click IMPORT.</li>
+        <li>Drag the three dimensions into Rows and the metric into Values.</li>
+        <li>Set the date range at the top of the Variables panel to the cycle.</li>
+        <li>Click the <b>Export data</b> icon in the upper right and choose <b>CSV</b>. Sheets, TSV and CSV exports contain all rows, not only the ones displayed.</li>
+      </ol>
+      <div class="note">The exploration can be saved and reused; only the date range changes each cycle.</div>
+    </div>
+  </details>
+
+  <div class="im-privacy">Privacy: what gets saved to the sheet is, per campaign and cycle, the spend figures from Google Ads; and per web booking, the reservation number, date, source / medium, campaign and the revenue GA4 recorded. No names, phone numbers or emails are in either file.</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="header">
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div class="header-right">
+      <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
+      <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
+      <button class="hdr-btn" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <a class="nav-tab" href="index.html">Revenue</a>
+    <a class="nav-tab active" href="paid-ads.html">Paid Ads</a>
+    <a class="nav-tab" href="invoices.html">Mendes Invoices</a>
+    <a class="nav-tab" href="guests.html">Guests</a>
+  </div>
+  <div class="filter-bar">
+    <span class="filter-label">Cycle</span>
+    <select class="filter-select" id="cycle-select" onchange="render()"></select>
+    <span class="filter-sep"></span>
+    <span class="filter-label">Loaded</span>
+    <span id="chips"></span>
+    <span class="filter-note" id="filter-note"></span>
+  </div>
+
+  <div class="content">
+    <div class="error-banner" id="error-banner"></div>
+    <div class="info-banner" id="empty-info" style="display:none;">
+      No paid ads data yet. Click <strong>Import cycle data</strong> above and choose the Google Ads campaigns report and the GA4 transactions export for a billing cycle. The cheat sheet in that window says where each one comes from.
+    </div>
+    <div id="report-area">
+      <div class="scorecards">
+        <div class="scorecard spend"><div class="scorecard-label">Ad Spend</div><div class="scorecard-value" id="sc-spend">—</div><div class="scorecard-meta">Google Ads account, all campaigns</div><div class="scorecard-sub" id="sc-spend-sub"></div><div class="scorecard-delta" id="sc-spend-d"></div></div>
+        <div class="scorecard book"><div class="scorecard-label">Attributed Bookings</div><div class="scorecard-value" id="sc-book">—</div><div class="scorecard-meta">web bookings, GA4 last click</div><div class="scorecard-sub" id="sc-book-sub"></div><div class="scorecard-delta" id="sc-book-d"></div></div>
+        <div class="scorecard rn"><div class="scorecard-label">ResNexus Value</div><div class="scorecard-value" id="sc-rn">—</div><div class="scorecard-meta" id="sc-rn-meta">room + resort fee of those bookings</div><div class="scorecard-sub" id="sc-rn-sub"></div><div class="scorecard-delta" id="sc-rn-d"></div></div>
+        <div class="scorecard ga4"><div class="scorecard-label">GA4 Said</div><div class="scorecard-value" id="sc-ga4">—</div><div class="scorecard-meta">GA4 purchase revenue, Google Ads last click</div><div class="scorecard-sub" id="sc-ga4-sub"></div><div class="scorecard-delta" id="sc-ga4-d"></div></div>
+        <div class="scorecard ret"><div class="scorecard-label">Per $1 Spent</div><div class="scorecard-value" id="sc-ret">—</div><div class="scorecard-meta">ResNexus value ÷ spend</div><div class="scorecard-sub" id="sc-ret-sub"></div><div class="scorecard-delta" id="sc-ret-d"></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Three Sources, Side by Side</span><span class="panel-sub" id="cmp-sub"></span></div>
+        <div class="panel-body"><div class="table-scroll"><table class="data-table">
+          <thead><tr><th>Figure</th><th class="right">Google Ads account</th><th class="right">GA4 said</th><th class="right">ResNexus value</th><th class="right">GA4 − ResNexus</th><th>Agency invoice <span class="dim" style="font-weight:400;text-transform:none;letter-spacing:0">(optional, saved on this computer only)</span></th></tr></thead>
+          <tbody id="cmp-tbody"></tbody>
+        </table></div></div>
+        <div class="panel-foot">Google Ads account figures come from the campaigns report. GA4 said is GA4's own purchase revenue for bookings whose session source / medium is google / cpc. ResNexus value is room charge plus resort fee for those same reservation numbers, from the stays and retail data on this dashboard. The invoice field is the only agency figure on the page.</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-header"><span class="panel-title">Spend and ResNexus Value by Cycle</span><span class="panel-sub">Google Ads, every cycle saved</span></div>
+          <div class="panel-body"><div class="legend"><span style="--c:#4a5e6d">Spend</span><span style="--c:#c4572a">ResNexus value</span></div><div class="chart-wrap" style="height:240px"><canvas id="chart-cycle"></canvas></div></div>
+        </div>
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-header"><span class="panel-title">Web Bookings by Campaign</span><span class="panel-sub">GA4 last click, per cycle</span></div>
+          <div class="panel-body"><div class="legend" id="camp-legend"></div><div class="chart-wrap" style="height:240px"><canvas id="chart-camp"></canvas></div></div>
+          <div class="panel-foot" id="camp-chart-foot"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Campaign Breakdown</span><span class="panel-sub" id="camp-sub"></span></div>
+        <div class="table-scroll"><table class="data-table">
+          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Clicks</th><th class="right">Google conversions</th><th class="right">Web bookings</th><th class="right">GA4 said</th><th class="right">ResNexus value</th><th class="right">Not in ResNexus</th><th class="right">Cost / booking</th><th class="right">Per $1 spent</th><th>Flag</th></tr></thead>
+          <tbody id="camp-tbody"></tbody><tfoot id="camp-tfoot"></tfoot>
+        </table></div>
+        <div class="panel-foot">Bookings: GA4 transactions with session source / medium google / cpc, grouped by GA4 session campaign and joined to ResNexus by reservation number. Google conversions are Google Ads' own count from the campaigns report and are not the same thing as bookings. A GA4 campaign name that does not match a campaign in the Google Ads report gets its own row with no spend.</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Cycle Trend</span><span class="panel-sub">one row per billing cycle, 15th to 14th</span></div>
+        <div class="table-scroll"><table class="data-table">
+          <thead><tr><th>Cycle</th><th class="right">Spend</th><th class="right">Web bookings</th><th class="right">GA4 said</th><th class="right">ResNexus value</th><th class="right">Per $1 spent</th><th class="right">GA4 − ResNexus</th><th class="right">Not in ResNexus</th></tr></thead>
+          <tbody id="trend-tbody"></tbody><tfoot id="trend-tfoot"></tfoot>
+        </table></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-header"><span class="panel-title">Measurement Coverage</span><span class="panel-sub" id="cov-sub"></span></div>
+          <div class="panel-body"><table class="data-table"><tbody id="cov-tbody"></tbody></table></div>
+          <div class="panel-foot">Counts only. Booking-engine bookings are ResNexus reservations booked online, by reserved-on date. GA4 recorded means the reservation number appears as a GA4 transaction ID. Phone bookings and calls from ads are shown side by side with no link between them; GA4 has no record of phone bookings. Why a booking is missing from GA4 is not known from these files.</div>
+        </div>
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-header"><span class="panel-title">Other Paid Sources in GA4</span><span class="panel-sub" id="meta-sub"></span></div>
+          <div class="panel-body"><table class="data-table"><tbody id="meta-tbody"></tbody></table></div>
+          <div class="panel-foot">Bookings whose GA4 session source / medium is a paid Meta source (fb, ig, facebook, instagram with medium paid or cpc). Meta spend is not on this page until a Meta Ads Manager export is added to the import.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Attributed Reservations</span><span class="panel-sub" id="res-sub"></span></div>
+        <div class="table-scroll"><table class="data-table">
+          <thead><tr><th>Res#</th><th>Campaign</th><th>Source / medium</th><th>Booked on</th><th>First night</th><th class="right">Nights</th><th class="right">GA4 said</th><th class="right">ResNexus value</th><th>Match</th></tr></thead>
+          <tbody id="res-tbody"></tbody><tfoot id="res-tfoot"></tfoot>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLIENT_ID = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
+const SHEET_ID  = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
+const STAYS_TAB = 'STAYS_CLEAN';
+const RETAIL_TAB= 'RETAIL_CLEAN';
+const SPEND_TAB = 'AD_SPEND_CLEAN';
+const GA4_TAB   = 'GA4_TXN_CLEAN';
+const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
+const SPEND_HEADER=['Cycle','CycleStart','Campaign','Cost','Impressions','Clicks','Conversions','ConvValue','PhoneCalls','ImportedOn'];
+const GA4_HEADER=['TransactionId','Date','Cycle','CycleStart','SourceMedium','Campaign','FirstUserSourceMedium','FirstUserCampaign','Revenue','ImportedOn'];
+const CAMP_COLORS=['#4a5e6d','#c4572a','#3a7d5c','#b87c2a'];
+
+let tokenClient, accessToken;
+let staysByRes={}, feeByRes={}, feeLoaded=false, spendRows=[], ga4Rows=[];
+let knownCycles=[];            // [{label,start}] oldest → newest, from saved data
+let cycleChart, campChart;
+
+/* ---------- Auth ----------
+   Token is cached in sessionStorage so moving between the dashboard pages does not
+   re-prompt. sessionStorage, not localStorage: it is scoped to this tab and dies when
+   the tab closes, rather than leaving a live Sheets token on disk. */
+const TOKEN_KEY='cs_gtoken';
+function saveToken(tok,expiresIn){try{sessionStorage.setItem(TOKEN_KEY,JSON.stringify({token:tok,exp:Date.now()+((expiresIn||3600)*1000)-60000}));}catch(e){}}
+function loadToken(){try{const j=JSON.parse(sessionStorage.getItem(TOKEN_KEY)||'null');if(j&&j.token&&j.exp>Date.now())return j.token;}catch(e){}return null;}
+function clearToken(){try{sessionStorage.removeItem(TOKEN_KEY);}catch(e){}}
+function loadGSI(){
+  if(window.google&&window.google.accounts)return Promise.resolve();
+  return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});
+}
+async function signIn(){
+  await loadGSI();
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:async(resp)=>{
+    if(resp.error){showErr('Sign-in failed: '+resp.error);return;}
+    accessToken=resp.access_token;saveToken(resp.access_token,resp.expires_in);showLoad();await loadAll();
+  }});
+  tokenClient.requestAccessToken({});
+}
+function signOut(){
+  if(accessToken&&window.google&&window.google.accounts)google.accounts.oauth2.revoke(accessToken);
+  clearToken();accessToken=null;staysByRes={};feeByRes={};spendRows=[];ga4Rows=[];
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  [cycleChart,campChart].forEach(c=>{if(c)c.destroy();});cycleChart=campChart=null;
+}
+function showLoad(){document.getElementById('auth-screen').style.display='none';document.getElementById('loading-screen').style.display='flex';}
+function showDash(){document.getElementById('loading-screen').style.display='none';document.getElementById('dashboard').style.display='block';}
+function showAuth(){document.getElementById('loading-screen').style.display='none';document.getElementById('dashboard').style.display='none';document.getElementById('auth-screen').style.display='flex';}
+function resumeSession(){const t=loadToken();if(!t)return;accessToken=t;showLoad();loadAll();}
+if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',resumeSession);else resumeSession();
+function showErr(msg){const b=document.getElementById('error-banner');b.style.display='block';b.textContent=msg;}
+
+/* ---------- Sheet helpers ---------- */
+async function sheetsApi(url,opts){
+  const r=await fetch(url,Object.assign({headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'}},opts||{}));
+  if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=(j.error&&j.error.message)?j.error.message:msg;}catch(e){}
+    if(r.status===401)msg+=' — your sign-in may have expired. Sign out and back in, then retry.';
+    throw new Error(msg);}
+  return r.json();
+}
+async function fetchTab(tab){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?majorDimension=ROWS`,{headers:{Authorization:`Bearer ${accessToken}`}});
+  if(r.status===400)return [];               // tab does not exist yet
+  if(!r.ok){const err=new Error(`Cannot load ${tab} (${r.status})`);if(r.status===401||r.status===403)err.auth=true;throw err;}
+  return (await r.json()).values||[];
+}
+async function listSheetTitles(){const j=await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`);return (j.sheets||[]).map(s=>s.properties.title);}
+async function ensureTab(tab){const titles=await listSheetTitles();if(titles.includes(tab))return;await sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:tab}}}]})});}
+async function clearTab(tab){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:clear`,{method:'POST',body:'{}'});}
+async function putValues(tab,values){return sheetsApi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}!A1?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values})});}
+async function writeTab(tab,values){await ensureTab(tab);await clearTab(tab);await putValues(tab,values);}
+
+function cell(v){return String(v==null?'':v).trim();}
+function toRows(raw){
+  if(!raw||raw.length<2)return[];
+  const H=raw[0].map(h=>String(h).trim());
+  return raw.slice(1).filter(row=>row.some(c=>cell(c)!=='')).map(row=>{const o={};H.forEach((h,i)=>o[h]=cell(row[i]));return o;});
+}
+function pMoney(s){return parseFloat(String(s==null?0:s).replace(/[$,\s]/g,''))||0;}
+function pInt(s){return parseInt(String(s==null?0:s).replace(/[,\s]/g,''),10)||0;}
+const fmt$=v=>v==null||!isFinite(v)?'—':'$'+Math.round(v).toLocaleString('en-US');
+const fmt$2=v=>v==null||!isFinite(v)?'—':'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtN=v=>v==null?'—':Number(v).toLocaleString('en-US');
+const fmtX=v=>v==null||!isFinite(v)?'—':'$'+v.toFixed(2);
+const signed=v=>(v>=0?'+':'−')+fmt$(Math.abs(v));
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sum=(a,f)=>a.reduce((s,x)=>s+(f(x)||0),0);
+const normName=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+
+/* ---------- Dates ----------
+   Built from local Y/M/D parts. A bare "2026-06-17" handed to new Date() parses as UTC
+   and lands on the previous day west of Greenwich. Never do that here. */
+function p2(n){return String(n).padStart(2,'0');}
+function startOfDay(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+function parseDateLoose(s){
+  if(!s)return null;const t=String(s).trim();if(!t)return null;
+  let m=t.match(/^(\d{4})(\d{2})(\d{2})$/);                               // GA4 "20260516"
+  if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+  m=t.match(/([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})/);                // "Jun 17, 2026"
+  if(m){const d=new Date(m[1]+' '+m[2]+', '+m[3]);if(!isNaN(d))return startOfDay(d);}
+  m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);                          // "5/14/2026"
+  if(m){let y=Number(m[3]);if(y<100)y+=2000;return new Date(y,Number(m[1])-1,Number(m[2]));}
+  m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);                              // "2026-06-17"
+  if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+  const d=new Date(t);return isNaN(d)?null:startOfDay(d);
+}
+function toISO(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+function fmtStamp(d){return d?(d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear():'';}
+function fmtDay(d){if(!d)return '—';if(typeof d==='string')d=parseDateLoose(d);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';}
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ---------- Billing cycles: the 15th of one month through the 14th of the next ---------- */
+function cycleFromStart(start){
+  const end=new Date(start.getFullYear(),start.getMonth()+1,15);
+  const label=MON[start.getMonth()]+' 15 – '+MON[end.getMonth()]+' 15, '+end.getFullYear();
+  return {label,start,startISO:toISO(start),end};
+}
+function cycleFor(d){if(!d)return null;const s=d.getDate()>=15?new Date(d.getFullYear(),d.getMonth(),15):new Date(d.getFullYear(),d.getMonth()-1,15);return cycleFromStart(s);}
+function cycleByStartISO(iso){const d=parseDateLoose(iso);return d?cycleFromStart(d):null;}
+function cycleOptions(){
+  // every cycle from May 2026 (reporting start) through the current one
+  const out=[];let s=new Date(2026,4,15);const now=cycleFor(new Date()).start;
+  while(s<=now){out.push(cycleFromStart(s));s=new Date(s.getFullYear(),s.getMonth()+1,15);}
+  return out.reverse();
+}
+
+/* ---------- File reading & CSV ---------- */
+async function readText(file){
+  const b=new Uint8Array(await file.arrayBuffer());let enc='utf-8';
+  if(b[0]===0xFF&&b[1]===0xFE)enc='utf-16le';else if(b[0]===0xFE&&b[1]===0xFF)enc='utf-16be';
+  else if(!(b[0]===0xEF&&b[1]===0xBB)){let even=0,odd=0;const n=Math.min(b.length,2000);for(let i=0;i<n;i++)if(b[i]===0){if(i%2)odd++;else even++;}if(odd>n/4)enc='utf-16le';else if(even>n/4)enc='utf-16be';}
+  return new TextDecoder(enc).decode(b).replace(/^﻿/,'').replace(/\u0000/g,'');
+}
+function parseCSV(text){
+  const rows=[];let row=[],cur='',inQ=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(inQ){if(c==='"'){if(text[i+1]==='"'){cur+='"';i++;}else inQ=false;}else cur+=c;}
+    else{if(c==='"')inQ=true;else if(c===','||c==='\t'){row.push(cur);cur='';}
+      else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}
+      else if(c==='\r'){}else cur+=c;}
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+function findIdx(headers,names){
+  const norm=headers.map(h=>normName(h));
+  for(const n of names){const i=norm.indexOf(normName(n));if(i!==-1)return i;}
+  return -1;
+}
+// Google Ads and GA4 exports both put a few title/comment lines above the real header.
+function findHeader(rows,must){
+  for(let i=0;i<Math.min(rows.length,25);i++){if(must.every(names=>findIdx(rows[i],names)!==-1))return i;}
+  return -1;
+}
+function dateRangeIn(rows){
+  // "May 15, 2026 - Jun 14, 2026" somewhere in the first lines → suggests the cycle
+  for(let i=0;i<Math.min(rows.length,8);i++){const line=rows[i].join(' ');
+    const m=line.match(/([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})\s*[-–—to]+\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})/);
+    if(m){const a=parseDateLoose(m[1]);if(a)return a;}
+    const m2=line.match(/(\d{8})\s*[-–—]\s*(\d{8})/);
+    if(m2){const a=parseDateLoose(m2[1]);if(a)return a;}
+  }
+  return null;
+}
+
+const ADS_ALIASES={
+  campaign:['Campaign','Campaign name'],
+  cost:['Cost','Spend','Amount spent','Cost (USD)'],
+  impressions:['Impr.','Impressions','Impr'],
+  clicks:['Clicks'],
+  conversions:['Conversions','Conv.','All conv.'],
+  convValue:['Conv. value','Conversion value','Conv value','All conv. value'],
+  calls:['Phone calls','Calls','Phone calls (call assets)','Calls from ads']
+};
+function parseAdsReport(rows){
+  const h=findHeader(rows,[ADS_ALIASES.campaign,ADS_ALIASES.cost]);
+  if(h===-1)throw new Error('Could not find the Campaign and Cost columns. Is this the Google Ads campaigns report (.csv)?');
+  const H=rows[h];const ix={};Object.keys(ADS_ALIASES).forEach(k=>ix[k]=findIdx(H,ADS_ALIASES[k]));
+  const out=[];let skipped=0;
+  rows.slice(h+1).forEach(r=>{
+    const name=cell(r[ix.campaign]);
+    if(!name||/^total/i.test(name)){skipped++;return;}
+    out.push({campaign:name,cost:pMoney(r[ix.cost]),impressions:ix.impressions>=0?pInt(r[ix.impressions]):'',clicks:ix.clicks>=0?pInt(r[ix.clicks]):'',
+      conversions:ix.conversions>=0?pMoney(r[ix.conversions]):'',convValue:ix.convValue>=0?pMoney(r[ix.convValue]):'',calls:ix.calls>=0?pInt(r[ix.calls]):''});
+  });
+  // the same campaign can appear on several rows (e.g. one per status); add them up
+  const by={};out.forEach(o=>{const k=o.campaign;if(!by[k])by[k]=Object.assign({},o);else{['cost','impressions','clicks','conversions','convValue','calls'].forEach(f=>{if(o[f]!=='')by[k][f]=(by[k][f]===''?0:by[k][f])+o[f];});}});
+  return {rows:Object.values(by),columns:Object.keys(ix).filter(k=>ix[k]>=0),skipped,rangeStart:dateRangeIn(rows)};
+}
+
+const GA4_ALIASES={
+  txn:['Transaction ID','transaction_id','Transaction id','TransactionId'],
+  date:['Date','date','Event date','Day'],
+  sm:['Session source / medium','Session source/medium','session_source_medium','Source / medium','Source/medium'],
+  campaign:['Session campaign','session_campaign','Session campaign name','Campaign'],
+  fusm:['First user source / medium','first_user_source_medium','First user source/medium'],
+  fcamp:['First user campaign','first_user_campaign'],
+  revenue:['Purchase revenue','purchase_revenue','purchase_revenue_usd','Total revenue','Ecommerce revenue','Revenue','Item revenue'],
+};
+function parseGa4Export(rows){
+  // GA4 CSVs carry "# ..." comment lines above the table; drop them first
+  const body=rows.filter(r=>!/^#/.test(String(r[0]||'').trim()));
+  const h=findHeader(body,[GA4_ALIASES.txn]);
+  if(h===-1)throw new Error('Could not find a Transaction ID column. Is this the GA4 transactions export?');
+  const H=body[h];const ix={};Object.keys(GA4_ALIASES).forEach(k=>ix[k]=findIdx(H,GA4_ALIASES[k]));
+  const out={};let dropped=0;
+  body.slice(h+1).forEach(r=>{
+    const raw=cell(r[ix.txn]);
+    if(!/^\d+$/.test(raw)){dropped++;return;}             // "(not set)", "Totals", blank
+    const id=String(parseInt(raw,10));
+    const rec=out[id]||(out[id]={id,date:null,sm:'',campaign:'',fusm:'',fcamp:'',revenue:null});
+    if(ix.date>=0&&!rec.date)rec.date=parseDateLoose(r[ix.date]);
+    if(ix.sm>=0&&!rec.sm)rec.sm=cell(r[ix.sm]);
+    if(ix.campaign>=0&&!rec.campaign)rec.campaign=cell(r[ix.campaign]);
+    if(ix.fusm>=0&&!rec.fusm)rec.fusm=cell(r[ix.fusm]);
+    if(ix.fcamp>=0&&!rec.fcamp)rec.fcamp=cell(r[ix.fcamp]);
+    if(ix.revenue>=0&&rec.revenue==null){const v=cell(r[ix.revenue]);if(v!=='')rec.revenue=pMoney(v);}
+  });
+  return {byId:out,columns:Object.keys(ix).filter(k=>ix[k]>=0),dropped,rangeStart:dateRangeIn(rows)};
+}
+
+/* ---------- Import flow ---------- */
+let pending=null;
+function openImport(){
+  const sel=document.getElementById('im-cycle');
+  sel.innerHTML=cycleOptions().map(c=>`<option value="${c.startISO}">${esc(c.label)}</option>`).join('');
+  document.getElementById('import-overlay').style.display='block';document.getElementById('import-modal').style.display='block';
+  cancelPreview();document.getElementById('im-result').style.display='none';document.getElementById('im-status').textContent='';
+}
+function closeImport(){document.getElementById('import-overlay').style.display='none';document.getElementById('import-modal').style.display='none';}
+function onModeChange(){document.querySelectorAll('.im-mode').forEach(l=>l.classList.toggle('sel',l.querySelector('input').checked));}
+function cancelPreview(){pending=null;document.getElementById('im-preview-wrap').style.display='none';document.getElementById('im-analyze-btn').disabled=false;}
+function importMode(){const r=document.querySelector('input[name="im-mode"]:checked');return r?r.value:'cycle';}
+
+async function analyzeImport(){
+  const status=document.getElementById('im-status');const result=document.getElementById('im-result');result.style.display='none';
+  const adsFile=document.getElementById('im-ads').files[0];const ga4Files=Array.from(document.getElementById('im-ga4').files);
+  if(!adsFile&&!ga4Files.length){status.textContent='Choose at least one file.';return;}
+  const cycle=cycleByStartISO(document.getElementById('im-cycle').value);
+  status.textContent='Reading…';
+  try{
+    let ads=null,ga4=null;const warn=[];
+    if(adsFile){ads=parseAdsReport(parseCSV(await readText(adsFile)));if(!ads.rows.length)throw new Error('No campaign rows found in the Google Ads file.');
+      if(ads.rangeStart&&toISO(cycleFor(ads.rangeStart).start)!==cycle.startISO)warn.push('The Google Ads file starts '+fmtDay(ads.rangeStart)+', which is not in the chosen cycle. Check the cycle above.');}
+    if(ga4Files.length){ga4={byId:{},columns:[],dropped:0};
+      for(const f of ga4Files){const p=parseGa4Export(parseCSV(await readText(f)));ga4.dropped+=p.dropped;p.columns.forEach(c=>{if(!ga4.columns.includes(c))ga4.columns.push(c);});
+        Object.values(p.byId).forEach(rec=>{const e=ga4.byId[rec.id];if(!e)ga4.byId[rec.id]=rec;else{['date','sm','campaign','fusm','fcamp','revenue'].forEach(k=>{if((e[k]==null||e[k]==='')&&rec[k]!=null&&rec[k]!=='')e[k]=rec[k];});}});
+        if(p.rangeStart&&toISO(cycleFor(p.rangeStart).start)!==cycle.startISO)warn.push(f.name+' starts '+fmtDay(p.rangeStart)+', which is not in the chosen cycle.');}
+      if(!Object.keys(ga4.byId).length)throw new Error('No transactions with a numeric Transaction ID found in the GA4 file.');
+      if(!ga4.columns.includes('sm'))warn.push('The GA4 file has no Session source / medium column, so none of these bookings can be attributed to Google Ads. Add it as the secondary dimension or use the Explore route.');
+      if(!ga4.columns.includes('campaign'))warn.push('The GA4 file has no Session campaign column; bookings will show without a campaign.');
+      if(!ga4.columns.includes('revenue'))warn.push('The GA4 file has no Purchase revenue column; GA4 said will read $0.');
+    }
+    // dedupe against the sheet
+    const existingIds=new Set(ga4Rows.filter(r=>importMode()==='cycle'?r.cycleStart!==cycle.startISO:true).map(r=>r.id));
+    const ga4List=ga4?Object.values(ga4.byId):[];
+    const dup=ga4List.filter(r=>existingIds.has(r.id)).length;
+    const matched=ga4List.filter(r=>staysByRes[r.id]).length;
+    const gads=ga4List.filter(r=>isGoogleAds(r.sm)).length;
+    const offCycle=ga4List.filter(r=>r.date&&toISO(cycleFor(r.date).start)!==cycle.startISO).length;
+    pending={cycle,ads,ga4:ga4List,dup};
+    const lines=[];
+    if(ads)lines.push(['Google Ads campaigns',ads.rows.length+' · spend '+fmt$(sum(ads.rows,r=>r.cost))],['Columns found','Campaign, Cost'+(ads.columns.filter(c=>!['campaign','cost'].includes(c)).map(c=>', '+c).join(''))]);
+    if(ga4)lines.push(['GA4 transactions',fmtN(ga4List.length)+(ga4.dropped?' · '+ga4.dropped+' rows without a numeric ID skipped':'')],['Found in ResNexus stays',matched+' of '+ga4List.length],['Session source google / cpc',String(gads)],['Already in the sheet',dup+' (skipped)']);
+    if(offCycle)lines.push(['Dated outside the chosen cycle',offCycle+' transactions (saved under their own date)']);
+    lines.push(['Cycle',cycle.label],['Mode',importMode()==='cycle'?'replace this cycle':'add to what is saved']);
+    document.getElementById('im-preview').innerHTML=lines.map(([k,v])=>'<div class="im-stat"><span>'+esc(k)+'</span><b>'+esc(v)+'</b></div>').join('')+(warn.length?'<div class="im-warn">'+esc(warn.join('\n'))+'</div>':'');
+    document.getElementById('im-preview-wrap').style.display='block';document.getElementById('im-analyze-btn').disabled=true;status.textContent='';
+  }catch(e){status.textContent='';result.style.display='block';result.innerHTML='<div class="im-err">'+esc(e.message)+'</div>';}
+}
+
+async function confirmImport(){
+  if(!pending)return;const {cycle,ads,ga4}=pending;const btn=document.getElementById('im-confirm-btn');btn.disabled=true;
+  const status=document.getElementById('im-status');status.textContent='Saving…';
+  const stamp=fmtStamp(new Date());const replace=importMode()==='cycle';
+  try{
+    let nSpend=0,nGa4=0;
+    if(ads){
+      const keep=replace?spendRows.filter(r=>r.cycleStart!==cycle.startISO):spendRows.slice();
+      const add=ads.rows.map(r=>({cycle:cycle.label,cycleStart:cycle.startISO,campaign:r.campaign,cost:r.cost,impressions:r.impressions,clicks:r.clicks,conversions:r.conversions,convValue:r.convValue,calls:r.calls,imported:stamp}));
+      const rows=keep.concat(add);nSpend=add.length;
+      await writeTab(SPEND_TAB,[SPEND_HEADER].concat(rows.map(r=>[r.cycle,r.cycleStart,r.campaign,r.cost,r.impressions,r.clicks,r.conversions,r.convValue,r.calls,r.imported])));
+      spendRows=rows;
+    }
+    if(ga4.length){
+      const keep=replace?ga4Rows.filter(r=>r.cycleStart!==cycle.startISO):ga4Rows.slice();
+      const have=new Set(keep.map(r=>r.id));
+      const add=ga4.filter(r=>!have.has(r.id)).map(r=>{const c=r.date?cycleFor(r.date):cycle;return {id:r.id,date:r.date?toISO(r.date):'',cycle:c.label,cycleStart:c.startISO,sm:r.sm,campaign:r.campaign,fusm:r.fusm,fcamp:r.fcamp,revenue:r.revenue==null?'':r.revenue,imported:stamp};});
+      const rows=keep.concat(add);nGa4=add.length;
+      await writeTab(GA4_TAB,[GA4_HEADER].concat(rows.map(r=>[r.id,r.date,r.cycle,r.cycleStart,r.sm,r.campaign,r.fusm,r.fcamp,r.revenue,r.imported])));
+      ga4Rows=rows;
+    }
+    status.textContent='';
+    const res=document.getElementById('im-result');res.style.display='block';
+    res.innerHTML='<div class="im-ok">Saved for '+esc(cycle.label)+': '+nSpend+' campaign row'+(nSpend===1?'':'s')+' and '+nGa4+' GA4 transaction'+(nGa4===1?'':'s')+'.</div>';
+    cancelPreview();buildCycles();render();
+  }catch(e){status.textContent='';document.getElementById('im-result').style.display='block';document.getElementById('im-result').innerHTML='<div class="im-err">Save failed: '+esc(e.message)+'</div>';btn.disabled=false;}
+}
+
+/* ---------- Load ---------- */
+async function loadAll(){
+  try{
+    const [stayRaw,retailRaw,spendRaw,ga4Raw]=await Promise.all([fetchTab(STAYS_TAB),fetchTab(RETAIL_TAB).catch(()=>[]),fetchTab(SPEND_TAB),fetchTab(GA4_TAB)]);
+    staysByRes={};
+    toRows(stayRaw).forEach(r=>{
+      const raw=String(r['Res#']||r['Res']||'').trim();if(!raw)return;const res=/^\d+$/.test(raw)?String(parseInt(raw,10)):raw;
+      const nd=parseDateLoose(r['NightDate']);const ro=parseDateLoose(r['ReservedOn']);
+      const bo=/^(true|x|yes|1)$/i.test(r['BookedOnline']||''),dc=/^(true|x|yes|1)$/i.test(r['DirectConnect']||'');
+      const e=staysByRes[res]||(staysByRes[res]={room:0,nights:0,firstNight:null,reservedOn:null,bookedOnline:bo,directConnect:dc});
+      e.room+=pMoney(r['NightRevenue']);e.nights++;
+      if(nd&&(!e.firstNight||nd<e.firstNight))e.firstNight=nd;
+      if(ro&&(!e.reservedOn||ro<e.reservedOn))e.reservedOn=ro;
+    });
+    Object.values(staysByRes).forEach(e=>e.channel=e.bookedOnline?'Direct':e.directConnect?'OTA':'Phone/Manual');
+    feeByRes={};feeLoaded=false;
+    toRows(retailRaw).forEach(r=>{
+      const raw=String(r['Res#']||'').trim();if(!raw)return;const res=/^\d+$/.test(raw)?String(parseInt(raw,10)):raw;
+      if(!/resort fee/i.test((r['Bucket']||'')+' '+(r['Item']||'')))return;
+      feeByRes[res]=(feeByRes[res]||0)+pMoney(r['Total']);feeLoaded=true;
+    });
+    spendRows=toRows(spendRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],campaign:r['Campaign'],cost:pMoney(r['Cost']),impressions:r['Impressions']===''?'':pInt(r['Impressions']),clicks:r['Clicks']===''?'':pInt(r['Clicks']),conversions:r['Conversions']===''?'':pMoney(r['Conversions']),convValue:r['ConvValue']===''?'':pMoney(r['ConvValue']),calls:r['PhoneCalls']===''?'':pInt(r['PhoneCalls']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.campaign);
+    ga4Rows=toRows(ga4Raw).map(r=>({id:String(parseInt(r['TransactionId'],10)),date:r['Date'],cycle:r['Cycle'],cycleStart:r['CycleStart'],sm:r['SourceMedium'],campaign:r['Campaign'],fusm:r['FirstUserSourceMedium'],fcamp:r['FirstUserCampaign'],revenue:r['Revenue']===''?null:pMoney(r['Revenue']),imported:r['ImportedOn']})).filter(r=>r.id&&r.id!=='NaN'&&r.cycleStart);
+    showDash();buildCycles();render();
+  }catch(e){
+    if(e.auth){clearToken();accessToken=null;showAuth();return;}
+    showErr('Error loading data: '+e.message);showDash();
+  }
+}
+function buildCycles(){
+  const by={};spendRows.concat(ga4Rows).forEach(r=>{if(r.cycleStart&&!by[r.cycleStart])by[r.cycleStart]=cycleByStartISO(r.cycleStart);});
+  knownCycles=Object.values(by).filter(Boolean).sort((a,b)=>a.start-b.start);
+  const sel=document.getElementById('cycle-select');const prev=sel.value;
+  sel.innerHTML=knownCycles.map(c=>`<option value="${c.startISO}">${esc(c.label)}</option>`).join('')+(knownCycles.length>1?'<option value="ALL">All cycles</option>':'');
+  sel.value=knownCycles.some(c=>c.startISO===prev)||prev==='ALL'?prev:(knownCycles.length?knownCycles[knownCycles.length-1].startISO:'');
+}
+
+/* ---------- Attribution rules ---------- */
+function splitSM(sm){const p=String(sm||'').split('/');return {source:(p[0]||'').trim().toLowerCase(),medium:(p[1]||'').trim().toLowerCase()};}
+function isGoogleAds(sm){const {source,medium}=splitSM(sm);return source==='google'&&/^(cpc|ppc|paid)$/.test(medium);}
+function isMetaPaid(sm){const {source,medium}=splitSM(sm);return /^(fb|ig|facebook|instagram|meta)$/.test(source)&&/^(paid|cpc|paid_social|paidsocial)$/.test(medium);}
+function rnValue(res){const s=staysByRes[res];if(!s)return null;return +(s.room+(feeByRes[res]||0)).toFixed(2);}
+
+/* ---------- Stats ---------- */
+function stats(starts){
+  const inSet=iso=>starts.includes(iso);
+  const spend=spendRows.filter(r=>inSet(r.cycleStart));
+  const web=ga4Rows.filter(r=>inSet(r.cycleStart)&&isGoogleAds(r.sm)).map(r=>Object.assign({},r,{rn:rnValue(r.id),stay:staysByRes[r.id]||null}));
+  const meta=ga4Rows.filter(r=>inSet(r.cycleStart)&&isMetaPaid(r.sm)).map(r=>Object.assign({},r,{rn:rnValue(r.id)}));
+  const allGa4=ga4Rows.filter(r=>inSet(r.cycleStart));
+  // campaigns: spend rows first (by normalized name), then GA4-only names
+  const by={};const order=[];
+  spend.forEach(r=>{const k=normName(r.campaign);if(!by[k]){by[k]={name:r.campaign,spend:0,clicks:0,conv:0,calls:0,web:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false};order.push(k);}
+    by[k].spend+=r.cost;if(r.clicks!==''){by[k].clicks+=r.clicks;by[k].hasClicks=true;}if(r.conversions!==''){by[k].conv+=r.conversions;by[k].hasConv=true;}if(r.calls!=='')by[k].calls+=r.calls;});
+  web.forEach(r=>{const name=r.campaign||'(not set)';const k=normName(name)||'notset';if(!by[k]){by[k]={name,spend:0,clicks:0,conv:0,calls:0,web:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false,ga4Only:true};order.push(k);}
+    by[k].web++;by[k].ga4+=r.revenue||0;if(r.rn!=null)by[k].rn+=r.rn;else by[k].um++;});
+  const spendTotal=sum(spend,r=>r.cost),ga4=sum(web,r=>r.revenue),rn=sum(web,r=>r.rn),um=web.filter(r=>r.rn==null).length;
+  const calls=sum(spend,r=>r.calls===''?0:r.calls),hasCalls=spend.some(r=>r.calls!=='');
+  // coverage from stays, by reserved-on date
+  const cov={web:0,webRn:0,rec:0,recRn:0,phone:0,phoneRn:0};const ga4Ids=new Set(allGa4.map(r=>r.id));
+  Object.keys(staysByRes).forEach(res=>{const s=staysByRes[res];if(!s.reservedOn)return;const c=cycleFor(s.reservedOn);if(!inSet(c.startISO))return;const v=rnValue(res);
+    if(s.channel==='Direct'){cov.web++;cov.webRn+=v;if(ga4Ids.has(res)){cov.rec++;cov.recRn+=v;}}
+    else if(s.channel==='Phone/Manual'){cov.phone++;cov.phoneRn+=v;}});
+  cov.ga4only=allGa4.filter(r=>!staysByRes[r.id]).length;
+  cov.ref=allGa4.filter(r=>/cavesprings\.com\s*\/\s*referral/i.test(r.sm)).length;
+  return {spend,web,meta,by,order,spendTotal,ga4,rn,um,calls,hasCalls,cov,metaGa4:sum(meta,r=>r.revenue),metaRn:sum(meta,r=>r.rn),allGa4};
+}
+function delta(el,cur,prev,money,invert){
+  if(prev==null||!isFinite(prev)||prev===0||cur==null||!isFinite(cur)){el.textContent='';el.className='scorecard-delta flat';return;}
+  const d=cur-prev,p=d/Math.abs(prev)*100;
+  el.textContent=(d>=0?'+':'−')+(money?fmt$(Math.abs(d)):Math.abs(d).toLocaleString('en-US',{maximumFractionDigits:2}))+' ('+(p>=0?'+':'')+p.toFixed(0)+'%) vs prior cycle';
+  el.className='scorecard-delta '+(Math.abs(p)<1?'flat':((d>0)!==!!invert?'up':'down'));
+}
+function invKey(iso){return 'cs_paidads_invoice_'+iso;}
+function readInv(iso){try{return pMoney(localStorage.getItem(invKey(iso))||'');}catch(e){return 0;}}
+function onInvChange(iso,v){try{localStorage.setItem(invKey(iso),v||'');}catch(e){}render();}
+
+/* ---------- Render ---------- */
+function render(){
+  const sel=document.getElementById('cycle-select').value;
+  const empty=!spendRows.length&&!ga4Rows.length;
+  document.getElementById('empty-info').style.display=empty?'block':'none';
+  document.getElementById('report-area').style.display=empty?'none':'block';
+  if(empty){document.getElementById('chips').innerHTML='';document.getElementById('filter-note').textContent='';return;}
+  const all=sel==='ALL';const starts=all?knownCycles.map(c=>c.startISO):[sel];
+  const s=stats(starts);
+  const idx=knownCycles.findIndex(c=>c.startISO===sel);
+  const prev=!all&&idx>0?stats([knownCycles[idx-1].startISO]):null;
+  const cyc=knownCycles.find(c=>c.startISO===sel);
+  const label=all?'all '+knownCycles.length+' cycles':(cyc?cyc.label:'');
+  const hasSpend=s.spend.length>0,hasGa4=s.allGa4.length>0,hasStays=Object.keys(staysByRes).length>0;
+  document.getElementById('chips').innerHTML=[['Google Ads',hasSpend],['GA4',hasGa4],['ResNexus',hasStays],['Resort fee',feeLoaded]].map(([n,ok])=>'<span class="chip '+(ok?'ok':'no')+'">'+n+(ok?' ✓':' not loaded')+'</span>').join('');
+  document.getElementById('filter-note').textContent=all?'Cycles summed':'Billing cycle, 15th to 14th';
+  document.getElementById('sc-rn-meta').textContent=feeLoaded?'room + resort fee of those bookings':'room charge of those bookings (retail tab not loaded, no resort fee)';
+
+  // scorecards
+  const ret=s.spendTotal?s.rn/s.spendTotal:null;
+  document.getElementById('sc-spend').textContent=hasSpend?fmt$(s.spendTotal):'—';
+  document.getElementById('sc-spend-sub').textContent=s.order.filter(k=>s.by[k].spend>0).map(k=>s.by[k].name.replace(/ campaign$/i,'')+' '+fmt$(s.by[k].spend)).join(' · ');
+  document.getElementById('sc-book').textContent=fmtN(s.web.length);
+  document.getElementById('sc-book-sub').textContent=(s.web.length-s.um)+' in ResNexus'+(s.um?' · '+s.um+' not in ResNexus':'');
+  document.getElementById('sc-rn').textContent=fmt$(s.rn);
+  document.getElementById('sc-rn-sub').textContent=signed(s.ga4-s.rn)+' GA4 said vs ResNexus value';
+  document.getElementById('sc-ga4').textContent=fmt$(s.ga4);
+  document.getElementById('sc-ga4-sub').textContent=s.um?fmt$(sum(s.web.filter(r=>r.rn==null),r=>r.revenue))+' of this is the '+s.um+' not in ResNexus':(s.web.length?'every booking found in ResNexus':'');
+  document.getElementById('sc-ret').textContent=fmtX(ret);
+  document.getElementById('sc-ret-sub').textContent=s.web.length&&s.spendTotal?'cost per booking '+fmt$(s.spendTotal/s.web.length):'';
+  delta(document.getElementById('sc-spend-d'),s.spendTotal,prev&&prev.spendTotal,true,true);
+  delta(document.getElementById('sc-book-d'),s.web.length,prev&&prev.web.length,false);
+  delta(document.getElementById('sc-rn-d'),s.rn,prev&&prev.rn,true);
+  delta(document.getElementById('sc-ga4-d'),s.ga4,prev&&prev.ga4,true);
+  delta(document.getElementById('sc-ret-d'),ret,prev&&(prev.spendTotal?prev.rn/prev.spendTotal:null),false);
+
+  // three sources
+  document.getElementById('cmp-sub').textContent=label;
+  const inv=all?sum(starts,iso=>readInv(iso)):readInv(sel);
+  const invCell=all?(inv?'<span class="dim">'+fmt$(inv)+' entered across cycles · '+signed(inv-s.spendTotal)+' vs account</span>':'<span class="dim">entered per cycle</span>')
+    :'<input type="number" class="inv-input" placeholder="$ invoice" value="'+(inv||'')+'" onchange="onInvChange(\''+sel+'\',this.value)"> <span class="dim">'+(inv?signed(inv-s.spendTotal)+' vs account':'vs '+fmt$(s.spendTotal)+' in the account')+'</span>';
+  const row=(name,acct,ga4,rn,extra)=>{const d=(ga4!=null&&rn!=null)?ga4-rn:null;return '<tr><td><b>'+name+'</b></td><td class="right">'+fmt$(acct)+'</td><td class="right">'+fmt$(ga4)+'</td><td class="right">'+fmt$(rn)+'</td><td class="right'+(d==null?' dim':'')+'">'+(d==null?'—':signed(d))+'</td><td>'+(extra||'')+'</td></tr>';};
+  document.getElementById('cmp-tbody').innerHTML=row('Google Ads spend',hasSpend?s.spendTotal:null,null,null,invCell)+row('Google Ads revenue, web',null,s.ga4,s.rn)+row('Meta paid revenue, web',null,s.metaGa4,s.metaRn);
+
+  // campaign table
+  document.getElementById('camp-sub').textContent=label;
+  const rows=s.order.map(k=>s.by[k]);
+  document.getElementById('camp-tbody').innerHTML=rows.length?rows.map(r=>{const n=r.web;
+    const flag=r.ga4Only?'<span class="pill s">in GA4 only, not in Google Ads report</span>':r.spend>0&&n===0?'<span class="pill t">spend, no bookings</span>':r.um?'<span class="pill a">'+r.um+' not in ResNexus</span>':n?'<span class="pill g">bookings found</span>':'';
+    return '<tr'+(r.spend>0&&n===0?' class="muted"':'')+'><td><b>'+esc(r.name)+'</b></td><td class="right">'+(r.ga4Only?'—':fmt$(r.spend))+'</td><td class="right">'+(r.hasClicks?fmtN(r.clicks):'—')+'</td><td class="right">'+(r.hasConv?r.conv.toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+fmt$(r.ga4)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.um||'—')+'</td><td class="right">'+(n&&r.spend?fmt$(r.spend/n):'—')+'</td><td class="right">'+(r.spend?fmtX(r.rn/r.spend):'—')+'</td><td>'+flag+'</td></tr>';}).join('')
+    :'<tr><td colspan="11" class="empty-state">Nothing saved for this cycle yet</td></tr>';
+  document.getElementById('camp-tfoot').innerHTML=rows.length?'<tr><td>All campaigns</td><td class="right">'+fmt$(s.spendTotal)+'</td><td class="right">'+(rows.some(r=>r.hasClicks)?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right">'+(rows.some(r=>r.hasConv)?sum(rows,r=>r.conv).toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td><td class="right">'+fmtN(s.web.length)+'</td><td class="right">'+fmt$(s.ga4)+'</td><td class="right">'+fmt$(s.rn)+'</td><td class="right">'+(s.um||'—')+'</td><td class="right">'+(s.web.length&&s.spendTotal?fmt$(s.spendTotal/s.web.length):'—')+'</td><td class="right">'+fmtX(ret)+'</td><td></td></tr>':'';
+
+  // trend
+  const per=knownCycles.map(c=>({c,t:stats([c.startISO])}));
+  document.getElementById('trend-tbody').innerHTML=per.map(({c,t})=>'<tr'+(c.startISO===sel?' style="background:var(--surface2)"':'')+'><td><b>'+esc(c.label)+'</b></td><td class="right">'+(t.spend.length?fmt$(t.spendTotal):'<span class="dim">not loaded</span>')+'</td><td class="right">'+t.web.length+'</td><td class="right">'+fmt$(t.ga4)+'</td><td class="right">'+fmt$(t.rn)+'</td><td class="right">'+(t.spendTotal?fmtX(t.rn/t.spendTotal):'—')+'</td><td class="right">'+signed(t.ga4-t.rn)+'</td><td class="right">'+(t.um||'—')+'</td></tr>').join('');
+  const tot=stats(knownCycles.map(c=>c.startISO));
+  document.getElementById('trend-tfoot').innerHTML=knownCycles.length>1?'<tr><td>All cycles</td><td class="right">'+fmt$(tot.spendTotal)+'</td><td class="right">'+tot.web.length+'</td><td class="right">'+fmt$(tot.ga4)+'</td><td class="right">'+fmt$(tot.rn)+'</td><td class="right">'+(tot.spendTotal?fmtX(tot.rn/tot.spendTotal):'—')+'</td><td class="right">'+signed(tot.ga4-tot.rn)+'</td><td class="right">'+(tot.um||'—')+'</td></tr>':'';
+
+  // coverage
+  const cv=s.cov;
+  document.getElementById('cov-sub').textContent=label;
+  document.getElementById('cov-tbody').innerHTML=[
+    ['Booking-engine bookings in ResNexus',fmtN(cv.web)+' <span class="dim">· '+fmt$(cv.webRn)+'</span>'],
+    ['GA4 recorded',fmtN(cv.rec)+(cv.web?' <span class="dim">('+(cv.rec/cv.web*100).toFixed(0)+'%)</span>':'')],
+    ['GA4 did not record',fmtN(cv.web-cv.rec)+' <span class="dim">· '+fmt$(cv.webRn-cv.recRn)+' ResNexus value</span>'],
+    ['GA4 transaction IDs not found in ResNexus',fmtN(cv.ga4only)],
+    ['Session source "cavesprings.com / referral"',fmtN(cv.ref)+' <span class="dim">bookings, no ad or search source</span>'],
+    ['Google Ads web bookings not in ResNexus',fmtN(s.um)+' <span class="dim">· GA4 said '+fmt$(sum(s.web.filter(r=>r.rn==null),r=>r.revenue))+'</span>'],
+    ['Phone or manual bookings in ResNexus',fmtN(cv.phone)+' <span class="dim">· '+fmt$(cv.phoneRn)+' · not attributed to any ad</span>'],
+    ['Calls from ads, Google Ads count',s.hasCalls?fmtN(s.calls):'<span class="dim">no Phone calls column in the campaigns report</span>']
+  ].map(([k,v])=>'<tr><td>'+k+'</td><td class="right"><b>'+v+'</b></td></tr>').join('');
+
+  // meta
+  document.getElementById('meta-sub').textContent=label;
+  const metaBy={};s.meta.forEach(r=>{const k=r.sm||'(not set)';metaBy[k]=metaBy[k]||{n:0,ga4:0,rn:0};metaBy[k].n++;metaBy[k].ga4+=r.revenue||0;metaBy[k].rn+=r.rn||0;});
+  document.getElementById('meta-tbody').innerHTML=[['Meta spend','<span class="dim">not imported</span>']].concat(Object.keys(metaBy).length?Object.keys(metaBy).map(k=>[esc(k),metaBy[k].n+' booking'+(metaBy[k].n===1?'':'s')+' <span class="dim">· GA4 said '+fmt$(metaBy[k].ga4)+' · ResNexus value '+fmt$(metaBy[k].rn)+'</span>']):[['Paid Meta bookings in GA4','0']]).map(([k,v])=>'<tr><td>'+k+'</td><td class="right"><b>'+v+'</b></td></tr>').join('');
+
+  // reservations
+  const list=s.web.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  document.getElementById('res-sub').textContent=list.length+' reservations · '+label;
+  document.getElementById('res-tbody').innerHTML=list.length?list.map(r=>'<tr><td><b>'+esc(r.id)+'</b></td><td>'+esc(r.campaign||'(not set)')+'</td><td class="dim">'+esc(r.sm)+'</td><td>'+(r.stay?fmtDay(r.stay.reservedOn):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.firstNight):'—')+'</td><td class="right">'+(r.stay?r.stay.nights:'—')+'</td><td class="right">'+(r.revenue==null?'—':fmt$2(r.revenue))+'</td><td class="right"><b>'+(r.rn==null?'—':fmt$2(r.rn))+'</b></td><td>'+(r.rn!=null?'<span class="pill g">in ResNexus</span>':'<span class="pill a">not in ResNexus</span>')+'</td></tr>').join('')
+    :'<tr><td colspan="9" class="empty-state">No Google Ads web bookings in this view</td></tr>';
+  document.getElementById('res-tfoot').innerHTML=list.length?'<tr><td colspan="6">Total</td><td class="right">'+fmt$2(s.ga4)+'</td><td class="right">'+fmt$2(s.rn)+'</td><td></td></tr>':'';
+
+  charts(per);
+}
+
+function charts(per){
+  const labels=per.map(({c})=>c.label.replace(/ 15 – /,' – ').replace(/ 15,.*$/,''));
+  const tip={backgroundColor:'#fff',borderColor:'#e8e2da',borderWidth:1,titleColor:'#4a5568',bodyColor:'#1a2530',padding:12};
+  const grid={color:'#f1ede8'};const tick={color:'#8a9bb0',font:{family:'Raleway',size:11}};
+  if(cycleChart)cycleChart.destroy();if(campChart)campChart.destroy();
+  cycleChart=new Chart(document.getElementById('chart-cycle'),{type:'bar',data:{labels,datasets:[
+    {label:'Spend',data:per.map(p=>Math.round(p.t.spendTotal)),backgroundColor:'#4a5e6d',borderRadius:4,maxBarThickness:28},
+    {label:'ResNexus value',data:per.map(p=>Math.round(p.t.rn)),backgroundColor:'#c4572a',borderRadius:4,maxBarThickness:28}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:Object.assign({callbacks:{label:c=>' '+c.dataset.label+': '+fmt$(c.raw)}},tip)},scales:{x:{grid:{display:false},ticks:tick},y:{grid,ticks:Object.assign({callback:v=>'$'+(v/1000)+'k'},tick),beginAtZero:true}}}});
+  // top campaigns by bookings across all cycles, fixed colour order
+  const tally={};per.forEach(p=>p.t.order.forEach(k=>{tally[k]=tally[k]||{name:p.t.by[k].name,n:0};tally[k].n+=p.t.by[k].web;}));
+  const top=Object.keys(tally).filter(k=>tally[k].n>0).sort((a,b)=>tally[b].n-tally[a].n).slice(0,4);
+  const zero=Object.keys(tally).filter(k=>tally[k].n===0).map(k=>tally[k].name);
+  document.getElementById('camp-legend').innerHTML=top.map((k,i)=>'<span style="--c:'+CAMP_COLORS[i]+'">'+esc(tally[k].name)+'</span>').join('');
+  document.getElementById('camp-chart-foot').textContent=zero.length?zero.join(', ')+': no booking in GA4 carries '+(zero.length===1?'this name':'these names')+' in any cycle saved.':'';
+  campChart=new Chart(document.getElementById('chart-camp'),{type:'line',data:{labels,datasets:top.map((k,i)=>({label:tally[k].name,data:per.map(p=>p.t.by[k]?p.t.by[k].web:0),borderColor:CAMP_COLORS[i],backgroundColor:CAMP_COLORS[i],borderWidth:2,pointRadius:4,pointBorderColor:'#fff',pointBorderWidth:2,tension:0}))},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:Object.assign({callbacks:{label:c=>' '+c.dataset.label+': '+c.raw+' bookings'}},tip)},scales:{x:{grid:{display:false},ticks:tick},y:{grid,ticks:tick,beginAtZero:true}}}});
+}
+</script>
+</body>
+</html>
