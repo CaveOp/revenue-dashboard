@@ -321,7 +321,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 8</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 9</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -373,13 +373,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="sec"><h2>Cycle to cycle</h2><span>every cycle saved</span></div>
       <div class="grid-2">
         <div class="panel" style="margin-bottom:0;">
-          <div class="panel-header"><span class="panel-title">Spend vs booked revenue</span></div>
-          <div class="panel-body"><div class="legend"><span style="--c:#4a5e6d">Spend</span><span style="--c:#c4572a">Booked revenue</span></div><div class="chart-wrap" style="height:220px"><canvas id="chart-cycle"></canvas></div></div>
+          <div class="panel-header"><span class="panel-title">Booked revenue per $1 spent</span><span class="panel-sub">higher is better</span></div>
+          <div class="panel-body"><div class="chart-wrap" style="height:220px"><canvas id="chart-ret"></canvas></div></div>
+          <div class="panel-foot" id="ret-foot"></div>
         </div>
         <div class="panel" style="margin-bottom:0;">
-          <div class="panel-header"><span class="panel-title">Bookings by campaign</span></div>
-          <div class="panel-body"><div class="legend" id="camp-legend"></div><div class="chart-wrap" style="height:220px"><canvas id="chart-camp"></canvas></div></div>
-          <div class="panel-foot" id="camp-chart-foot"></div>
+          <div class="panel-header"><span class="panel-title">Bookings from ads</span><span class="panel-sub">web bookings GA4 traced to a Google ad</span></div>
+          <div class="panel-body"><div class="chart-wrap" style="height:220px"><canvas id="chart-book"></canvas></div></div>
+          <div class="panel-foot" id="book-foot"></div>
         </div>
       </div>
       <div class="panel">
@@ -966,22 +967,19 @@ function render(){
   charts(per);
 }
 
+const barLabels={id:'barLabels',afterDatasetsDraw(chart,args,opts){const {ctx}=chart;const ds=chart.data.datasets[0];const meta=chart.getDatasetMeta(0);ctx.save();ctx.font='700 14px Raleway';ctx.fillStyle='#1a2530';ctx.textAlign='center';ctx.textBaseline='bottom';meta.data.forEach((bar,i)=>{const v=ds.data[i];if(v==null)return;ctx.fillText(opts.format(v),bar.x,bar.y-6);});ctx.restore();}};
 function charts(per){
   const labels=per.map(({c})=>c.label.replace(/ 15 – /,' – ').replace(/ 15,.*$/,''));
-  const tip={backgroundColor:'#fff',borderColor:'#e8e2da',borderWidth:1,titleColor:'#4a5568',bodyColor:'#1a2530',padding:12};
-  const grid={color:'#f1ede8'};const tick={color:'#8a9bb0',font:{family:'Raleway',size:13}};
+  const tick={color:'#8a9bb0',font:{family:'Raleway',size:13}};
+  const sel=document.getElementById('cycle-select').value;
+  const colors=per.map(({c})=>c.startISO===sel?'#c4572a':'#4a5e6d');
   if(cycleChart)cycleChart.destroy();if(campChart)campChart.destroy();
-  cycleChart=new Chart(document.getElementById('chart-cycle'),{type:'bar',data:{labels,datasets:[
-    {label:'Spend',data:per.map(p=>Math.round(p.t.spendTotal)),backgroundColor:'#4a5e6d',borderRadius:4,maxBarThickness:28},
-    {label:'Booked revenue',data:per.map(p=>Math.round(p.t.rn)),backgroundColor:'#c4572a',borderRadius:4,maxBarThickness:28}]},
-    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:Object.assign({callbacks:{label:c=>' '+c.dataset.label+': '+fmt$(c.raw)}},tip)},scales:{x:{grid:{display:false},ticks:tick},y:{grid,ticks:Object.assign({callback:v=>'$'+(v/1000)+'k'},tick),beginAtZero:true}}}});
-  const tally={};per.forEach(p=>p.t.order.forEach(k=>{tally[k]=tally[k]||{name:p.t.by[k].name,n:0};tally[k].n+=p.t.by[k].web;}));
-  const top=Object.keys(tally).filter(k=>tally[k].n>0).sort((a,b)=>tally[b].n-tally[a].n).slice(0,4);
-  const zero=Object.keys(tally).filter(k=>tally[k].n===0).map(k=>tally[k].name);
-  document.getElementById('camp-legend').innerHTML=top.map((k,i)=>'<span style="--c:'+CAMP_COLORS[i]+'">'+esc(tally[k].name)+'</span>').join('');
-  document.getElementById('camp-chart-foot').textContent=zero.length?zero.join(', ')+': no bookings in any cycle saved.':'';
-  campChart=new Chart(document.getElementById('chart-camp'),{type:'line',data:{labels,datasets:top.map((k,i)=>({label:tally[k].name,data:per.map(p=>p.t.by[k]?p.t.by[k].web:0),borderColor:CAMP_COLORS[i],backgroundColor:CAMP_COLORS[i],borderWidth:2,pointRadius:4,pointBorderColor:'#fff',pointBorderWidth:2,tension:0}))},
-    options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:Object.assign({callbacks:{label:c=>' '+c.dataset.label+': '+c.raw+' bookings'}},tip)},scales:{x:{grid:{display:false},ticks:tick},y:{grid,ticks:tick,beginAtZero:true}}}});
+  const base=(fmt)=>({responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{enabled:false},barLabels:{format:fmt}},scales:{x:{grid:{display:false},ticks:tick},y:{display:false,beginAtZero:true}}});
+  cycleChart=new Chart(document.getElementById('chart-ret'),{type:'bar',plugins:[barLabels],data:{labels,datasets:[{data:per.map(p=>p.t.spendTotal?+(p.t.rn/p.t.spendTotal).toFixed(2):null),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:base(v=>'$'+v.toFixed(2))});
+  campChart=new Chart(document.getElementById('chart-book'),{type:'bar',plugins:[barLabels],data:{labels,datasets:[{data:per.map(p=>p.t.web.length),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:base(v=>String(v))});
+  const arrow=' → ';
+  document.getElementById('ret-foot').textContent='Spend '+per.map(p=>p.t.spend.length?fmt$(p.t.spendTotal):'not loaded').join(arrow)+'. Booked revenue '+per.map(p=>fmt$(p.t.rn)).join(arrow)+'.';
+  document.getElementById('book-foot').textContent='Cost per booking '+per.map(p=>p.t.web.length&&p.t.spendTotal?fmt$(p.t.spendTotal/p.t.web.length):'—').join(arrow)+'. Average booking value '+per.map(p=>p.t.web.length?fmt$(p.t.rn/p.t.web.length):'—').join(arrow)+'.';
 }
 </script>
 </body>
