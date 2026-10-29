@@ -237,7 +237,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   <div class="im-field">
     <label>1 · Billing cycle these files cover</label>
     <select id="im-cycle"></select>
-    <div class="cheat-body note" id="im-cycle-hint">Cycles run from the 15th of one month through the 14th of the next. Choosing a file sets this from the file's date range.</div>
+    <div class="cheat-body note" id="im-cycle-hint"></div>
   </div>
   <div class="im-field">
     <label>2 · Google Ads export (the Overview .zip, or a campaigns report .csv)</label>
@@ -291,7 +291,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <h5>Google Ads · Overview download (.zip)</h5>
       <ol>
         <li>In Google Ads, open the <b>Overview</b> page.</li>
-        <li>Set the date range in the upper right to the cycle, the 15th through the 14th.</li>
+        <li>Set the date range in the upper right to the cycle.</li>
         <li>Click the <b>download icon</b> and choose <b>CSV</b>. The download is a .zip named Overview_cards_csv(…); choose that zip above as it is. The Campaigns file inside carries Campaign Name, Cost and Conversions.</li>
       </ol>
       <div class="note">The Campaigns page also works: set the same date range, click the download icon above the table and choose .csv. That file carries whatever columns the table shows, so Clicks and Phone calls come through if they are in the table.</div>
@@ -321,7 +321,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 9</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 10</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -339,7 +339,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
     <select class="filter-select" id="cycle-select" onchange="render()"></select>
     <span class="filter-sep"></span>
     <span class="status" id="status-line"></span>
-    <span class="filter-note">Billing cycle, 15th to 14th</span>
+    <span class="filter-note" id="cycle-note"></span>
   </div>
 
   <div class="content">
@@ -365,12 +365,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="sec"><h2>Which campaigns earned it</h2><span id="camp-sub"></span><span class="sec-right"><span id="camp-note" style="font-size:13px;color:var(--text3);"></span></span></div>
       <div class="panel">
         <div class="table-scroll"><table class="data-table camp-table" id="camp-table">
-          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right det">Cost / booking</th><th class="right det">GA4 revenue</th><th class="right det">No stay found</th><th class="right det">Clicks</th><th class="right det">Google conversions</th></tr></thead>
+          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right det">Cost / booking</th><th class="right det">GA4 revenue</th><th class="right det">Not in ResNexus</th><th class="right det">Clicks</th><th class="right det">Google conversions</th></tr></thead>
           <tbody id="camp-tbody"></tbody><tfoot id="camp-tfoot"></tfoot>
         </table></div>
       </div>
 
-      <div class="sec"><h2>Cycle to cycle</h2><span>every cycle saved</span></div>
+      <div class="sec"><h2>Cycle to cycle</h2><span id="trend-note">every cycle saved</span></div>
       <div class="grid-2">
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-header"><span class="panel-title">Booked revenue per $1 spent</span><span class="panel-sub">higher is better</span></div>
@@ -413,7 +413,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="panel">
         <div class="panel-header"><span class="panel-title">Reservations behind the numbers</span><span class="panel-sub" id="res-sum"></span></div>
         <div class="table-scroll"><table class="data-table">
-          <thead><tr><th>Res#</th><th>Campaign</th><th>Source / medium</th><th>Booked on</th><th>First night</th><th class="right">Nights</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th>Stay</th></tr></thead>
+          <thead><tr><th>Res#</th><th>Campaign</th><th>Source / medium</th><th>Booked on</th><th>First night</th><th class="right">Nights</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th>ResNexus</th></tr></thead>
           <tbody id="res-tbody"></tbody><tfoot id="res-tfoot"></tfoot>
         </table></div>
       </div>
@@ -423,8 +423,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <div class="panel-body help">
           <b>Spend</b> is from the Google Ads account, per campaign, for the cycle. <b>Bookings from ads</b> are GA4 purchases whose session source / medium is google / cpc, which is a paid Google click, matched to ResNexus by reservation number. <b>Booked revenue</b> is the room charge plus the resort fee of those reservations. <b>Per $1 spent</b> is booked revenue divided by spend; it is gross revenue, not profit.<br><br>
           <b>Phone bookings</b> are reservations ResNexus marks as phone or manual. GA4 has no record of phone calls, so they cannot be tied to a campaign and are shown as a plain count.<br><br>
-          <b>No stay found</b> means GA4 recorded a purchase with a reservation number that is not in the stays data, which happens when a booking is cancelled afterwards. These count toward GA4 revenue but not booked revenue.<br><br>
-          Cycles run from the 15th of one month through the 14th of the next. Each cycle needs two downloads: the Google Ads Overview zip and the GA4 transactions export. Stays and retail data come from the Revenue page.
+          <b>Not in ResNexus</b> means GA4 recorded a purchase whose reservation number is not in the stays data on this dashboard. These count toward GA4 revenue but not booked revenue.<br><br>
+          Each cycle needs two downloads: the Google Ads Overview zip and the GA4 transactions export. Stays and retail data come from the Revenue page.
         </div>
       </details>
     </div>
@@ -442,6 +442,11 @@ const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
 const SPEND_HEADER=['Cycle','CycleStart','Campaign','Cost','Impressions','Clicks','Conversions','ConvValue','PhoneCalls','ImportedOn'];
 const GA4_HEADER=['TransactionId','Date','Cycle','CycleStart','SourceMedium','Campaign','FirstUserSourceMedium','FirstUserCampaign','Revenue','ImportedOn'];
 const CAMP_COLORS=['#4a5e6d','#c4572a','#3a7d5c','#b87c2a'];
+// Billing cycle boundary: a cycle starts on this day of the month and ends the day before it next month.
+// Change this one number if the agency's billing day changes. Cycles already saved keep the start date they were saved with.
+const CYCLE_DAY=15;
+const CYCLE_FIRST=new Date(2026,4,CYCLE_DAY);   // first cycle offered in the import list
+const ord=n=>n+([,'st','nd','rd'][n%100>>3^1&&n%10]||'th');
 
 let tokenClient, accessToken;
 let staysByRes={}, feeByRes={}, feeLoaded=false, spendRows=[], ga4Rows=[];
@@ -541,18 +546,18 @@ function fmtStamp(d){return d?(d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear
 function fmtDay(d){if(!d)return '—';if(typeof d==='string')d=parseDateLoose(d);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';}
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-/* ---------- Billing cycles: the 15th of one month through the 14th of the next ---------- */
+/* ---------- Billing cycles: CYCLE_DAY of one month through the day before it the next month ---------- */
 function cycleFromStart(start){
-  const end=new Date(start.getFullYear(),start.getMonth()+1,15);
-  const label=MON[start.getMonth()]+' 15 – '+MON[end.getMonth()]+' 15, '+end.getFullYear();
+  const end=new Date(start.getFullYear(),start.getMonth()+1,CYCLE_DAY);
+  const label=MON[start.getMonth()]+' '+CYCLE_DAY+' – '+MON[end.getMonth()]+' '+CYCLE_DAY+', '+end.getFullYear();
   return {label,start,startISO:toISO(start),end};
 }
-function cycleFor(d){if(!d)return null;const s=d.getDate()>=15?new Date(d.getFullYear(),d.getMonth(),15):new Date(d.getFullYear(),d.getMonth()-1,15);return cycleFromStart(s);}
+function cycleFor(d){if(!d)return null;const s=d.getDate()>=CYCLE_DAY?new Date(d.getFullYear(),d.getMonth(),CYCLE_DAY):new Date(d.getFullYear(),d.getMonth()-1,CYCLE_DAY);return cycleFromStart(s);}
 function cycleByStartISO(iso){const d=parseDateLoose(iso);return d?cycleFromStart(d):null;}
 function cycleOptions(){
   // every completed cycle from May 2026 (reporting start); the cycle still running is left out
-  const out=[];let s=new Date(2026,4,15);const today=startOfDay(new Date());
-  while(true){const c=cycleFromStart(s);if(c.end>today)break;out.push(c);s=new Date(s.getFullYear(),s.getMonth()+1,15);}
+  const out=[];let s=new Date(CYCLE_FIRST);const today=startOfDay(new Date());
+  while(true){const c=cycleFromStart(s);if(c.end>today)break;out.push(c);s=new Date(s.getFullYear(),s.getMonth()+1,CYCLE_DAY);}
   if(!out.length)out.push(cycleFor(today));
   return out.reverse();
 }
@@ -819,7 +824,10 @@ async function loadAll(){
     showErr('Error loading data: '+e.message);showDash();
   }
 }
+function cycleWords(){const e=new Date(2026,0,CYCLE_DAY-1).getDate();return 'Billing cycle: the '+ord(CYCLE_DAY)+' through the '+ord(e)+' of the next month';}
 function buildCycles(){
+  document.getElementById('cycle-note').textContent=cycleWords();
+  document.getElementById('im-cycle-hint').textContent=cycleWords()+'. Choosing a file sets this from the dates in the file.';
   const by={};spendRows.concat(ga4Rows).forEach(r=>{if(r.cycleStart&&!by[r.cycleStart])by[r.cycleStart]=cycleByStartISO(r.cycleStart);});
   knownCycles=Object.values(by).filter(Boolean).sort((a,b)=>a.start-b.start);
   const sel=document.getElementById('cycle-select');const prev=sel.value;
@@ -872,7 +880,7 @@ function toggleDet(){const tb=document.getElementById('camp-table');tb.classList
 function flagFor(r){
   if(r.ga4Only)return '<span class="flag">GA4 only</span>';
   if(r.spend>0&&r.web===0)return '<span class="flag bad">no bookings</span>';
-  if(r.um)return '<span class="flag warn">'+r.um+' no stay found</span>';
+  if(r.um)return '<span class="flag warn">'+r.um+' not in ResNexus</span>';
   return '';
 }
 function render(){
@@ -898,7 +906,7 @@ function render(){
   document.getElementById('h-spend').textContent=hasSpend?fmt$(s.spendTotal):'—';
   document.getElementById('h-spend-m').textContent=hasSpend?s.order.filter(k=>s.by[k].spend>0).length+' campaigns in the Google Ads account':'no Google Ads file for this cycle';
   document.getElementById('h-book').textContent=fmtN(s.web.length);
-  document.getElementById('h-book-m').textContent=s.um?(s.web.length-s.um)+' with a stay in ResNexus, '+s.um+' with no stay found':'all with a stay in ResNexus';
+  document.getElementById('h-book-m').textContent=s.um?(s.web.length-s.um)+' found in ResNexus, '+s.um+' not in ResNexus':'all found in ResNexus';
   document.getElementById('h-rn').textContent=fmt$(s.rn);
   document.getElementById('h-rn-m').textContent='GA4 recorded '+fmt$(s.ga4)+' for the same bookings';
   document.getElementById('h-ret').textContent=fmtX(ret);
@@ -944,8 +952,8 @@ function render(){
     ['Recorded by GA4',fmtN(cv.rec)+(cv.web?' <span class="dim">· '+(cv.rec/cv.web*100).toFixed(0)+'%</span>':'')],
     ['Not recorded by GA4',fmtN(cv.web-cv.rec)+' <span class="dim">· '+fmt$(cv.webRn-cv.recRn)+'</span>'],
     ['GA4 purchases'],
-    ['With no stay found',fmtN(cv.ga4only)],
-    ['From ads, with no stay found',fmtN(s.um)+' <span class="dim">· GA4 '+fmt$(sum(s.web.filter(r=>r.rn==null),r=>r.revenue))+'</span>'],
+    ['Not in ResNexus',fmtN(cv.ga4only)],
+    ['From ads, not in ResNexus',fmtN(s.um)+' <span class="dim">· GA4 '+fmt$(sum(s.web.filter(r=>r.rn==null),r=>r.revenue))+'</span>'],
     ['Source cavesprings.com / referral',fmtN(cv.ref)]
   ]);
   const metaBy={};s.meta.forEach(r=>{const k=r.sm||'(not set)';metaBy[k]=metaBy[k]||{n:0,ga4:0,rn:0};metaBy[k].n++;metaBy[k].ga4+=r.revenue||0;metaBy[k].rn+=r.rn||0;});
@@ -960,7 +968,7 @@ function render(){
   // reservations
   const list=s.web.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   document.getElementById('res-sum').textContent=list.length+' reservations · '+label;
-  document.getElementById('res-tbody').innerHTML=list.length?list.map(r=>'<tr><td><b>'+esc(r.id)+'</b></td><td>'+esc(r.campaign||'(not set)')+'</td><td class="dim">'+esc(r.sm)+'</td><td>'+(r.stay?fmtDay(r.stay.reservedOn):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.firstNight):'—')+'</td><td class="right">'+(r.stay?r.stay.nights:'—')+'</td><td class="right">'+(r.revenue==null?'—':fmt$2(r.revenue))+'</td><td class="right"><b>'+(r.rn==null?'—':fmt$2(r.rn))+'</b></td><td>'+(r.rn!=null?'<span class="pill g">found</span>':'<span class="pill a">no stay found</span>')+'</td></tr>').join('')
+  document.getElementById('res-tbody').innerHTML=list.length?list.map(r=>'<tr><td><b>'+esc(r.id)+'</b></td><td>'+esc(r.campaign||'(not set)')+'</td><td class="dim">'+esc(r.sm)+'</td><td>'+(r.stay?fmtDay(r.stay.reservedOn):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.firstNight):'—')+'</td><td class="right">'+(r.stay?r.stay.nights:'—')+'</td><td class="right">'+(r.revenue==null?'—':fmt$2(r.revenue))+'</td><td class="right"><b>'+(r.rn==null?'—':fmt$2(r.rn))+'</b></td><td>'+(r.rn!=null?'<span class="pill g">in ResNexus</span>':'<span class="pill a">not in ResNexus</span>')+'</td></tr>').join('')
     :'<tr><td colspan="9" class="empty-state">No Google Ads web bookings in this view</td></tr>';
   document.getElementById('res-tfoot').innerHTML=list.length?'<tr><td colspan="6">Total</td><td class="right">'+fmt$2(s.ga4)+'</td><td class="right">'+fmt$2(s.rn)+'</td><td></td></tr>':'';
 
