@@ -321,7 +321,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 11</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 12</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -371,7 +371,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       </div>
 
       <div class="sec"><h2>Cycle to cycle</h2><span id="trend-note">every cycle saved</span></div>
-      <div class="grid-2">
+      <div class="grid-2" id="charts-row">
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-header"><span class="panel-title">Booked revenue per $1 spent</span><span class="panel-sub">higher is better</span></div>
           <div class="panel-body"><div class="chart-wrap" style="height:220px"><canvas id="chart-ret"></canvas></div></div>
@@ -964,7 +964,10 @@ function render(){
     :'<tr><td colspan="10" class="empty-state">No Google Ads bookings in this view</td></tr>';
   document.getElementById('res-tfoot').innerHTML=list.length?'<tr><td colspan="7">Total</td><td class="right">'+fmt$2(s.ga4)+'</td><td class="right">'+fmt$2(s.rn)+'</td><td></td></tr>':'';
 
-  charts(per);
+  const multi=knownCycles.length>1;
+  document.getElementById("charts-row").style.display=multi?"grid":"none";
+  document.getElementById("trend-note").textContent=multi?"every cycle saved":"charts appear once a second cycle is saved";
+  if(multi)charts(per);
 }
 
 const barLabels={id:'barLabels',afterDatasetsDraw(chart,args,opts){const {ctx}=chart;const ds=chart.data.datasets[0];const meta=chart.getDatasetMeta(0);ctx.save();ctx.font='700 14px Raleway';ctx.fillStyle='#1a2530';ctx.textAlign='center';ctx.textBaseline='bottom';meta.data.forEach((bar,i)=>{const v=ds.data[i];if(v==null)return;ctx.fillText(opts.format(v),bar.x,bar.y-6);});ctx.restore();}};
