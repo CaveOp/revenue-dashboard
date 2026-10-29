@@ -187,8 +187,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
     <div class="cheat-body note" id="im-cycle-hint">Cycles run from the 15th of one month through the 14th of the next.</div>
   </div>
   <div class="im-field">
-    <label>2 · Google Ads campaigns report (CSV)</label>
-    <input type="file" id="im-ads" accept=".csv,text/csv">
+    <label>2 · Google Ads export (the Overview .zip, or a campaigns report .csv)</label>
+    <input type="file" id="im-ads" accept=".csv,.zip,text/csv,application/zip,application/x-zip-compressed">
+    <div class="cheat-body note">The Overview page download is a .zip holding one CSV per card; choose the zip as it is and the Campaigns file inside is used.</div>
   </div>
   <div class="im-field">
     <label>3 · GA4 transactions export (CSV, one or more files)</label>
@@ -226,13 +227,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
   <details class="cheat">
     <summary>Where to get each file</summary>
     <div class="cheat-body">
-      <h5>Google Ads · campaigns report</h5>
+      <h5>Google Ads · Overview download (.zip)</h5>
       <ol>
-        <li>In Google Ads, click <b>Campaigns</b> in the left menu.</li>
-        <li>Click the date range in the upper right, choose <b>Custom</b>, and set the 15th through the 14th of the cycle. Apply.</li>
-        <li>Make sure the table shows the columns you want saved: Campaign, Cost, Clicks, Impr., Conversions, Conv. value and, if you use it, Phone calls. The download contains the columns in the table.</li>
-        <li>Click the <b>download icon</b> above the table and choose <b>.csv</b>.</li>
+        <li>In Google Ads, open the <b>Overview</b> page.</li>
+        <li>Set the date range in the upper right to the cycle, the 15th through the 14th.</li>
+        <li>Click the <b>download icon</b> and choose <b>CSV</b>. The download is a .zip named Overview_cards_csv(…); choose that zip above as it is. The Campaigns file inside carries Campaign Name, Cost and Conversions.</li>
       </ol>
+      <div class="note">The Campaigns page also works: set the same date range, click the download icon above the table and choose .csv. That file carries whatever columns the table shows, so Clicks and Phone calls come through if they are in the table.</div>
       <h5>GA4 · transactions, the Reports route</h5>
       <ol>
         <li>In GA4, open <b>Reports › Monetization › Transactions</b>.</li>
@@ -489,6 +490,31 @@ async function readText(file){
   else if(!(b[0]===0xEF&&b[1]===0xBB)){let even=0,odd=0;const n=Math.min(b.length,2000);for(let i=0;i<n;i++)if(b[i]===0){if(i%2)odd++;else even++;}if(odd>n/4)enc='utf-16le';else if(even>n/4)enc='utf-16be';}
   return new TextDecoder(enc).decode(b).replace(/^﻿/,'').replace(/\u0000/g,'');
 }
+/* ---------- Zip reading ----------
+   The Google Ads Overview download is a .zip with one CSV per card. Read it here in the
+   browser with the built-in DecompressionStream; no library needed. */
+async function inflateRaw(bytes){const ds=new DecompressionStream('deflate-raw');const w=ds.writable.getWriter();w.write(bytes);w.close();return new Uint8Array(await new Response(ds.readable).arrayBuffer());}
+async function unzip(file){
+  const buf=new Uint8Array(await file.arrayBuffer());const dv=new DataView(buf.buffer,buf.byteOffset,buf.byteLength);const out=[];let p=0;
+  while(p+30<=buf.length&&dv.getUint32(p,true)===0x04034b50){
+    const flags=dv.getUint16(p+6,true),method=dv.getUint16(p+8,true),csize=dv.getUint32(p+18,true),nlen=dv.getUint16(p+26,true),xlen=dv.getUint16(p+28,true);
+    const name=new TextDecoder().decode(buf.subarray(p+30,p+30+nlen));const start=p+30+nlen+xlen;
+    if(flags&8)throw new Error('This zip stores sizes after the data, which this page cannot read. Unzip it and choose the Campaigns CSV instead.');
+    const data=buf.subarray(start,start+csize);
+    let bytes;if(method===0)bytes=data;else if(method===8)bytes=await inflateRaw(data);else throw new Error('Unsupported compression inside the zip for '+name);
+    if(!name.endsWith('/'))out.push({name:name.split('/').pop(),text:new TextDecoder().decode(bytes).replace(/^\uFEFF/,'').replace(/\u0000/g,'')});
+    p=start+csize;
+  }
+  if(!out.length)throw new Error('No files found inside the zip.');
+  return out;
+}
+// From a zip of Overview cards, the Campaigns card; otherwise any CSV with campaign + cost columns and no ad-group column.
+function pickCampaignsEntry(entries){
+  const byName=entries.find(e=>/^campaigns\b/i.test(e.name));if(byName)return byName;
+  return entries.find(e=>{const r=parseCSV(e.text);const h=findHeader(r,[ADS_ALIASES.campaign,ADS_ALIASES.cost]);return h!==-1&&findIdx(r[h],['Ad Group Name','Ad group','Ad group name'])===-1;});
+}
+function dateFromName(name){const m=String(name||'').match(/(\d{4})[.\-](\d{2})[.\-](\d{2})/);return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):null;}
+
 function parseCSV(text){
   const rows=[];let row=[],cur='',inQ=false;
   for(let i=0;i<text.length;i++){const c=text[i];
@@ -517,6 +543,8 @@ function dateRangeIn(rows){
     if(m){const a=parseDateLoose(m[1]);if(a)return a;}
     const m2=line.match(/(\d{8})\s*[-–—]\s*(\d{8})/);
     if(m2){const a=parseDateLoose(m2[1]);if(a)return a;}
+    const m3=line.match(/(\d{4}\.\d{2}\.\d{2})\s*[-–—]\s*(\d{4}\.\d{2}\.\d{2})/);
+    if(m3){const a=dateFromName(m3[1]);if(a)return a;}
   }
   return null;
 }
@@ -530,7 +558,7 @@ const ADS_ALIASES={
   convValue:['Conv. value','Conversion value','Conv value','All conv. value'],
   calls:['Phone calls','Calls','Phone calls (call assets)','Calls from ads']
 };
-function parseAdsReport(rows){
+function parseAdsReport(rows,fname){
   const h=findHeader(rows,[ADS_ALIASES.campaign,ADS_ALIASES.cost]);
   if(h===-1)throw new Error('Could not find the Campaign and Cost columns. Is this the Google Ads campaigns report (.csv)?');
   const H=rows[h];const ix={};Object.keys(ADS_ALIASES).forEach(k=>ix[k]=findIdx(H,ADS_ALIASES[k]));
@@ -543,7 +571,7 @@ function parseAdsReport(rows){
   });
   // the same campaign can appear on several rows (e.g. one per status); add them up
   const by={};out.forEach(o=>{const k=o.campaign;if(!by[k])by[k]=Object.assign({},o);else{['cost','impressions','clicks','conversions','convValue','calls'].forEach(f=>{if(o[f]!=='')by[k][f]=(by[k][f]===''?0:by[k][f])+o[f];});}});
-  return {rows:Object.values(by),columns:Object.keys(ix).filter(k=>ix[k]>=0),skipped,rangeStart:dateRangeIn(rows)};
+  return {rows:Object.values(by),columns:Object.keys(ix).filter(k=>ix[k]>=0),skipped,rangeStart:dateRangeIn(rows)||dateFromName(fname)};
 }
 
 const GA4_ALIASES={
@@ -555,7 +583,7 @@ const GA4_ALIASES={
   fcamp:['First user campaign','first_user_campaign'],
   revenue:['Purchase revenue','purchase_revenue','purchase_revenue_usd','Total revenue','Ecommerce revenue','Revenue','Item revenue'],
 };
-function parseGa4Export(rows){
+function parseGa4Export(rows,fname){
   // GA4 CSVs carry "# ..." comment lines above the table; drop them first
   const body=rows.filter(r=>!/^#/.test(String(r[0]||'').trim()));
   const h=findHeader(body,[GA4_ALIASES.txn]);
@@ -574,7 +602,7 @@ function parseGa4Export(rows){
     if(ix.fcamp>=0&&!rec.fcamp)rec.fcamp=cell(r[ix.fcamp]);
     if(ix.revenue>=0&&rec.revenue==null){const v=cell(r[ix.revenue]);if(v!=='')rec.revenue=pMoney(v);}
   });
-  return {byId:out,columns:Object.keys(ix).filter(k=>ix[k]>=0),dropped,rangeStart:dateRangeIn(rows)};
+  return {byId:out,columns:Object.keys(ix).filter(k=>ix[k]>=0),dropped,rangeStart:dateRangeIn(rows)||dateFromName(fname)};
 }
 
 /* ---------- Import flow ---------- */
@@ -598,10 +626,16 @@ async function analyzeImport(){
   status.textContent='Reading…';
   try{
     let ads=null,ga4=null;const warn=[];
-    if(adsFile){ads=parseAdsReport(parseCSV(await readText(adsFile)));if(!ads.rows.length)throw new Error('No campaign rows found in the Google Ads file.');
+    if(adsFile){
+      let rows,fname=adsFile.name;
+      if(/\.zip$/i.test(adsFile.name)){const entries=await unzip(adsFile);const pick=pickCampaignsEntry(entries);
+        if(!pick)throw new Error('No campaigns CSV found inside the zip. Files inside: '+entries.map(e=>e.name).join(', '));
+        rows=parseCSV(pick.text);fname=pick.name;}
+      else rows=parseCSV(await readText(adsFile));
+      ads=parseAdsReport(rows,fname);ads.file=fname;if(!ads.rows.length)throw new Error('No campaign rows found in '+fname+'.');
       if(ads.rangeStart&&toISO(cycleFor(ads.rangeStart).start)!==cycle.startISO)warn.push('The Google Ads file starts '+fmtDay(ads.rangeStart)+', which is not in the chosen cycle. Check the cycle above.');}
     if(ga4Files.length){ga4={byId:{},columns:[],dropped:0};
-      for(const f of ga4Files){const p=parseGa4Export(parseCSV(await readText(f)));ga4.dropped+=p.dropped;p.columns.forEach(c=>{if(!ga4.columns.includes(c))ga4.columns.push(c);});
+      for(const f of ga4Files){const p=parseGa4Export(parseCSV(await readText(f)),f.name);ga4.dropped+=p.dropped;p.columns.forEach(c=>{if(!ga4.columns.includes(c))ga4.columns.push(c);});
         Object.values(p.byId).forEach(rec=>{const e=ga4.byId[rec.id];if(!e)ga4.byId[rec.id]=rec;else{['date','sm','campaign','fusm','fcamp','revenue'].forEach(k=>{if((e[k]==null||e[k]==='')&&rec[k]!=null&&rec[k]!=='')e[k]=rec[k];});}});
         if(p.rangeStart&&toISO(cycleFor(p.rangeStart).start)!==cycle.startISO)warn.push(f.name+' starts '+fmtDay(p.rangeStart)+', which is not in the chosen cycle.');}
       if(!Object.keys(ga4.byId).length)throw new Error('No transactions with a numeric Transaction ID found in the GA4 file.');
@@ -618,7 +652,7 @@ async function analyzeImport(){
     const offCycle=ga4List.filter(r=>r.date&&toISO(cycleFor(r.date).start)!==cycle.startISO).length;
     pending={cycle,ads,ga4:ga4List,dup};
     const lines=[];
-    if(ads)lines.push(['Google Ads campaigns',ads.rows.length+' · spend '+fmt$(sum(ads.rows,r=>r.cost))],['Columns found','Campaign, Cost'+(ads.columns.filter(c=>!['campaign','cost'].includes(c)).map(c=>', '+c).join(''))]);
+    if(ads)lines.push(['Google Ads file read',ads.file],['Google Ads campaigns',ads.rows.length+' · spend '+fmt$(sum(ads.rows,r=>r.cost))],['Columns found','Campaign, Cost'+(ads.columns.filter(c=>!['campaign','cost'].includes(c)).map(c=>', '+c).join(''))]);
     if(ga4)lines.push(['GA4 transactions',fmtN(ga4List.length)+(ga4.dropped?' · '+ga4.dropped+' rows without a numeric ID skipped':'')],['Found in ResNexus stays',matched+' of '+ga4List.length],['Session source google / cpc',String(gads)],['Already in the sheet',dup+' (skipped)']);
     if(offCycle)lines.push(['Dated outside the chosen cycle',offCycle+' transactions (saved under their own date)']);
     lines.push(['Cycle',cycle.label],['Mode',importMode()==='cycle'?'replace this cycle':'add to what is saved']);
