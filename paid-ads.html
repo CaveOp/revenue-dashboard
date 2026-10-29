@@ -184,16 +184,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
   <div class="im-field">
     <label>1 · Billing cycle these files cover</label>
     <select id="im-cycle"></select>
-    <div class="cheat-body note" id="im-cycle-hint">Cycles run from the 15th of one month through the 14th of the next.</div>
+    <div class="cheat-body note" id="im-cycle-hint">Cycles run from the 15th of one month through the 14th of the next. Choosing a file sets this from the file's date range.</div>
   </div>
   <div class="im-field">
     <label>2 · Google Ads export (the Overview .zip, or a campaigns report .csv)</label>
-    <input type="file" id="im-ads" accept=".csv,.zip,text/csv,application/zip,application/x-zip-compressed">
+    <input type="file" id="im-ads" accept=".csv,.zip,text/csv,application/zip,application/x-zip-compressed" onchange="suggestCycle()">
     <div class="cheat-body note">The Overview page download is a .zip holding one CSV per card; choose the zip as it is and the Campaigns file inside is used.</div>
   </div>
   <div class="im-field">
     <label>3 · GA4 transactions export (CSV, one or more files)</label>
-    <input type="file" id="im-ga4" accept=".csv,text/csv" multiple>
+    <input type="file" id="im-ga4" accept=".csv,text/csv" multiple onchange="suggestCycle()">
     <div class="cheat-body note">If you downloaded the Transactions report twice, once with Session source / medium and once with Session campaign, choose both files. They are merged by Transaction ID.</div>
   </div>
   <div class="im-field">
@@ -260,7 +260,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 4</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -477,9 +477,10 @@ function cycleFromStart(start){
 function cycleFor(d){if(!d)return null;const s=d.getDate()>=15?new Date(d.getFullYear(),d.getMonth(),15):new Date(d.getFullYear(),d.getMonth()-1,15);return cycleFromStart(s);}
 function cycleByStartISO(iso){const d=parseDateLoose(iso);return d?cycleFromStart(d):null;}
 function cycleOptions(){
-  // every cycle from May 2026 (reporting start) through the current one
-  const out=[];let s=new Date(2026,4,15);const now=cycleFor(new Date()).start;
-  while(s<=now){out.push(cycleFromStart(s));s=new Date(s.getFullYear(),s.getMonth()+1,15);}
+  // every completed cycle from May 2026 (reporting start); the cycle still running is left out
+  const out=[];let s=new Date(2026,4,15);const today=startOfDay(new Date());
+  while(true){const c=cycleFromStart(s);if(c.end>today)break;out.push(c);s=new Date(s.getFullYear(),s.getMonth()+1,15);}
+  if(!out.length)out.push(cycleFor(today));
   return out.reverse();
 }
 
@@ -607,6 +608,21 @@ function parseGa4Export(rows,fname){
 
 /* ---------- Import flow ---------- */
 let pending=null;
+// Read the date range out of whichever file was just chosen and pick that cycle in the list.
+async function fileRangeStart(file){
+  if(/\.zip$/i.test(file.name)){const entries=await unzip(file);const pick=pickCampaignsEntry(entries);return pick?(dateRangeIn(parseCSV(pick.text))||dateFromName(pick.name)):null;}
+  const rows=parseCSV(await readText(file));return dateRangeIn(rows)||dateFromName(file.name);
+}
+async function suggestCycle(){
+  const hint=document.getElementById('im-cycle-hint');const sel=document.getElementById('im-cycle');
+  const files=[document.getElementById('im-ads').files[0]].concat(Array.from(document.getElementById('im-ga4').files)).filter(Boolean);
+  for(const f of files){
+    try{const d=await fileRangeStart(f);if(!d)continue;const c=cycleFor(d);
+      if(Array.from(sel.options).some(o=>o.value===c.startISO)){sel.value=c.startISO;hint.textContent='Set from '+f.name+': '+c.label+'.';return;}
+      hint.textContent=f.name+' starts '+fmtDay(d)+', which is not a completed cycle. Pick the cycle by hand.';return;
+    }catch(e){}
+  }
+}
 function openImport(){
   const sel=document.getElementById('im-cycle');
   sel.innerHTML=cycleOptions().map(c=>`<option value="${c.startISO}">${esc(c.label)}</option>`).join('');
