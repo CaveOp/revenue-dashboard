@@ -224,6 +224,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
   </div>
   <div id="im-result" style="display:none;"></div>
 
+  <div class="cheat" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+    <div class="im-row" style="margin-top:0;align-items:center;">
+      <button class="im-btn ghost" onclick="clearSaved()">Clear everything saved on this page</button>
+      <span class="cheat-body note" style="margin:0;">Empties the AD_SPEND_CLEAN and GA4_TXN_CLEAN tabs. Stays and retail data are not touched.</span>
+    </div>
+    <div id="im-clear-out"></div>
+  </div>
+
   <details class="cheat">
     <summary>Where to get each file</summary>
     <div class="cheat-body">
@@ -260,7 +268,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 4</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 5</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -703,6 +711,18 @@ async function confirmImport(){
     res.innerHTML='<div class="im-ok">Saved for '+esc(cycle.label)+': '+nSpend+' campaign row'+(nSpend===1?'':'s')+' and '+nGa4+' GA4 transaction'+(nGa4===1?'':'s')+'.</div>';
     cancelPreview();buildCycles();render();
   }catch(e){status.textContent='';document.getElementById('im-result').style.display='block';document.getElementById('im-result').innerHTML='<div class="im-err">Save failed: '+esc(e.message)+'</div>';btn.disabled=false;}
+}
+
+async function clearSaved(){
+  const out=document.getElementById('im-clear-out');
+  if(!window.confirm('Delete every saved paid ads row (spend and GA4 transactions, all cycles)? The stays and retail data stay as they are.'))return;
+  out.innerHTML='<div class="im-status">Clearing…</div>';
+  try{
+    const titles=await listSheetTitles();
+    for(const tab of [SPEND_TAB,GA4_TAB])if(titles.includes(tab))await clearTab(tab);
+    spendRows=[];ga4Rows=[];knownCycles=[];buildCycles();render();
+    out.innerHTML='<div class="im-ok">Cleared. Both tabs are empty; import a cycle to start again.</div>';
+  }catch(e){out.innerHTML='<div class="im-err">Could not clear: '+esc(e.message)+'</div>';}
 }
 
 /* ---------- Load ---------- */
