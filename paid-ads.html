@@ -321,7 +321,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 10</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 11</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -365,7 +365,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="sec"><h2>Which campaigns earned it</h2><span id="camp-sub"></span><span class="sec-right"><span id="camp-note" style="font-size:13px;color:var(--text3);"></span></span></div>
       <div class="panel">
         <div class="table-scroll"><table class="data-table camp-table" id="camp-table">
-          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right det">Cost / booking</th><th class="right det">GA4 revenue</th><th class="right det">Not in ResNexus</th><th class="right det">Clicks</th><th class="right det">Google conversions</th></tr></thead>
+          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">By phone</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right det">Cost / booking</th><th class="right det">GA4 revenue</th><th class="right det">Not in ResNexus</th><th class="right det">Clicks</th><th class="right det">Google conversions</th></tr></thead>
           <tbody id="camp-tbody"></tbody><tfoot id="camp-tfoot"></tfoot>
         </table></div>
       </div>
@@ -413,20 +413,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="panel">
         <div class="panel-header"><span class="panel-title">Reservations behind the numbers</span><span class="panel-sub" id="res-sum"></span></div>
         <div class="table-scroll"><table class="data-table">
-          <thead><tr><th>Res#</th><th>Campaign</th><th>Source / medium</th><th>Booked on</th><th>First night</th><th class="right">Nights</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th>ResNexus</th></tr></thead>
+          <thead><tr><th>Res#</th><th>Campaign</th><th>Source / medium</th><th>Channel</th><th>Booked on</th><th>First night</th><th class="right">Nights</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th>ResNexus</th></tr></thead>
           <tbody id="res-tbody"></tbody><tfoot id="res-tfoot"></tfoot>
         </table></div>
       </div>
 
-      <details class="more">
-        <summary>How to read this page</summary>
-        <div class="panel-body help">
-          <b>Spend</b> is from the Google Ads account, per campaign, for the cycle. <b>Bookings from ads</b> are GA4 purchases whose session source / medium is google / cpc, which is a paid Google click, matched to ResNexus by reservation number. <b>Booked revenue</b> is the room charge plus the resort fee of those reservations. <b>Per $1 spent</b> is booked revenue divided by spend; it is gross revenue, not profit.<br><br>
-          <b>Phone bookings</b> are reservations ResNexus marks as phone or manual. GA4 has no record of phone calls, so they cannot be tied to a campaign and are shown as a plain count.<br><br>
-          <b>Not in ResNexus</b> means GA4 recorded a purchase whose reservation number is not in the stays data on this dashboard. These count toward GA4 revenue but not booked revenue.<br><br>
-          Each cycle needs two downloads: the Google Ads Overview zip and the GA4 transactions export. Stays and retail data come from the Revenue page.
-        </div>
-      </details>
     </div>
   </div>
 </div>
@@ -850,10 +841,11 @@ function stats(starts){
   const allGa4=ga4Rows.filter(r=>inSet(r.cycleStart));
   // campaigns: spend rows first (by normalized name), then GA4-only names
   const by={};const order=[];
-  spend.forEach(r=>{const k=normName(r.campaign);if(!by[k]){by[k]={name:r.campaign,spend:0,clicks:0,conv:0,calls:0,web:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false};order.push(k);}
+  spend.forEach(r=>{const k=normName(r.campaign);if(!by[k]){by[k]={name:r.campaign,spend:0,clicks:0,conv:0,calls:0,web:0,ph:0,ota:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false};order.push(k);}
     by[k].spend+=r.cost;if(r.clicks!==''){by[k].clicks+=r.clicks;by[k].hasClicks=true;}if(r.conversions!==''){by[k].conv+=r.conversions;by[k].hasConv=true;}if(r.calls!=='')by[k].calls+=r.calls;});
-  web.forEach(r=>{const name=r.campaign||'(not set)';const k=normName(name)||'notset';if(!by[k]){by[k]={name,spend:0,clicks:0,conv:0,calls:0,web:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false,ga4Only:true};order.push(k);}
-    by[k].web++;by[k].ga4+=r.revenue||0;if(r.rn!=null)by[k].rn+=r.rn;else by[k].um++;});
+  web.forEach(r=>{const name=r.campaign||'(not set)';const k=normName(name)||'notset';if(!by[k]){by[k]={name,spend:0,clicks:0,conv:0,calls:0,web:0,ph:0,ota:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false,ga4Only:true};order.push(k);}
+    by[k].web++;by[k].ga4+=r.revenue||0;if(r.rn!=null)by[k].rn+=r.rn;else by[k].um++;if(r.stay&&r.stay.channel==='Phone/Manual')by[k].ph++;if(r.stay&&r.stay.channel==='OTA')by[k].ota++;});
+  const phAttr=web.filter(r=>r.stay&&r.stay.channel==='Phone/Manual');
   const spendTotal=sum(spend,r=>r.cost),ga4=sum(web,r=>r.revenue),rn=sum(web,r=>r.rn),um=web.filter(r=>r.rn==null).length;
   const calls=sum(spend,r=>r.calls===''?0:r.calls),hasCalls=spend.some(r=>r.calls!=='');
   // coverage from stays, by reserved-on date
@@ -863,7 +855,7 @@ function stats(starts){
     else if(s.channel==='Phone/Manual'){cov.phone++;cov.phoneRn+=v;}});
   cov.ga4only=allGa4.filter(r=>!staysByRes[r.id]).length;
   cov.ref=allGa4.filter(r=>/cavesprings\.com\s*\/\s*referral/i.test(r.sm)).length;
-  return {spend,web,meta,by,order,spendTotal,ga4,rn,um,calls,hasCalls,cov,metaGa4:sum(meta,r=>r.revenue),metaRn:sum(meta,r=>r.rn),allGa4};
+  return {spend,web,phAttr,meta,by,order,spendTotal,ga4,rn,um,calls,hasCalls,cov,metaGa4:sum(meta,r=>r.revenue),metaRn:sum(meta,r=>r.rn),allGa4};
 }
 function delta(el,cur,prev,money,invert){
   if(prev==null||!isFinite(prev)||prev===0||cur==null||!isFinite(cur)){el.textContent='';el.className='scorecard-delta flat';return;}
@@ -906,7 +898,7 @@ function render(){
   document.getElementById('h-spend').textContent=hasSpend?fmt$(s.spendTotal):'—';
   document.getElementById('h-spend-m').textContent=hasSpend?s.order.filter(k=>s.by[k].spend>0).length+' campaigns in the Google Ads account':'no Google Ads file for this cycle';
   document.getElementById('h-book').textContent=fmtN(s.web.length);
-  document.getElementById('h-book-m').textContent=s.um?(s.web.length-s.um)+' found in ResNexus, '+s.um+' not in ResNexus':'all found in ResNexus';
+  document.getElementById('h-book-m').textContent=(s.phAttr.length?s.phAttr.length+' booked by phone · ':'')+(s.um?(s.web.length-s.um)+' found in ResNexus, '+s.um+' not in ResNexus':'all found in ResNexus');
   document.getElementById('h-rn').textContent=fmt$(s.rn);
   document.getElementById('h-rn-m').textContent='GA4 recorded '+fmt$(s.ga4)+' for the same bookings';
   document.getElementById('h-ret').textContent=fmtX(ret);
@@ -924,9 +916,9 @@ function render(){
   document.getElementById('camp-sub').textContent=label;
   const rows=s.order.map(k=>s.by[k]);
   document.getElementById('camp-note').textContent='';
-  document.getElementById('camp-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+esc(r.name)+'</b>'+flagFor(r)+'</td><td class="right">'+(r.ga4Only?'—':fmt$(r.spend))+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.spend?fmtX(r.rn/r.spend):'—')+'</td><td class="right det">'+(r.web&&r.spend?fmt$(r.spend/r.web):'—')+'</td><td class="right det">'+fmt$(r.ga4)+'</td><td class="right det">'+(r.um||'—')+'</td><td class="right det">'+(r.hasClicks?fmtN(r.clicks):'—')+'</td><td class="right det">'+(r.hasConv?r.conv.toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>').join('')
-    :'<tr><td colspan="10" class="empty-state">Nothing saved for this cycle yet</td></tr>';
-  document.getElementById('camp-tfoot').innerHTML=rows.length?'<tr><td>All campaigns</td><td class="right">'+fmt$(s.spendTotal)+'</td><td class="right">'+fmtN(s.web.length)+'</td><td class="right">'+fmt$(s.rn)+'</td><td class="right">'+fmtX(ret)+'</td><td class="right det">'+(s.web.length&&s.spendTotal?fmt$(s.spendTotal/s.web.length):'—')+'</td><td class="right det">'+fmt$(s.ga4)+'</td><td class="right det">'+(s.um||'—')+'</td><td class="right det">'+(rows.some(r=>r.hasClicks)?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right det">'+(rows.some(r=>r.hasConv)?sum(rows,r=>r.conv).toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>':'';
+  document.getElementById('camp-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+esc(r.name)+'</b>'+flagFor(r)+'</td><td class="right">'+(r.ga4Only?'—':fmt$(r.spend))+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+(r.ph||'—')+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.spend?fmtX(r.rn/r.spend):'—')+'</td><td class="right det">'+(r.web&&r.spend?fmt$(r.spend/r.web):'—')+'</td><td class="right det">'+fmt$(r.ga4)+'</td><td class="right det">'+(r.um||'—')+'</td><td class="right det">'+(r.hasClicks?fmtN(r.clicks):'—')+'</td><td class="right det">'+(r.hasConv?r.conv.toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>').join('')
+    :'<tr><td colspan="11" class="empty-state">Nothing saved for this cycle yet</td></tr>';
+  document.getElementById('camp-tfoot').innerHTML=rows.length?'<tr><td>All campaigns</td><td class="right">'+fmt$(s.spendTotal)+'</td><td class="right">'+fmtN(s.web.length)+'</td><td class="right">'+(s.phAttr.length||'—')+'</td><td class="right">'+fmt$(s.rn)+'</td><td class="right">'+fmtX(ret)+'</td><td class="right det">'+(s.web.length&&s.spendTotal?fmt$(s.spendTotal/s.web.length):'—')+'</td><td class="right det">'+fmt$(s.ga4)+'</td><td class="right det">'+(s.um||'—')+'</td><td class="right det">'+(rows.some(r=>r.hasClicks)?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right det">'+(rows.some(r=>r.hasConv)?sum(rows,r=>r.conv).toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>':'';
 
   // trend
   const per=knownCycles.map(c=>({c,t:stats([c.startISO])}));
@@ -958,9 +950,9 @@ function render(){
   ]);
   const metaBy={};s.meta.forEach(r=>{const k=r.sm||'(not set)';metaBy[k]=metaBy[k]||{n:0,ga4:0,rn:0};metaBy[k].n++;metaBy[k].ga4+=r.revenue||0;metaBy[k].rn+=r.rn||0;});
   document.getElementById('meta-tbody').innerHTML=kv([
-    ['Not attributable to ads'],
-    ['Phone or manual bookings',fmtN(cv.phone)+' <span class="dim">· '+fmt$(cv.phoneRn)+'</span>'],
-    ['Calls from ads, Google Ads count',s.hasCalls?fmtN(s.calls):'<span class="dim">not in this export</span>'],
+    ['Phone, from ResNexus channel'],
+    ['Phone or manual bookings, all',fmtN(cv.phone)+' <span class="dim">· '+fmt$(cv.phoneRn)+'</span>'],
+    ['Of those, traced to a Google ad by GA4',fmtN(s.phAttr.length)+' <span class="dim">· '+fmt$(sum(s.phAttr,r=>r.rn))+'</span>'],
     ['Meta'],
     ['Meta spend','<span class="dim">not imported</span>']
   ].concat(Object.keys(metaBy).length?Object.keys(metaBy).map(k=>['Paid Meta bookings, '+esc(k),metaBy[k].n+' <span class="dim">· GA4 '+fmt$(metaBy[k].ga4)+' · booked '+fmt$(metaBy[k].rn)+'</span>']):[['Paid Meta bookings in GA4','0']]));
@@ -968,9 +960,9 @@ function render(){
   // reservations
   const list=s.web.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   document.getElementById('res-sum').textContent=list.length+' reservations · '+label;
-  document.getElementById('res-tbody').innerHTML=list.length?list.map(r=>'<tr><td><b>'+esc(r.id)+'</b></td><td>'+esc(r.campaign||'(not set)')+'</td><td class="dim">'+esc(r.sm)+'</td><td>'+(r.stay?fmtDay(r.stay.reservedOn):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.firstNight):'—')+'</td><td class="right">'+(r.stay?r.stay.nights:'—')+'</td><td class="right">'+(r.revenue==null?'—':fmt$2(r.revenue))+'</td><td class="right"><b>'+(r.rn==null?'—':fmt$2(r.rn))+'</b></td><td>'+(r.rn!=null?'<span class="pill g">in ResNexus</span>':'<span class="pill a">not in ResNexus</span>')+'</td></tr>').join('')
-    :'<tr><td colspan="9" class="empty-state">No Google Ads web bookings in this view</td></tr>';
-  document.getElementById('res-tfoot').innerHTML=list.length?'<tr><td colspan="6">Total</td><td class="right">'+fmt$2(s.ga4)+'</td><td class="right">'+fmt$2(s.rn)+'</td><td></td></tr>':'';
+  document.getElementById('res-tbody').innerHTML=list.length?list.map(r=>'<tr><td><b>'+esc(r.id)+'</b></td><td>'+esc(r.campaign||'(not set)')+'</td><td class="dim">'+esc(r.sm)+'</td><td>'+(r.stay?(r.stay.channel==='Phone/Manual'?'Phone':r.stay.channel==='OTA'?'OTA':'Web'):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.reservedOn):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.firstNight):'—')+'</td><td class="right">'+(r.stay?r.stay.nights:'—')+'</td><td class="right">'+(r.revenue==null?'—':fmt$2(r.revenue))+'</td><td class="right"><b>'+(r.rn==null?'—':fmt$2(r.rn))+'</b></td><td>'+(r.rn!=null?'<span class="pill g">in ResNexus</span>':'<span class="pill a">not in ResNexus</span>')+'</td></tr>').join('')
+    :'<tr><td colspan="10" class="empty-state">No Google Ads bookings in this view</td></tr>';
+  document.getElementById('res-tfoot').innerHTML=list.length?'<tr><td colspan="7">Total</td><td class="right">'+fmt$2(s.ga4)+'</td><td class="right">'+fmt$2(s.rn)+'</td><td></td></tr>':'';
 
   charts(per);
 }
