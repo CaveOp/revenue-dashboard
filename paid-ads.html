@@ -309,7 +309,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 13</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 14</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -353,7 +353,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="sec"><h2>Which campaigns earned it</h2><span id="camp-sub"></span><span class="sec-right"><span id="camp-note" style="font-size:13px;color:var(--text3);"></span></span></div>
       <div class="panel">
         <div class="table-scroll"><table class="data-table camp-table" id="camp-table">
-          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">By phone</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right det">Cost / booking</th><th class="right det">GA4 revenue</th><th class="right det">Not in ResNexus</th><th class="right det">Clicks</th><th class="right det">Google conversions</th></tr></thead>
+          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right det">Cost / booking</th><th class="right det">GA4 revenue</th><th class="right det">Not in ResNexus</th><th class="right det">Clicks</th><th class="right det">Google conversions</th></tr></thead>
           <tbody id="camp-tbody"></tbody><tfoot id="camp-tfoot"></tfoot>
         </table></div>
       </div>
@@ -361,7 +361,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="sec"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
       <div class="panel">
         <div class="table-scroll"><table class="data-table camp-table" id="kw-table">
-          <thead><tr><th>Keyword</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">By phone</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right">Cost / booking</th><th class="right">GA4 revenue</th><th class="right">Not in ResNexus</th><th class="right">Clicks</th></tr></thead>
+          <thead><tr><th>Keyword</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right">Cost / booking</th><th class="right">GA4 revenue</th><th class="right">Not in ResNexus</th><th class="right">Clicks</th></tr></thead>
           <tbody id="kw-tbody"></tbody><tfoot id="kw-tfoot"></tfoot>
         </table></div>
         <div class="panel-foot" id="kw-foot" style="display:none;"></div>
@@ -392,19 +392,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="panel">
         <div class="panel-header"><span class="panel-title">GA4 revenue vs booked revenue</span><span class="panel-sub" id="cmp-sum"></span></div>
         <div class="panel-body"><div class="table-scroll"><table class="data-table">
-          <thead><tr><th>Figure</th><th class="right">Google Ads account</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th class="right">Difference</th><th>Agency invoice <span class="dim" style="font-weight:400;text-transform:none;letter-spacing:0">(optional, saved on this computer only)</span></th></tr></thead>
+          <thead><tr><th>Figure</th><th class="right">Google Ads account</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th class="right">Difference</th></tr></thead>
           <tbody id="cmp-tbody"></tbody>
         </table></div>
         <p class="help" style="margin-top:14px;">GA4 revenue is what GA4 recorded at the moment of booking. Booked revenue is the room charge plus resort fee for the same reservation numbers in ResNexus. They differ when a stay is changed or cancelled after booking.</p></div>
       </div>
 
       <div class="panel">
-        <div class="panel-header"><span class="panel-title">Measurement coverage</span><span class="panel-sub" id="cov-sum"></span></div>
+        <div class="panel-header"><span class="panel-title">How complete the data is</span><span class="panel-sub" id="cov-sum"></span></div>
         <div class="panel-body"><div class="grid-2" style="margin-bottom:0;gap:40px;">
           <table class="kv"><tbody id="cov-tbody"></tbody></table>
           <table class="kv"><tbody id="meta-tbody"></tbody></table>
         </div>
-        <p class="help" style="margin-top:14px;">Counts only. A booking GA4 did not record cannot be attributed to anything, so the ad figures above are a floor, not a ceiling. Why a booking is missing from GA4 is not known from these files.</p></div>
+        <p class="help" style="margin-top:14px;" id="cov-note"></p></div>
       </div>
 
       <div class="panel">
@@ -896,9 +896,6 @@ function delta(el,cur,prev,money,invert){
   el.textContent=(d>=0?'+':'−')+(money?fmt$(Math.abs(d)):Math.abs(d).toLocaleString('en-US',{maximumFractionDigits:2}))+' ('+(p>=0?'+':'')+p.toFixed(0)+'%) vs prior cycle';
   el.className='scorecard-delta '+(Math.abs(p)<1?'flat':((d>0)!==!!invert?'up':'down'));
 }
-function invKey(iso){return 'cs_paidads_invoice_'+iso;}
-function readInv(iso){try{return pMoney(localStorage.getItem(invKey(iso))||'');}catch(e){return 0;}}
-function onInvChange(iso,v){try{localStorage.setItem(invKey(iso),v||'');}catch(e){}render();}
 
 /* ---------- Render ---------- */
 function toggleDet(){const tb=document.getElementById('camp-table');tb.classList.toggle('show-det');document.getElementById('det-btn').textContent=tb.classList.contains('show-det')?'Hide details':'Show details';}
@@ -931,7 +928,7 @@ function render(){
   document.getElementById('h-spend').textContent=hasSpend?fmt$(s.spendTotal):'—';
   document.getElementById('h-spend-m').textContent=hasSpend?s.order.filter(k=>s.by[k].spend>0).length+' campaigns in the Google Ads account':'no Google Ads file for this cycle';
   document.getElementById('h-book').textContent=fmtN(s.web.length);
-  document.getElementById('h-book-m').textContent=(s.phAttr.length?s.phAttr.length+' booked by phone · ':'')+(s.um?(s.web.length-s.um)+' found in ResNexus, '+s.um+' not in ResNexus':'all found in ResNexus');
+  document.getElementById('h-book-m').textContent=(s.um?(s.web.length-s.um)+' found in ResNexus, '+s.um+' not in ResNexus':'all found in ResNexus');
   document.getElementById('h-rn').textContent=fmt$(s.rn);
   document.getElementById('h-rn-m').textContent='GA4 recorded '+fmt$(s.ga4)+' for the same bookings';
   document.getElementById('h-ret').textContent=fmtX(ret);
@@ -949,9 +946,9 @@ function render(){
   document.getElementById('camp-sub').textContent=label;
   const rows=s.order.map(k=>s.by[k]);
   document.getElementById('camp-note').textContent='';
-  document.getElementById('camp-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+esc(r.name)+'</b>'+flagFor(r)+'</td><td class="right">'+(r.ga4Only?'—':fmt$(r.spend))+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+(r.ph||'—')+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.spend?fmtX(r.rn/r.spend):'—')+'</td><td class="right det">'+(r.web&&r.spend?fmt$(r.spend/r.web):'—')+'</td><td class="right det">'+fmt$(r.ga4)+'</td><td class="right det">'+(r.um||'—')+'</td><td class="right det">'+(r.hasClicks?fmtN(r.clicks):'—')+'</td><td class="right det">'+(r.hasConv?r.conv.toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>').join('')
-    :'<tr><td colspan="11" class="empty-state">Nothing saved for this cycle yet</td></tr>';
-  document.getElementById('camp-tfoot').innerHTML=rows.length?'<tr><td>All campaigns</td><td class="right">'+fmt$(s.spendTotal)+'</td><td class="right">'+fmtN(s.web.length)+'</td><td class="right">'+(s.phAttr.length||'—')+'</td><td class="right">'+fmt$(s.rn)+'</td><td class="right">'+fmtX(ret)+'</td><td class="right det">'+(s.web.length&&s.spendTotal?fmt$(s.spendTotal/s.web.length):'—')+'</td><td class="right det">'+fmt$(s.ga4)+'</td><td class="right det">'+(s.um||'—')+'</td><td class="right det">'+(rows.some(r=>r.hasClicks)?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right det">'+(rows.some(r=>r.hasConv)?sum(rows,r=>r.conv).toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>':'';
+  document.getElementById('camp-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+esc(r.name)+'</b>'+flagFor(r)+'</td><td class="right">'+(r.ga4Only?'—':fmt$(r.spend))+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.spend?fmtX(r.rn/r.spend):'—')+'</td><td class="right det">'+(r.web&&r.spend?fmt$(r.spend/r.web):'—')+'</td><td class="right det">'+fmt$(r.ga4)+'</td><td class="right det">'+(r.um||'—')+'</td><td class="right det">'+(r.hasClicks?fmtN(r.clicks):'—')+'</td><td class="right det">'+(r.hasConv?r.conv.toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>').join('')
+    :'<tr><td colspan="10" class="empty-state">Nothing saved for this cycle yet</td></tr>';
+  document.getElementById('camp-tfoot').innerHTML=rows.length?'<tr><td>All campaigns</td><td class="right">'+fmt$(s.spendTotal)+'</td><td class="right">'+fmtN(s.web.length)+'</td><td class="right">'+fmt$(s.rn)+'</td><td class="right">'+fmtX(ret)+'</td><td class="right det">'+(s.web.length&&s.spendTotal?fmt$(s.spendTotal/s.web.length):'—')+'</td><td class="right det">'+fmt$(s.ga4)+'</td><td class="right det">'+(s.um||'—')+'</td><td class="right det">'+(rows.some(r=>r.hasClicks)?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right det">'+(rows.some(r=>r.hasConv)?sum(rows,r=>r.conv).toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>':'';
 
   renderKeywords(starts,s,label);
 
@@ -963,31 +960,28 @@ function render(){
 
   // GA4 vs booked
   document.getElementById('cmp-sum').textContent=signed(s.ga4-s.rn)+' GA4 vs booked';
-  const inv=all?sum(starts,iso=>readInv(iso)):readInv(sel);
-  const invCell=all?(inv?'<span class="dim">'+fmt$(inv)+' entered across cycles · '+signed(inv-s.spendTotal)+' vs account</span>':'<span class="dim">entered per cycle</span>')
-    :'<input type="number" class="inv-input" placeholder="$ invoice" value="'+(inv||'')+'" onchange="onInvChange(\''+sel+'\',this.value)"> <span class="dim">'+(inv?signed(inv-s.spendTotal)+' vs account':'vs '+fmt$(s.spendTotal)+' in the account')+'</span>';
-  const row=(name,acct,ga4,rn,extra)=>{const d=(ga4!=null&&rn!=null)?ga4-rn:null;return '<tr><td><b>'+name+'</b></td><td class="right">'+fmt$(acct)+'</td><td class="right">'+fmt$(ga4)+'</td><td class="right">'+fmt$(rn)+'</td><td class="right'+(d==null?' dim':'')+'">'+(d==null?'—':signed(d))+'</td><td>'+(extra||'')+'</td></tr>';};
-  document.getElementById('cmp-tbody').innerHTML=row('Google Ads spend',hasSpend?s.spendTotal:null,null,null,invCell)+row('Google Ads bookings, web',null,s.ga4,s.rn)+row('Paid Meta bookings, web',null,s.metaGa4,s.metaRn);
+  const row=(name,acct,ga4,rn)=>{const d=(ga4!=null&&rn!=null)?ga4-rn:null;return '<tr><td><b>'+name+'</b></td><td class="right">'+fmt$(acct)+'</td><td class="right">'+fmt$(ga4)+'</td><td class="right">'+fmt$(rn)+'</td><td class="right'+(d==null?' dim':'')+'">'+(d==null?'—':signed(d))+'</td></tr>';};
+  document.getElementById('cmp-tbody').innerHTML=row('Google Ads spend',hasSpend?s.spendTotal:null,null,null)+row('Google Ads bookings, web',null,s.ga4,s.rn)+row('Paid Meta bookings, web',null,s.metaGa4,s.metaRn);
 
   // coverage + meta
   const cv=s.cov;
-  document.getElementById('cov-sum').textContent=(cv.web?'GA4 recorded '+(cv.rec/cv.web*100).toFixed(0)+'% of booking-engine bookings · ':'')+label;
+  document.getElementById('cov-sum').textContent=(cv.web?'GA4 saw '+(cv.rec/cv.web*100).toFixed(0)+'% of website bookings · ':'')+label;
+  document.getElementById('cov-note').textContent='The ad numbers above only count bookings GA4 saw. The '+fmtN(cv.web-cv.rec)+' bookings GA4 missed can’t be linked to any source, so the real ad totals are the same or higher.';
   const kv=rows2=>rows2.map(r=>r.length===1?'<tr class="group"><td colspan="2">'+r[0]+'</td></tr>':'<tr><td>'+r[0]+'</td><td class="num">'+r[1]+'</td></tr>').join('');
   document.getElementById('cov-tbody').innerHTML=kv([
-    ['Booking engine, by reserved-on date'],
-    ['Bookings in ResNexus',fmtN(cv.web)+' <span class="dim">· '+fmt$(cv.webRn)+'</span>'],
-    ['Recorded by GA4',fmtN(cv.rec)+(cv.web?' <span class="dim">· '+(cv.rec/cv.web*100).toFixed(0)+'%</span>':'')],
-    ['Not recorded by GA4',fmtN(cv.web-cv.rec)+' <span class="dim">· '+fmt$(cv.webRn-cv.recRn)+'</span>'],
-    ['GA4 purchases'],
-    ['Not in ResNexus',fmtN(cv.ga4only)],
-    ['From ads, not in ResNexus',fmtN(s.um)+' <span class="dim">· GA4 '+fmt$(sum(s.web.filter(r=>r.rn==null),r=>r.revenue))+'</span>'],
-    ['Source cavesprings.com / referral',fmtN(cv.ref)]
+    ['Website bookings (by date booked)'],
+    ['Website bookings in ResNexus',fmtN(cv.web)+' <span class="dim">· '+fmt$(cv.webRn)+'</span>'],
+    ['GA4 saw',fmtN(cv.rec)+(cv.web?' <span class="dim">· '+(cv.rec/cv.web*100).toFixed(0)+'%</span>':'')],
+    ['GA4 missed',fmtN(cv.web-cv.rec)+' <span class="dim">· '+fmt$(cv.webRn-cv.recRn)+'</span>'],
+    ['In GA4 but not in ResNexus'],
+    ['All sources',fmtN(cv.ga4only)],
+    ['From Google Ads',fmtN(s.um)+' <span class="dim">· GA4 '+fmt$(sum(s.web.filter(r=>r.rn==null),r=>r.revenue))+'</span>'],
+    ['Source shown as cavesprings.com',fmtN(cv.ref)]
   ]);
   const metaBy={};s.meta.forEach(r=>{const k=r.sm||'(not set)';metaBy[k]=metaBy[k]||{n:0,ga4:0,rn:0};metaBy[k].n++;metaBy[k].ga4+=r.revenue||0;metaBy[k].rn+=r.rn||0;});
   document.getElementById('meta-tbody').innerHTML=kv([
-    ['Phone, from ResNexus channel'],
-    ['Phone or manual bookings, all',fmtN(cv.phone)+' <span class="dim">· '+fmt$(cv.phoneRn)+'</span>'],
-    ['Of those, traced to a Google ad by GA4',fmtN(s.phAttr.length)+' <span class="dim">· '+fmt$(sum(s.phAttr,r=>r.rn))+'</span>'],
+    ['Phone'],
+    ['Phone or manual bookings in ResNexus',fmtN(cv.phone)+' <span class="dim">· '+fmt$(cv.phoneRn)+'</span>'],
     ['Meta'],
     ['Meta spend','<span class="dim">not imported</span>']
   ].concat(Object.keys(metaBy).length?Object.keys(metaBy).map(k=>['Paid Meta bookings, '+esc(k),metaBy[k].n+' <span class="dim">· GA4 '+fmt$(metaBy[k].ga4)+' · booked '+fmt$(metaBy[k].rn)+'</span>']):[['Paid Meta bookings in GA4','0']]));
@@ -1014,7 +1008,7 @@ function renderKeywords(starts,s,label){
   document.getElementById('kw-sub').textContent='search campaigns · '+label+(withKw.length&&withKw.length<starts.length?' · '+withKw.length+' of '+starts.length+' cycles':'');
   foot.style.display='none';
   if(!withKw.length){
-    tbody.innerHTML='<tr><td colspan="10" class="empty-state">No keyword data for this cycle. Re-import it with the GA4 "Ads keywords" file.</td></tr>';tfoot.innerHTML='';return;
+    tbody.innerHTML='<tr><td colspan="9" class="empty-state">No keyword data for this cycle. Re-import it with the GA4 "Ads keywords" file.</td></tr>';tfoot.innerHTML='';return;
   }
   const inSet=iso=>withKw.includes(iso);
   const by={};const NONE='\u0000none';
@@ -1026,10 +1020,10 @@ function renderKeywords(starts,s,label){
   const none=by[NONE];delete by[NONE];
   const rows=Object.values(by).sort((a,b)=>b.spend-a.spend||b.web-a.web||a.name.localeCompare(b.name));
   if(none)rows.push(none);
-  const tr=(r,bold)=>'<tr><td>'+(bold?'<b>'+esc(r.name)+'</b>':esc(r.name))+'</td><td class="right">'+(r.hasSpend?fmt$(r.spend):'—')+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+(r.ph||'—')+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.hasSpend&&r.spend?fmtX(r.rn/r.spend):'—')+'</td><td class="right">'+(r.hasSpend&&r.web&&r.spend?fmt$(r.spend/r.web):'—')+'</td><td class="right">'+fmt$(r.ga4)+'</td><td class="right">'+(r.um||'—')+'</td><td class="right">'+(r.hasSpend?fmtN(r.clicks):'—')+'</td></tr>';
+  const tr=(r,bold)=>'<tr><td>'+(bold?'<b>'+esc(r.name)+'</b>':esc(r.name))+'</td><td class="right">'+(r.hasSpend?fmt$(r.spend):'—')+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.hasSpend&&r.spend?fmtX(r.rn/r.spend):'—')+'</td><td class="right">'+(r.hasSpend&&r.web&&r.spend?fmt$(r.spend/r.web):'—')+'</td><td class="right">'+fmt$(r.ga4)+'</td><td class="right">'+(r.um||'—')+'</td><td class="right">'+(r.hasSpend?fmtN(r.clicks):'—')+'</td></tr>';
   tbody.innerHTML=rows.map(r=>tr(r,r!==none)).join('');
   const kwSpend=sum(rows,r=>r.spend),anySpend=rows.some(r=>r.hasSpend);
-  tfoot.innerHTML='<tr><td>All keywords</td><td class="right">'+(anySpend?fmt$(kwSpend):'—')+'</td><td class="right">'+fmtN(web.length)+'</td><td class="right">'+(sum(rows,r=>r.ph)||'—')+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">—</td><td class="right">—</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">'+(sum(rows,r=>r.um)||'—')+'</td><td class="right">'+(anySpend?fmtN(sum(rows,r=>r.clicks)):'—')+'</td></tr>';
+  tfoot.innerHTML='<tr><td>All keywords</td><td class="right">'+(anySpend?fmt$(kwSpend):'—')+'</td><td class="right">'+fmtN(web.length)+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">—</td><td class="right">—</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">'+(sum(rows,r=>r.um)||'—')+'</td><td class="right">'+(anySpend?fmtN(sum(rows,r=>r.clicks)):'—')+'</td></tr>';
   // Search campaigns = campaigns with at least one keyword booking; their spend from the campaigns file.
   const searchCamps=new Set(web.filter(r=>hasKw(r.keyword)).map(r=>normName(r.campaign)));
   const campSpend=sum(spendRows.filter(r=>inSet(r.cycleStart)&&searchCamps.has(normName(r.campaign))),r=>r.cost);
