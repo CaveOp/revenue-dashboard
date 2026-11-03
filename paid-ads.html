@@ -1124,7 +1124,7 @@ function charts(per,allRet){
   const labels=per.map(({c})=>c.label.replace(/ 15 – /,' – ').replace(/ 15,.*$/,''));
   const tick={color:'#8a9bb0',font:{family:'Raleway',size:13}};
   const sel=document.getElementById('cycle-select').value;
-  const colors=per.map(({c})=>c.startISO===sel?'#c4572a':'#4a5e6d');
+  const colors=per.map(({c})=>c.startISO===sel?'#3a4d5c':'#c3ced7');
   if(cycleChart)cycleChart.destroy();if(campChart)campChart.destroy();
   const base=(fmt)=>({responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{enabled:false},barLabels:{format:fmt}},scales:{x:{grid:{display:false},ticks:tick},y:{display:false,beginAtZero:true}}});
   const retOpts=base(v=>'$'+v.toFixed(2));
