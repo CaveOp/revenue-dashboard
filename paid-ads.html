@@ -336,7 +336,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 24</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 25</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -405,7 +405,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <tbody id="camp-tbody"></tbody><tfoot id="camp-tfoot"></tfoot>
         </table></div>
       </div>
-      <div class="unit brand-box" id="u-brand-box" style="display:none;"><span class="u-label">Bookings from people who searched “Cave Springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-c"></span></div>
+      <div class="unit brand-box" id="u-brand-box" style="display:none;"><span class="u-label">Bookings from people who searched “Cave Springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-c"></span><span class="u-line">Each booking’s Res# is in Reservations behind the numbers, in the Searched column.</span></div>
 
       <div class="fold" id="kw-fold">
       <div class="sec fold-head" onclick="toggleFold('kw-fold')" title="Show or hide the keyword rows"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
@@ -440,7 +440,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="panel">
         <div class="panel-header"><span class="panel-title">Reservations behind the numbers</span><span class="panel-sub" id="res-sum"></span></div>
         <div class="table-scroll"><table class="data-table">
-          <thead><tr><th>Res#</th><th>Campaign</th><th>Source / medium</th><th>Channel</th><th>Booked on</th><th>First night</th><th class="right">Nights</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th>ResNexus</th></tr></thead>
+          <thead><tr><th>Res#</th><th>Campaign</th><th id="res-q-th">Searched</th><th>Source / medium</th><th>Channel</th><th>Booked on</th><th>First night</th><th class="right">Nights</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th>ResNexus</th></tr></thead>
           <tbody id="res-tbody"></tbody><tfoot id="res-tfoot"></tfoot>
         </table></div>
       </div>
@@ -1025,9 +1025,12 @@ function render(){
   // reservations
   const list=s.web.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   document.getElementById('res-sum').textContent=list.length+' reservations · '+label;
-  document.getElementById('res-tbody').innerHTML=list.length?list.map(r=>'<tr><td><b>'+esc(r.id)+'</b></td><td>'+esc(r.campaign||'(not set)')+'</td><td class="dim">'+esc(r.sm)+'</td><td>'+(r.stay?(r.stay.channel==='Phone/Manual'?'Phone':r.stay.channel==='OTA'?'OTA':'Web'):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.reservedOn):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.firstNight):'—')+'</td><td class="right">'+(r.stay?r.stay.nights:'—')+'</td><td class="right">'+(r.revenue==null?'—':fmt$2(r.revenue))+'</td><td class="right"><b>'+(r.rn==null?'—':fmt$2(r.rn))+'</b></td><td>'+(r.rn!=null?'<span class="pill g">in ResNexus</span>':'<span class="pill a">not in ResNexus</span>')+'</td></tr>').join('')
-    :'<tr><td colspan="10" class="empty-state">No Google Ads bookings in this view</td></tr>';
-  document.getElementById('res-tfoot').innerHTML=list.length?'<tr><td colspan="7">Total</td><td class="right">'+fmt$2(s.ga4)+'</td><td class="right">'+fmt$2(s.rn)+'</td><td></td></tr>':'';
+  // Searched: what the person typed into Google, when the cycle was imported with the search-text file.
+  const showQ=list.some(r=>r.query);document.getElementById('res-q-th').style.display=showQ?'':'none';
+  const qCell=r=>showQ?'<td>'+(r.query&&r.query!=='(not set)'?(isBrand(r.query)?'<b>'+esc(r.query)+'</b>':esc(r.query)):'—')+'</td>':'';
+  document.getElementById('res-tbody').innerHTML=list.length?list.map(r=>'<tr><td><b>'+esc(r.id)+'</b></td><td>'+esc(r.campaign||'(not set)')+'</td>'+qCell(r)+'<td class="dim">'+esc(r.sm)+'</td><td>'+(r.stay?(r.stay.channel==='Phone/Manual'?'Phone':r.stay.channel==='OTA'?'OTA':'Web'):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.reservedOn):'—')+'</td><td>'+(r.stay?fmtDay(r.stay.firstNight):'—')+'</td><td class="right">'+(r.stay?r.stay.nights:'—')+'</td><td class="right">'+(r.revenue==null?'—':fmt$2(r.revenue))+'</td><td class="right"><b>'+(r.rn==null?'—':fmt$2(r.rn))+'</b></td><td>'+(r.rn!=null?'<span class="pill g">in ResNexus</span>':'<span class="pill a">not in ResNexus</span>')+'</td></tr>').join('')
+    :'<tr><td colspan="11" class="empty-state">No Google Ads bookings in this view</td></tr>';
+  document.getElementById('res-tfoot').innerHTML=list.length?'<tr><td colspan="'+(showQ?8:7)+'">Total</td><td class="right">'+fmt$2(s.ga4)+'</td><td class="right">'+fmt$2(s.rn)+'</td><td></td></tr>':'';
 
   const multi=knownCycles.length>1;
   document.getElementById("charts-row").style.display=multi?"grid":"none";
