@@ -369,7 +369,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 36">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 37">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -440,7 +440,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       </div>
       <div class="unit brand-box" id="u-brand-box" style="display:none;"><span class="u-label">Bookings from people who searched “Cave Springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-c"></span><span class="u-line">Each booking’s Res# is in Reservations behind the numbers, in the Searched column.</span></div>
 
-      <div class="sec"><h2>Facebook &amp; Instagram</h2><span id="social-sub"></span></div>
+      <div class="sec"><h2>Facebook, Instagram &amp; Email</h2><span id="social-sub"></span></div>
       <div class="panel">
         <div class="table-scroll"><table class="data-table">
           <thead><tr><th>Paid or unpaid</th><th>Where</th><th>Name</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">GA4 revenue</th><th class="right">Spend</th></tr></thead>
@@ -998,10 +998,12 @@ function isGoogleAds(sm){const {source,medium}=splitSM(sm);return source==='goog
 function isMetaPaid(sm){const {source,medium}=splitSM(sm);return /^(fb|ig|facebook|instagram|meta)$/.test(source)&&/^(paid|cpc|paid_social|paidsocial)$/.test(medium);}
 // Facebook or Instagram as the GA4 source: tagged (fb, ig, facebook, instagram, meta) or the sites themselves (l.facebook.com, instagram.com …)
 function isMetaSource(sm){const {source}=splitSM(sm);return /^(fb|ig|facebook|instagram|meta)$/.test(source)||/(^|\.)(facebook|instagram)\.com$/.test(source);}
-function metaWhere(sm){return /instagram|^ig$/.test(splitSM(sm).source)?'Instagram':'Facebook';}
+function metaWhere(sm){if(isEmail(sm))return 'Email';return /instagram|^ig$/.test(splitSM(sm).source)?'Instagram':'Facebook';}
+// Email: any booking whose GA4 medium is "email" (Mailchimp links are tagged mailchimp / email)
+function isEmail(sm){return splitSM(sm).medium==='email';}
 // Paid or unpaid, straight from the GA4 medium: a paid tag, the "social" tag (unpaid post, Story or bio link),
 // or no tag at all (a plain link from the site, which could be either)
-function metaTag(sm){const m=splitSM(sm).medium;return isMetaPaid(sm)?'Paid':m==='social'?'Unpaid':'Not tagged';}
+function metaTag(sm){const m=splitSM(sm).medium;return isMetaPaid(sm)?'Paid':(m==='social'||m==='email')?'Unpaid':'Not tagged';}
 function isBrand(q){return String(q||'').toLowerCase().replace(/\s+/g,' ').includes(BRAND_SEARCH);}
 function hasKw(k){const t=kwKey(k);return !!t&&t!=='(not set)'&&t!=='(not provided)';}
 function rnValue(res){const s=staysByRes[res];if(!s)return null;return +(s.room+(feeByRes[res]||0)).toFixed(2);}
@@ -1178,21 +1180,22 @@ function trendSum(per,sel){
 /* Keywords: spend and clicks from the Google Ads Search keywords card, bookings from the
    GA4 Session Google Ads keyword text of each Google Ads booking. Only cycles whose GA4
    import carried the keyword column are counted, so older imports don't land in "No keyword recorded". */
-// Facebook & Instagram: every GA4 booking with a Facebook or Instagram source, one row per tag + where + name.
+// Facebook, Instagram & Email: every GA4 booking with a Facebook or Instagram source or an email medium,
+// one row per paid/unpaid + where + name.
 // Spend stays "—" until Meta spend is imported.
 function renderSocial(s,label){
   document.getElementById('social-sub').textContent=label;
   const by={};
-  s.allGa4.filter(r=>isMetaSource(r.sm)).forEach(r=>{
+  s.allGa4.filter(r=>isMetaSource(r.sm)||isEmail(r.sm)).forEach(r=>{
     const camp=String(r.campaign||'').trim();const name=!camp||/^\((not set|referral|direct|none)\)$/i.test(camp)?'':camp;
     const tag=metaTag(r.sm),where=metaWhere(r.sm),k=tag+'|'+where+'|'+name.toLowerCase();
     const e=by[k]||(by[k]={tag,where,name,ids:[],n:0,ga4:0,rn:0});const v=rnValue(r.id);
     e.n++;e.ids.push(r.id);e.ga4+=r.revenue||0;if(v!=null)e.rn+=v;});
-  const order={'Paid':0,'Unpaid':1,'Not tagged':2};
-  const rows=Object.values(by).sort((a,b)=>order[a.tag]-order[b.tag]||b.n-a.n||a.name.localeCompare(b.name));
+  const order={'Paid':0,'Unpaid':1,'Not tagged':2},whereOrder={'Email':0,'Facebook':1,'Instagram':2};
+  const rows=Object.values(by).sort((a,b)=>order[a.tag]-order[b.tag]||whereOrder[a.where]-whereOrder[b.where]||b.n-a.n||a.name.localeCompare(b.name));
   document.getElementById('social-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+r.tag+'</b></td><td>'+r.where+'</td><td>'+(r.name?esc(r.name):'—')+'</td><td>'+esc(r.ids.join(', '))+'</td><td class="right">'+fmtN(r.n)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+fmt$(r.ga4)+'</td><td class="right">—</td></tr>').join('')
-    :'<tr><td colspan="8" class="empty-state">No Facebook or Instagram bookings in this cycle</td></tr>';
-  document.getElementById('social-tfoot').innerHTML=rows.length?'<tr><td colspan="4">All Facebook &amp; Instagram</td><td class="right">'+fmtN(sum(rows,r=>r.n))+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">—</td></tr>':'';
+    :'<tr><td colspan="8" class="empty-state">No Facebook, Instagram or email bookings in this cycle</td></tr>';
+  document.getElementById('social-tfoot').innerHTML=rows.length?'<tr><td colspan="4">All</td><td class="right">'+fmtN(sum(rows,r=>r.n))+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">—</td></tr>':'';
 }
 function renderKeywords(starts,s,label){
   const tbody=document.getElementById('kw-tbody'),tfoot=document.getElementById('kw-tfoot');
