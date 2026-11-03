@@ -245,7 +245,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
     <div class="cheat-body note">The Overview page download is a .zip holding one CSV per card; choose the zip as it is and the Campaigns and Search keywords files inside are used.</div>
   </div>
   <div class="im-field">
-    <label>3 · GA4 "Ads keywords" exploration (CSV)</label>
+    <label>3 · GA4 "Ads keywords" exploration (both CSVs)</label>
     <input type="file" id="im-ga4" accept=".csv,text/csv" multiple onchange="suggestCycle()">
   </div>
   <div class="im-field">
@@ -298,18 +298,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <ol>
         <li>In GA4, click <b>Explore</b> and open <b>Ads keywords</b>.</li>
         <li>Set the dates to the cycle (15th to 15th).</li>
-        <li>Click the <b>download arrow</b> and choose <b>CSV</b>.</li>
+        <li>On <b>Free form 1</b>, click the <b>download arrow</b> and choose <b>CSV</b>.</li>
+        <li>Click <b>Free form 2</b> and download its CSV too. Choose both files above.</li>
       </ol>
     </div>
   </details>
 
-  <div class="im-privacy">Privacy: what gets saved to the sheet is, per campaign and cycle, the spend figures from Google Ads; per keyword, the spend and clicks; and per web booking, the reservation number, date, source / medium, campaign, keyword and the revenue GA4 recorded. No names, phone numbers or emails are in either file.</div>
+  <div class="im-privacy">Privacy: what gets saved to the sheet is, per campaign and cycle, the spend figures from Google Ads; per keyword, the spend and clicks; and per web booking, the reservation number, date, source / medium, campaign, keyword, search text and the revenue GA4 recorded. No names, phone numbers or emails are in either file.</div>
 </div>
 
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 14</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 15</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -365,6 +366,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <tbody id="kw-tbody"></tbody><tfoot id="kw-tfoot"></tfoot>
         </table></div>
         <div class="panel-foot" id="kw-foot" style="display:none;"></div>
+        <div class="panel-foot" id="kw-brand" style="display:none;"></div>
       </div>
 
       <div class="sec"><h2>Cycle to cycle</h2><span id="trend-note">every cycle saved</span></div>
@@ -429,7 +431,8 @@ const GA4_TAB   = 'GA4_TXN_CLEAN';
 const KW_TAB    = 'AD_KEYWORDS_CLEAN';
 const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
 const SPEND_HEADER=['Cycle','CycleStart','Campaign','Cost','Impressions','Clicks','Conversions','ConvValue','PhoneCalls','ImportedOn'];
-const GA4_HEADER=['TransactionId','Date','Cycle','CycleStart','SourceMedium','Campaign','FirstUserSourceMedium','FirstUserCampaign','Revenue','ImportedOn','Keyword'];
+const GA4_HEADER=['TransactionId','Date','Cycle','CycleStart','SourceMedium','Campaign','FirstUserSourceMedium','FirstUserCampaign','Revenue','ImportedOn','Keyword','SearchQuery'];
+const BRAND_SEARCH='cave springs';   // searches containing this count as searches for the resort's name
 const KW_HEADER=['Cycle','CycleStart','Keyword','Cost','Clicks','ImportedOn'];
 const CAMP_COLORS=['#4a5e6d','#c4572a','#3a7d5c','#b87c2a'];
 // Billing cycle boundary: a cycle starts on this day of the month and ends the day before it next month.
@@ -670,6 +673,7 @@ const GA4_ALIASES={
   fcamp:['First user campaign','first_user_campaign'],
   revenue:['Purchase revenue','purchase_revenue','purchase_revenue_usd','Total revenue','Ecommerce revenue','Revenue','Item revenue'],
   keyword:['Session Google Ads keyword text','Session Google Ads keyword','session_google_ads_keyword'],
+  query:['Session Google Ads query','session_google_ads_query'],
 };
 function parseGa4Export(rows,fname){
   // GA4 CSVs carry "# ..." comment lines above the table; drop them first
@@ -682,8 +686,9 @@ function parseGa4Export(rows,fname){
     const raw=cell(r[ix.txn]);
     if(!/^\d+$/.test(raw)){dropped++;return;}             // "(not set)", "Totals", blank
     const id=String(parseInt(raw,10));
-    const rec=out[id]||(out[id]={id,date:null,sm:'',campaign:'',fusm:'',fcamp:'',revenue:null,keyword:''});
+    const rec=out[id]||(out[id]={id,date:null,sm:'',campaign:'',fusm:'',fcamp:'',revenue:null,keyword:'',query:''});
     if(ix.keyword>=0&&!rec.keyword)rec.keyword=cell(r[ix.keyword]);
+    if(ix.query>=0&&!rec.query)rec.query=cell(r[ix.query]);
     if(ix.date>=0&&!rec.date)rec.date=parseDateLoose(r[ix.date]);
     if(ix.sm>=0&&!rec.sm)rec.sm=cell(r[ix.sm]);
     if(ix.campaign>=0&&!rec.campaign)rec.campaign=cell(r[ix.campaign]);
@@ -741,7 +746,7 @@ async function analyzeImport(){
       if(ads.rangeStart&&toISO(cycleFor(ads.rangeStart).start)!==cycle.startISO)warn.push('The Google Ads file starts '+fmtDay(ads.rangeStart)+', which is not in the chosen cycle. Check the cycle above.');}
     if(ga4Files.length){ga4={byId:{},columns:[],dropped:0};
       for(const f of ga4Files){const p=parseGa4Export(parseCSV(await readText(f)),f.name);ga4.dropped+=p.dropped;p.columns.forEach(c=>{if(!ga4.columns.includes(c))ga4.columns.push(c);});
-        Object.values(p.byId).forEach(rec=>{const e=ga4.byId[rec.id];if(!e)ga4.byId[rec.id]=rec;else{['date','sm','campaign','fusm','fcamp','revenue','keyword'].forEach(k=>{if((e[k]==null||e[k]==='')&&rec[k]!=null&&rec[k]!=='')e[k]=rec[k];});}});
+        Object.values(p.byId).forEach(rec=>{const e=ga4.byId[rec.id];if(!e)ga4.byId[rec.id]=rec;else{['date','sm','campaign','fusm','fcamp','revenue','keyword','query'].forEach(k=>{if((e[k]==null||e[k]==='')&&rec[k]!=null&&rec[k]!=='')e[k]=rec[k];});}});
         if(p.rangeStart&&toISO(cycleFor(p.rangeStart).start)!==cycle.startISO)warn.push(f.name+' starts '+fmtDay(p.rangeStart)+', which is not in the chosen cycle.');}
       if(!Object.keys(ga4.byId).length)throw new Error('No transactions with a numeric Transaction ID found in the GA4 file.');
       if(!ga4.columns.includes('sm'))warn.push('The GA4 file has no Session source / medium column, so none of these bookings can be attributed to Google Ads. Add Session source / medium to the Ads keywords exploration.');
@@ -762,6 +767,7 @@ async function analyzeImport(){
     if(kw)lines.push(['Google Ads keywords',kw.length?kw.length+' · spend '+fmt$(sum(kw,r=>r.cost)):'no Search keywords file in the zip']);
     if(ga4)lines.push(['GA4 transactions',fmtN(ga4List.length)+(ga4.dropped?' · '+ga4.dropped+' rows without a numeric ID skipped':'')],['Found in ResNexus stays',matched+' of '+ga4List.length],['Session source google / cpc',String(gads)]);
     if(ga4&&ga4.columns.includes('keyword'))lines.push(['Google Ads bookings with a keyword',ga4List.filter(r=>isGoogleAds(r.sm)&&hasKw(r.keyword)).length+' of '+gads]);
+    if(ga4&&ga4.columns.includes('query'))lines.push(['Google Ads bookings from searches for "'+BRAND_SEARCH+'"',String(ga4List.filter(r=>isGoogleAds(r.sm)&&isBrand(r.query)).length)]);
     if(ga4)lines.push(['Already in the sheet',dup+' (skipped)']);
     if(offCycle)lines.push(['Dated outside the chosen cycle',offCycle+' transactions (saved under their own date)']);
     lines.push(['Cycle',cycle.label],['Mode',importMode()==='cycle'?'replace this cycle':'add to what is saved']);
@@ -793,9 +799,9 @@ async function confirmImport(){
     if(ga4.length){
       const keep=replace?ga4Rows.filter(r=>r.cycleStart!==cycle.startISO):ga4Rows.slice();
       const have=new Set(keep.map(r=>r.id));
-      const add=ga4.filter(r=>!have.has(r.id)).map(r=>{const c=r.date?cycleFor(r.date):cycle;return {id:r.id,date:r.date?toISO(r.date):'',cycle:c.label,cycleStart:c.startISO,sm:r.sm,campaign:r.campaign,fusm:r.fusm,fcamp:r.fcamp,revenue:r.revenue==null?'':r.revenue,imported:stamp,keyword:r.keyword||''};});
+      const add=ga4.filter(r=>!have.has(r.id)).map(r=>{const c=r.date?cycleFor(r.date):cycle;return {id:r.id,date:r.date?toISO(r.date):'',cycle:c.label,cycleStart:c.startISO,sm:r.sm,campaign:r.campaign,fusm:r.fusm,fcamp:r.fcamp,revenue:r.revenue==null?'':r.revenue,imported:stamp,keyword:r.keyword||'',query:r.query||''};});
       const rows=keep.concat(add);nGa4=add.length;
-      await writeTab(GA4_TAB,[GA4_HEADER].concat(rows.map(r=>[r.id,r.date,r.cycle,r.cycleStart,r.sm,r.campaign,r.fusm,r.fcamp,r.revenue,r.imported,r.keyword||''])));
+      await writeTab(GA4_TAB,[GA4_HEADER].concat(rows.map(r=>[r.id,r.date,r.cycle,r.cycleStart,r.sm,r.campaign,r.fusm,r.fcamp,r.revenue,r.imported,r.keyword||'',r.query||''])));
       ga4Rows=rows;
     }
     status.textContent='';
@@ -839,7 +845,7 @@ async function loadAll(){
       feeByRes[res]=(feeByRes[res]||0)+pMoney(r['Total']);feeLoaded=true;
     });
     spendRows=toRows(spendRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],campaign:r['Campaign'],cost:pMoney(r['Cost']),impressions:r['Impressions']===''?'':pInt(r['Impressions']),clicks:r['Clicks']===''?'':pInt(r['Clicks']),conversions:r['Conversions']===''?'':pMoney(r['Conversions']),convValue:r['ConvValue']===''?'':pMoney(r['ConvValue']),calls:r['PhoneCalls']===''?'':pInt(r['PhoneCalls']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.campaign);
-    ga4Rows=toRows(ga4Raw).map(r=>({id:String(parseInt(r['TransactionId'],10)),date:r['Date'],cycle:r['Cycle'],cycleStart:r['CycleStart'],sm:r['SourceMedium'],campaign:r['Campaign'],fusm:r['FirstUserSourceMedium'],fcamp:r['FirstUserCampaign'],revenue:r['Revenue']===''?null:pMoney(r['Revenue']),imported:r['ImportedOn'],keyword:r['Keyword']||''})).filter(r=>r.id&&r.id!=='NaN'&&r.cycleStart);
+    ga4Rows=toRows(ga4Raw).map(r=>({id:String(parseInt(r['TransactionId'],10)),date:r['Date'],cycle:r['Cycle'],cycleStart:r['CycleStart'],sm:r['SourceMedium'],campaign:r['Campaign'],fusm:r['FirstUserSourceMedium'],fcamp:r['FirstUserCampaign'],revenue:r['Revenue']===''?null:pMoney(r['Revenue']),imported:r['ImportedOn'],keyword:r['Keyword']||'',query:r['SearchQuery']||''})).filter(r=>r.id&&r.id!=='NaN'&&r.cycleStart);
     kwRows=toRows(kwRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],keyword:r['Keyword'],cost:pMoney(r['Cost']),clicks:pInt(r['Clicks']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.keyword);
     showDash();buildCycles();render();
   }catch(e){
@@ -862,6 +868,7 @@ function buildCycles(){
 function splitSM(sm){const p=String(sm||'').split('/');return {source:(p[0]||'').trim().toLowerCase(),medium:(p[1]||'').trim().toLowerCase()};}
 function isGoogleAds(sm){const {source,medium}=splitSM(sm);return source==='google'&&/^(cpc|ppc|paid)$/.test(medium);}
 function isMetaPaid(sm){const {source,medium}=splitSM(sm);return /^(fb|ig|facebook|instagram|meta)$/.test(source)&&/^(paid|cpc|paid_social|paidsocial)$/.test(medium);}
+function isBrand(q){return String(q||'').toLowerCase().replace(/\s+/g,' ').includes(BRAND_SEARCH);}
 function hasKw(k){const t=kwKey(k);return !!t&&t!=='(not set)'&&t!=='(not provided)';}
 function rnValue(res){const s=staysByRes[res];if(!s)return null;return +(s.room+(feeByRes[res]||0)).toFixed(2);}
 
@@ -1004,6 +1011,16 @@ function render(){
    import carried the keyword column are counted, so older imports don't land in "No keyword recorded". */
 function renderKeywords(starts,s,label){
   const tbody=document.getElementById('kw-tbody'),tfoot=document.getElementById('kw-tfoot'),foot=document.getElementById('kw-foot');
+  // Searches for the resort's name: only cycles whose GA4 import carried the search-text tab.
+  const brandEl=document.getElementById('kw-brand');brandEl.style.display='none';
+  const withQ=starts.filter(iso=>ga4Rows.some(r=>r.cycleStart===iso&&r.query));
+  if(withQ.length){
+    const hits=s.web.filter(r=>withQ.includes(r.cycleStart)&&isBrand(r.query));
+    const byC={};hits.forEach(r=>{const c=r.campaign||'(not set)';byC[c]=(byC[c]||0)+1;});
+    const parts=Object.keys(byC).sort().map(c=>esc(c)+' '+byC[c]);
+    brandEl.innerHTML='<b>Bookings from searches for “'+esc(BRAND_SEARCH)+'”: '+hits.length+' · '+fmt$(sum(hits,r=>r.rn))+' booked revenue</b>'+(parts.length?' ('+parts.join(' · ')+')':'')+(withQ.length<starts.length?' · '+withQ.length+' of '+starts.length+' cycles':'');
+    brandEl.style.display='block';
+  }
   const withKw=starts.filter(iso=>ga4Rows.some(r=>r.cycleStart===iso&&r.keyword));
   document.getElementById('kw-sub').textContent='search campaigns · '+label+(withKw.length&&withKw.length<starts.length?' · '+withKw.length+' of '+starts.length+' cycles':'');
   foot.style.display='none';
