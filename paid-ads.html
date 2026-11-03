@@ -20,7 +20,7 @@
   --green:#3a7d5c;--green-bg:#edf6f1;
   --amber:#b87c2a;--amber-bg:#fdf5e8;
   --purple:#6b5b8c;--purple-bg:#f2f0f7;
-  --text:#1a2530;--text2:#4a5568;--text3:#8a9bb0;
+  --text:#1a2530;--text2:#4a5568;--text3:#5f6f80;
   --sans:'Raleway',sans-serif;
   --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
   --shadow2:0 2px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.06);
@@ -1122,7 +1122,7 @@ const avgLine={id:'avgLine',afterDatasetsDraw(chart,args,opts){if(opts.value==nu
   ctx.setLineDash([]);ctx.font='600 12px Raleway';ctx.fillStyle='#4a5568';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText(opts.label,a.right,y-3);ctx.restore();}};
 function charts(per,allRet){
   const labels=per.map(({c})=>c.label.replace(/ 15 – /,' – ').replace(/ 15,.*$/,''));
-  const tick={color:'#8a9bb0',font:{family:'Raleway',size:13}};
+  const tick={color:'#5f6f80',font:{family:'Raleway',size:13}};
   const sel=document.getElementById('cycle-select').value;
   const colors=per.map(({c})=>c.startISO===sel?'#3a4d5c':'#c3ced7');
   if(cycleChart)cycleChart.destroy();if(campChart)campChart.destroy();
