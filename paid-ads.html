@@ -374,7 +374,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 40">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 41">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -415,6 +415,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <div class="unit"><span class="u-label">Share of web bookings</span><span><span class="u-value num" id="u-share">—</span><span class="u-sub" id="u-share-s"></span></span></div>
       </div>
 
+      <div class="sec"><h2>Audit by dates</h2><span>Google Ads, by booking date</span></div>
+      <div class="panel"><div class="panel-body">
+        <div class="audit-row">
+          <label>From <input type="date" id="aud-from" onchange="renderAudit()"></label>
+          <label>To <input type="date" id="aud-to" onchange="renderAudit()"></label>
+        </div>
+        <div class="audit-units">
+          <div class="unit"><span class="u-label">Spend</span><span class="u-value num" id="aud-spend">—</span></div>
+          <div class="unit"><span class="u-label">Bookings</span><span class="u-value num" id="aud-book">—</span></div>
+          <div class="unit"><span class="u-label">Booked revenue</span><span class="u-value num" id="aud-rn">—</span></div>
+          <div class="unit"><span class="u-label">GA4 revenue</span><span class="u-value num" id="aud-ga4">—</span></div>
+          <div class="unit"><span class="u-label">Return per $1 spent</span><span class="u-value num" id="aud-ret">—</span></div>
+        </div>
+        <p class="help" style="margin-top:14px;" id="aud-note"></p>
+      </div></div>
+
       <div class="sec"><h2>Cycle to cycle</h2><span id="trend-note">every cycle saved</span></div>
       <div class="grid-2" id="charts-row">
         <div class="panel" style="margin-bottom:0;">
@@ -435,22 +451,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         </table></div>
         <div class="panel-foot" id="trend-sum" style="display:none;"></div>
       </div>
-
-      <div class="sec"><h2>Audit by dates</h2><span>Google Ads, by booking date</span></div>
-      <div class="panel"><div class="panel-body">
-        <div class="audit-row">
-          <label>From <input type="date" id="aud-from" onchange="renderAudit()"></label>
-          <label>To <input type="date" id="aud-to" onchange="renderAudit()"></label>
-        </div>
-        <div class="audit-units">
-          <div class="unit"><span class="u-label">Spend</span><span class="u-value num" id="aud-spend">—</span></div>
-          <div class="unit"><span class="u-label">Bookings</span><span class="u-value num" id="aud-book">—</span></div>
-          <div class="unit"><span class="u-label">Booked revenue</span><span class="u-value num" id="aud-rn">—</span></div>
-          <div class="unit"><span class="u-label">GA4 revenue</span><span class="u-value num" id="aud-ga4">—</span></div>
-          <div class="unit"><span class="u-label">Return per $1 spent</span><span class="u-value num" id="aud-ret">—</span></div>
-        </div>
-        <p class="help" style="margin-top:14px;" id="aud-note"></p>
-      </div></div>
 
       <div class="sec"><h2>Which campaigns earned it</h2><span id="camp-sub"></span><span class="sec-right"><span id="camp-note" style="font-size:13px;color:var(--text3);"></span></span></div>
       <div class="panel">
