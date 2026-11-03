@@ -326,6 +326,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   <div id="im-result" style="display:none;"></div>
 
   <div class="cheat" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+    <div class="im-field" style="margin-bottom:8px;">
+      <label>Fix boundary days</label>
+      <input type="file" id="im-fix" accept=".zip,application/zip,application/x-zip-compressed" multiple>
+      <div class="cheat-body note">For cycles already saved from a Google Ads zip that ran one day into the next cycle. Choose those zips; only their daily spend file is read. Saved campaign rows are not changed.</div>
+    </div>
+    <div class="im-row" style="margin-top:0;"><button class="im-btn ghost" onclick="fixBoundaries()">Fix boundary days</button></div>
+    <div id="im-fix-out"></div>
+  </div>
+
+  <div class="cheat" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
     <div class="im-row" style="margin-top:0;align-items:center;">
       <button class="im-btn ghost" onclick="clearSaved()">Clear everything saved on this page</button>
       <span class="cheat-body note" style="margin:0;">Empties the AD_SPEND_CLEAN, AD_KEYWORDS_CLEAN and GA4_TXN_CLEAN tabs. Stays and retail data are not touched.</span>
@@ -359,7 +369,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 32">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 33">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -480,7 +490,7 @@ const SPEND_TAB = 'AD_SPEND_CLEAN';
 const GA4_TAB   = 'GA4_TXN_CLEAN';
 const KW_TAB    = 'AD_KEYWORDS_CLEAN';
 const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
-const SPEND_HEADER=['Cycle','CycleStart','Campaign','Cost','Impressions','Clicks','Conversions','ConvValue','PhoneCalls','ImportedOn','DataThrough'];
+const SPEND_HEADER=['Cycle','CycleStart','Campaign','Cost','Impressions','Clicks','Conversions','ConvValue','PhoneCalls','ImportedOn','DataThrough','Adjustment'];
 const GA4_HEADER=['TransactionId','Date','Cycle','CycleStart','SourceMedium','Campaign','FirstUserSourceMedium','FirstUserCampaign','Revenue','ImportedOn','Keyword','SearchQuery'];
 const BRAND_SEARCH='cave springs';   // searches containing this count as searches for the resort's name
 const KW_HEADER=['Cycle','CycleStart','Keyword','Cost','Clicks','ImportedOn'];
@@ -636,6 +646,23 @@ async function unzip(file){
 function pickCampaignsEntry(entries){
   const byName=entries.find(e=>/^campaigns\b/i.test(e.name));if(byName)return byName;
   return entries.find(e=>{const r=parseCSV(e.text);const h=findHeader(r,[ADS_ALIASES.campaign,ADS_ALIASES.cost]);return h!==-1&&findIdx(r[h],['Ad Group Name','Ad group','Ad group name'])===-1;});
+}
+// The Time series card from the same zip: spend per day, all campaigns together.
+function pickDailyEntry(entries){return entries.find(e=>/^time_series\b/i.test(e.name))||null;}
+function parseDaily(text){
+  const rows=parseCSV(text);const h=findHeader(rows,[['Date','Day'],ADS_ALIASES.cost]);if(h===-1)return [];
+  const di=findIdx(rows[h],['Date','Day']),ci=findIdx(rows[h],ADS_ALIASES.cost);
+  return rows.slice(h+1).map(r=>({date:parseDateLoose(r[di]),cost:pMoney(r[ci])})).filter(d=>d.date);
+}
+// Google Ads files often run 15th to 15th, one day into the next cycle. Spend on days outside the cycle
+// becomes a correction row (negative cost) so the cycle total covers only its own days. The daily file
+// isn't split by campaign, so the correction is one row, not taken out of each campaign.
+function boundaryAdj(daily,cycle){
+  const out=[];
+  const after=daily.filter(d=>d.date>=cycle.end),before=daily.filter(d=>d.date<cycle.start);
+  [[after,'next'],[before,'previous']].forEach(([days,which])=>{const c=sum(days,d=>d.cost);
+    if(days.length&&Math.abs(c)>=0.005)out.push({campaign:days.map(d=>fmtDay(d.date)).join(', ')+' — counted in '+which+' cycle',cost:-Math.round(c*100)/100,adj:'boundary'});});
+  return out;
 }
 // The Search keywords card from the same zip (spend and clicks per keyword).
 function pickKeywordsEntry(entries){
@@ -795,15 +822,17 @@ async function analyzeImport(){
   const cycle=cycleByStartISO(document.getElementById('im-cycle').value);
   status.textContent='Reading…';
   try{
-    let ads=null,ga4=null,kw=null;const warn=[];
+    let ads=null,ga4=null,kw=null,daily=null;const warn=[];
     if(adsFile){
       let rows,fname=adsFile.name;
       if(/\.zip$/i.test(adsFile.name)){const entries=await unzip(adsFile);const pick=pickCampaignsEntry(entries);
         if(!pick)throw new Error('No campaigns CSV found inside the zip. Files inside: '+entries.map(e=>e.name).join(', '));
         rows=parseCSV(pick.text);fname=pick.name;
-        const kpick=pickKeywordsEntry(entries);kw=kpick?parseKeywordsReport(parseCSV(kpick.text)):[];}
+        const kpick=pickKeywordsEntry(entries);kw=kpick?parseKeywordsReport(parseCSV(kpick.text)):[];
+        const dpick=pickDailyEntry(entries);daily=dpick?parseDaily(dpick.text):null;}
       else rows=parseCSV(await readText(adsFile));
       ads=parseAdsReport(rows,fname);ads.file=fname;if(!ads.rows.length)throw new Error('No campaign rows found in '+fname+'.');
+      ads.adj=daily?boundaryAdj(daily,cycle):[];
       if(ads.rangeStart&&toISO(cycleFor(ads.rangeStart).start)!==cycle.startISO)warn.push('The Google Ads file starts '+fmtDay(ads.rangeStart)+', which is not in the chosen cycle. Check the cycle above.');}
     if(ga4Files.length){ga4={byId:{},columns:[],dropped:0};
       for(const f of ga4Files){const p=parseGa4Export(parseCSV(await readText(f)),f.name);ga4.dropped+=p.dropped;p.columns.forEach(c=>{if(!ga4.columns.includes(c))ga4.columns.push(c);});
@@ -825,6 +854,7 @@ async function analyzeImport(){
     pending={cycle,ads,ga4:ga4List,dup,kw};
     const lines=[];
     if(ads)lines.push(['Google Ads file read',ads.file],['Google Ads campaigns',ads.rows.length+' · spend '+fmt$(sum(ads.rows,r=>r.cost))],['Columns found','Campaign, Cost'+(ads.columns.filter(c=>!['campaign','cost'].includes(c)).map(c=>', '+c).join(''))]);
+    if(ads)ads.adj.forEach(a=>lines.push([a.campaign,'−'+fmt$2(-a.cost)]));
     if(kw)lines.push(['Google Ads keywords',kw.length?kw.length+' · spend '+fmt$(sum(kw,r=>r.cost)):'no Search keywords file in the zip']);
     if(ga4)lines.push(['GA4 transactions',fmtN(ga4List.length)+(ga4.dropped?' · '+ga4.dropped+' rows without a numeric ID skipped':'')],['Found in ResNexus stays',matched+' of '+ga4List.length],['Session source google / cpc',String(gads)]);
     if(ga4&&ga4.columns.includes('keyword'))lines.push(['Google Ads bookings with a keyword',ga4List.filter(r=>isGoogleAds(r.sm)&&hasKw(r.keyword)).length+' of '+gads]);
@@ -837,6 +867,10 @@ async function analyzeImport(){
   }catch(e){status.textContent='';result.style.display='block';result.innerHTML='<div class="im-err">'+esc(e.message)+'</div>';}
 }
 
+function adjRow(a,cycle,stamp){return {cycle:cycle.label,cycleStart:cycle.startISO,campaign:a.campaign,cost:a.cost,impressions:'',clicks:'',conversions:'',convValue:'',calls:'',imported:stamp,through:'',adj:'boundary'};}
+async function writeSpend(rows){
+  await writeTab(SPEND_TAB,[SPEND_HEADER].concat(rows.map(r=>[r.cycle,r.cycleStart,r.campaign,r.cost,r.impressions,r.clicks,r.conversions,r.convValue,r.calls,r.imported,r.through||'',r.adj||''])));
+}
 async function confirmImport(){
   if(!pending)return;const {cycle,ads,ga4,kw}=pending;const btn=document.getElementById('im-confirm-btn');btn.disabled=true;
   const status=document.getElementById('im-status');status.textContent='Saving…';
@@ -853,8 +887,9 @@ async function confirmImport(){
     if(ads){
       const keep=replace?spendRows.filter(r=>r.cycleStart!==cycle.startISO):spendRows.slice();
       const add=ads.rows.map(r=>({cycle:cycle.label,cycleStart:cycle.startISO,campaign:r.campaign,cost:r.cost,impressions:r.impressions,clicks:r.clicks,conversions:r.conversions,convValue:r.convValue,calls:r.calls,imported:stamp,through:ads.rangeEnd?toISO(ads.rangeEnd):''}));
-      const rows=keep.concat(add);nSpend=add.length;
-      await writeTab(SPEND_TAB,[SPEND_HEADER].concat(rows.map(r=>[r.cycle,r.cycleStart,r.campaign,r.cost,r.impressions,r.clicks,r.conversions,r.convValue,r.calls,r.imported,r.through||''])));
+      const adj=(ads.adj||[]).map(a=>adjRow(a,cycle,stamp));
+      const rows=keep.concat(add,adj);nSpend=add.length;
+      await writeSpend(rows);
       spendRows=rows;
     }
     if(ga4.length){
@@ -872,6 +907,31 @@ async function confirmImport(){
   }catch(e){status.textContent='';document.getElementById('im-result').style.display='block';document.getElementById('im-result').innerHTML='<div class="im-err">Save failed: '+esc(e.message)+'</div>';btn.disabled=false;}
 }
 
+// One-time fix for cycles saved before boundary corrections existed. Each zip must be the same file the
+// cycle was imported from: its Campaigns total has to match the saved spend, or that zip is skipped.
+async function fixBoundaries(){
+  const out=document.getElementById('im-fix-out');const files=Array.from(document.getElementById('im-fix').files);
+  if(!files.length){out.innerHTML='<div class="im-err">Choose one or more Google Ads zips first.</div>';return;}
+  out.innerHTML='<div class="im-status">Checking…</div>';
+  const lines=[];let rows=spendRows.slice();let changed=false;const stamp=fmtStamp(new Date());
+  try{
+    for(const f of files){
+      const entries=await unzip(f);const dpick=pickDailyEntry(entries),cpick=pickCampaignsEntry(entries);
+      if(!dpick||!cpick){lines.push(f.name+': no daily spend or Campaigns file inside, skipped.');continue;}
+      const daily=parseDaily(dpick.text);if(!daily.length){lines.push(f.name+': daily spend file is empty, skipped.');continue;}
+      const cycle=cycleFor(daily[0].date);
+      const saved=rows.filter(r=>r.cycleStart===cycle.startISO&&!r.adj);
+      if(!saved.length){lines.push(f.name+': nothing saved for '+cycle.label+', skipped.');continue;}
+      const fileTotal=sum(parseAdsReport(parseCSV(cpick.text),cpick.name).rows,r=>r.cost),savedTotal=sum(saved,r=>r.cost);
+      if(Math.abs(fileTotal-savedTotal)>=0.05){lines.push(f.name+': its spend '+fmt$2(fileTotal)+' does not match the saved '+cycle.label+' spend '+fmt$2(savedTotal)+', skipped.');continue;}
+      const adj=boundaryAdj(daily,cycle).map(a=>adjRow(a,cycle,stamp));
+      rows=rows.filter(r=>!(r.cycleStart===cycle.startISO&&r.adj)).concat(adj);changed=true;
+      lines.push(cycle.label+': '+(adj.length?adj.map(a=>a.campaign+' −'+fmt$2(-a.cost)).join(' · '):'no spend outside the cycle, nothing to change')+'.');
+    }
+    if(changed){out.innerHTML='<div class="im-status">Saving…</div>';await writeSpend(rows);spendRows=rows;buildCycles();render();}
+    out.innerHTML='<div class="'+(changed?'im-ok':'im-status')+'" style="white-space:pre-wrap;">'+esc(lines.join('\n'))+'</div>';
+  }catch(e){out.innerHTML='<div class="im-err">Could not fix: '+esc(e.message)+'</div>';}
+}
 async function clearSaved(){
   const out=document.getElementById('im-clear-out');
   if(!window.confirm('Delete every saved paid ads row (spend, keywords and GA4 transactions, all cycles)? The stays and retail data stay as they are.'))return;
@@ -905,7 +965,7 @@ async function loadAll(){
       if(!/resort fee/i.test((r['Bucket']||'')+' '+(r['Item']||'')))return;
       feeByRes[res]=(feeByRes[res]||0)+pMoney(r['Total']);feeLoaded=true;
     });
-    spendRows=toRows(spendRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],campaign:r['Campaign'],cost:pMoney(r['Cost']),impressions:r['Impressions']===''?'':pInt(r['Impressions']),clicks:r['Clicks']===''?'':pInt(r['Clicks']),conversions:r['Conversions']===''?'':pMoney(r['Conversions']),convValue:r['ConvValue']===''?'':pMoney(r['ConvValue']),calls:r['PhoneCalls']===''?'':pInt(r['PhoneCalls']),imported:r['ImportedOn'],through:r['DataThrough']||''})).filter(r=>r.cycleStart&&r.campaign);
+    spendRows=toRows(spendRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],campaign:r['Campaign'],cost:pMoney(r['Cost']),impressions:r['Impressions']===''?'':pInt(r['Impressions']),clicks:r['Clicks']===''?'':pInt(r['Clicks']),conversions:r['Conversions']===''?'':pMoney(r['Conversions']),convValue:r['ConvValue']===''?'':pMoney(r['ConvValue']),calls:r['PhoneCalls']===''?'':pInt(r['PhoneCalls']),imported:r['ImportedOn'],through:r['DataThrough']||'',adj:r['Adjustment']||''})).filter(r=>r.cycleStart&&r.campaign);
     ga4Rows=toRows(ga4Raw).map(r=>({id:String(parseInt(r['TransactionId'],10)),date:r['Date'],cycle:r['Cycle'],cycleStart:r['CycleStart'],sm:r['SourceMedium'],campaign:r['Campaign'],fusm:r['FirstUserSourceMedium'],fcamp:r['FirstUserCampaign'],revenue:r['Revenue']===''?null:pMoney(r['Revenue']),imported:r['ImportedOn'],keyword:r['Keyword']||'',query:r['SearchQuery']||''})).filter(r=>r.id&&r.id!=='NaN'&&r.cycleStart);
     kwRows=toRows(kwRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],keyword:r['Keyword'],cost:pMoney(r['Cost']),clicks:pInt(r['Clicks']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.keyword);
     showDash();buildCycles();render();
@@ -940,7 +1000,9 @@ function stats(starts){
   const allGa4=ga4Rows.filter(r=>inSet(r.cycleStart));
   // campaigns: spend rows first (by normalized name), then GA4-only names
   const by={};const order=[];
-  spend.forEach(r=>{const k=normName(r.campaign);if(!by[k]){by[k]={name:r.campaign,spend:0,clicks:0,conv:0,calls:0,web:0,ph:0,ota:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false};order.push(k);}
+  // boundary-day corrections count in the spend total but are not campaigns
+  const adj=spend.filter(r=>r.adj);
+  spend.filter(r=>!r.adj).forEach(r=>{const k=normName(r.campaign);if(!by[k]){by[k]={name:r.campaign,spend:0,clicks:0,conv:0,calls:0,web:0,ph:0,ota:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false};order.push(k);}
     by[k].spend+=r.cost;if(r.clicks!==''){by[k].clicks+=r.clicks;by[k].hasClicks=true;}if(r.conversions!==''){by[k].conv+=r.conversions;by[k].hasConv=true;}if(r.calls!=='')by[k].calls+=r.calls;});
   web.forEach(r=>{const name=r.campaign||'(not set)';const k=normName(name)||'notset';if(!by[k]){by[k]={name,spend:0,clicks:0,conv:0,calls:0,web:0,ph:0,ota:0,ga4:0,rn:0,um:0,hasClicks:false,hasConv:false,ga4Only:true};order.push(k);}
     by[k].web++;by[k].ga4+=r.revenue||0;if(r.rn!=null)by[k].rn+=r.rn;else by[k].um++;if(r.stay&&r.stay.channel==='Phone/Manual')by[k].ph++;if(r.stay&&r.stay.channel==='OTA')by[k].ota++;});
@@ -955,7 +1017,7 @@ function stats(starts){
     else if(s.channel==='OTA'){cov.ota++;cov.otaRn+=v;}});
   cov.ga4only=allGa4.filter(r=>!staysByRes[r.id]).length;
   cov.ref=allGa4.filter(r=>/cavesprings\.com\s*\/\s*referral/i.test(r.sm)).length;
-  return {spend,web,phAttr,meta,by,order,spendTotal,ga4,rn,um,calls,hasCalls,cov,metaGa4:sum(meta,r=>r.revenue),metaRn:sum(meta,r=>r.rn),allGa4};
+  return {spend,adj,web,phAttr,meta,by,order,spendTotal,ga4,rn,um,calls,hasCalls,cov,metaGa4:sum(meta,r=>r.revenue),metaRn:sum(meta,r=>r.rn),allGa4};
 }
 function delta(el,cur,prev,money,invert){
   if(prev==null||!isFinite(prev)||prev===0||cur==null||!isFinite(cur)){el.textContent='';el.className='scorecard-delta flat';return;}
@@ -1020,6 +1082,7 @@ function render(){
   const rows=s.order.map(k=>s.by[k]);
   document.getElementById('camp-note').textContent='';
   document.getElementById('camp-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+esc(r.name)+'</b>'+flagFor(r)+'</td><td class="right">'+(r.ga4Only?'—':fmt$(r.spend))+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.spend?fmtX(r.rn/r.spend):'—')+'</td><td class="right det">'+(r.web&&r.spend?fmt$(r.spend/r.web):'—')+'</td><td class="right det">'+fmt$(r.ga4)+'</td><td class="right det">'+(r.um||'—')+'</td><td class="right det">'+(r.hasClicks?fmtN(r.clicks):'—')+'</td><td class="right det">'+(r.hasConv?r.conv.toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>').join('')
+    +s.adj.map(a=>'<tr class="muted"><td>'+esc(a.campaign)+'</td><td class="right">'+(a.cost<0?'−':'')+fmt$2(Math.abs(a.cost))+'</td><td class="right">—</td><td class="right">—</td><td class="right">—</td><td class="right det">—</td><td class="right det">—</td><td class="right det">—</td><td class="right det">—</td><td class="right det">—</td></tr>').join('')
     :'<tr><td colspan="10" class="empty-state">Nothing saved for this cycle yet</td></tr>';
   document.getElementById('camp-tfoot').innerHTML=rows.length?'<tr><td>All campaigns</td><td class="right">'+fmt$(s.spendTotal)+'</td><td class="right">'+fmtN(s.web.length)+'</td><td class="right">'+fmt$(s.rn)+'</td><td class="right">'+fmtX(ret)+'</td><td class="right det">'+(s.web.length&&s.spendTotal?fmt$(s.spendTotal/s.web.length):'—')+'</td><td class="right det">'+fmt$(s.ga4)+'</td><td class="right det">'+(s.um||'—')+'</td><td class="right det">'+(rows.some(r=>r.hasClicks)?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right det">'+(rows.some(r=>r.hasConv)?sum(rows,r=>r.conv).toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>':'';
 
