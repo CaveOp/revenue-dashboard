@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cave Springs — Link Builder</title>
+<!-- Same rules as the other pages: nothing loads from outside except Google sign-in and the sheet check. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://sheets.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<style>@font-face{font-family:'Raleway';font-style:normal;font-weight:300 700;font-display:swap;src:url(vendor/fonts/raleway-latin.woff2) format('woff2');}</style>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f2ee;--surface:#fff;--surface2:#f9f7f4;
+  --border:#e8e2da;--border2:#d6cec3;
+  --slate:#4a5e6d;--slate2:#3a4d5c;--slate3:#6a7e8d;--slate-bg:#eef2f5;
+  --terra:#c4572a;--green:#3a7d5c;--green-bg:#edf6f1;
+  --text:#1a2530;--text2:#4a5568;--text3:#5f6f80;
+  --sans:'Raleway',sans-serif;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
+  --shadow2:0 2px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.06);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17px;line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;}
+.auth-card{background:var(--surface);border-radius:20px;box-shadow:var(--shadow2);padding:60px 56px;text-align:center;max-width:460px;width:90%;}
+.auth-logo-title{font-size:22px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--slate);}
+.auth-logo-sub{font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--text3);}
+.auth-divider{width:40px;height:2px;background:var(--terra);margin:20px auto 28px;}
+.auth-desc{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.7;}
+.auth-btn{display:inline-flex;align-items:center;gap:10px;background:var(--slate);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.auth-btn:hover{background:var(--slate2);}
+.auth-err{color:#c0392b;font-size:14px;margin-top:18px;}
+#loading-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;}
+.spinner{width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--slate);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:12px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;}
+#dashboard{display:none;}
+
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;}
+.header-title{font-size:15px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--slate);}
+.header-sub{font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+.hdr-btn{font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:var(--sans);}
+.hdr-btn:hover{color:var(--slate);border-color:var(--slate3);}
+.nav-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;height:44px;gap:4px;overflow-x:auto;}
+.nav-tab{font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:0 16px;height:44px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;}
+.nav-tab:hover{color:var(--slate);}
+.nav-tab.active{color:var(--slate);border-bottom-color:var(--slate);}
+
+.content{padding:32px 40px;max-width:860px;margin:0 auto;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden;}
+.panel-header{padding:18px 24px;border-bottom:1px solid var(--border);}
+.panel-title{font-size:14px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);}
+.panel-body{padding:22px 24px;}
+.step{font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px;}
+.step + .step{margin-top:22px;}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px;}
+.choice{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border2);border-radius:10px;cursor:pointer;}
+.choice:hover{border-color:var(--slate3);}
+.choice.sel{border-color:var(--slate);background:var(--slate-bg);}
+.choice input{margin-top:5px;}
+.choice b{display:block;font-size:16px;}
+.choice span{font-size:14px;color:var(--text2);}
+.name-input{width:100%;font-family:var(--sans);font-size:17px;padding:12px 14px;border:1px solid var(--border2);border-radius:10px;background:var(--surface2);color:var(--text);}
+.name-input:focus{outline:2px solid var(--slate3);outline-offset:1px;}
+.hint{font-size:14px;color:var(--text3);margin-top:6px;}
+.result{margin-top:22px;padding:16px 18px;border-radius:10px;background:var(--slate-bg);border:1px solid var(--border2);}
+.result-link{font-family:ui-monospace,Consolas,monospace;font-size:14px;color:var(--text);word-break:break-all;}
+.result-empty{font-size:15px;color:var(--text3);}
+.copy-btn{margin-top:12px;background:var(--slate);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-family:var(--sans);font-size:15px;font-weight:700;cursor:pointer;}
+.copy-btn:hover{background:var(--slate2);}
+.copy-btn:disabled{background:var(--border2);cursor:default;}
+.copied{margin-left:12px;font-size:14px;font-weight:700;color:var(--green);}
+.tips{list-style:none;}
+.tips li{padding:12px 0;border-bottom:1px solid var(--surface2);font-size:16px;color:var(--text2);}
+.tips li:last-child{border-bottom:none;}
+.tips b{color:var(--text);}
+
+@media(max-width:700px){.header,.nav-bar,.content{padding-left:16px;padding-right:16px;}.choices{grid-template-columns:1fr;}.auth-card{padding:40px 24px;}}
+</style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo-title">Cave Springs</div>
+    <div class="auth-logo-sub">Link Builder</div>
+    <div class="auth-divider"></div>
+    <div class="auth-desc">Sign in with the same Google account you use for the dashboard.</div>
+    <button class="auth-btn" onclick="signIn()">Sign in with Google</button>
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
+<div id="loading-screen"><div class="spinner"></div><div class="loading-text">Signing in</div></div>
+
+<div id="dashboard">
+  <div class="header">
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Link Builder · Dunsmuir, CA</div></div>
+    <button class="hdr-btn" onclick="signOut()">Sign out</button>
+  </div>
+  <div class="nav-bar">
+    <a class="nav-tab" href="index.html">Revenue</a>
+    <a class="nav-tab" href="paid-ads.html">Paid Ads</a>
+    <a class="nav-tab" href="invoices.html">Mendes Invoices</a>
+    <a class="nav-tab" href="guests.html">Guests</a>
+    <a class="nav-tab active" href="links.html">Link Builder</a>
+  </div>
+
+  <div class="content">
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Make a link</span></div>
+      <div class="panel-body">
+        <div class="step">1 · Where will this link go?</div>
+        <div class="choices" id="choices">
+          <label class="choice sel"><input type="radio" name="kind" value="ig-boost" checked><div><b>Instagram boost</b><span>Boosting a post on Instagram</span></div></label>
+          <label class="choice"><input type="radio" name="kind" value="fb-boost"><div><b>Facebook boost</b><span>Boosting a post on Facebook</span></div></label>
+          <label class="choice"><input type="radio" name="kind" value="fb-post"><div><b>Facebook post</b><span>A regular post with a link, not boosted</span></div></label>
+          <label class="choice"><input type="radio" name="kind" value="ig-story"><div><b>Instagram Story</b><span>A link sticker in a Story</span></div></label>
+        </div>
+
+        <div class="step">2 · Give it a short name</div>
+        <input class="name-input" id="name" type="text" placeholder="for example: fall cabins" autocomplete="off">
+        <div class="hint">A few words about the post. Use a new name for each post.</div>
+
+        <div class="result">
+          <div id="result-text" class="result-empty">Type a name above and the link appears here.</div>
+          <button class="copy-btn" id="copy-btn" onclick="copyLink()" disabled>Copy link</button><span class="copied" id="copied"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Tips</span></div>
+      <div class="panel-body">
+        <ul class="tips">
+          <li><b>Boosting a post:</b> choose the goal <b>More website visitors</b>, then paste the link as the website.</li>
+          <li><b>Promo code:</b> a code made just for one boost lets you count its bookings in ResNexus too.</li>
+          <li><b>Instagram bio link:</b> leave it as it is.</li>
+          <li><b>Instagram captions:</b> links there can't be tapped. Use a Story link sticker or the bio link instead.</li>
+          <li><b>One name per post:</b> don't reuse a name, so each post's bookings stay separate.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLIENT_ID='535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
+const SHEET_ID='18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
+const SCOPE='https://www.googleapis.com/auth/spreadsheets';
+const SITE='https://cavesprings.com';
+// Tags for each kind of link. "paid_social" is what the Paid Ads page counts as paid Meta.
+const KINDS={
+  'ig-boost':{source:'instagram',medium:'paid_social',prefix:'boost'},
+  'fb-boost':{source:'facebook',medium:'paid_social',prefix:'boost'},
+  'fb-post': {source:'facebook',medium:'social',prefix:'post'},
+  'ig-story':{source:'instagram',medium:'social',prefix:'story'}
+};
+
+/* ---------- Sign-in: same Google account and token as the other pages ----------
+   This page holds no data, so after sign-in it only checks that the account can open
+   the dashboard sheet. An account without access sees the sign-in screen with a message. */
+const TOKEN_KEY='cs_gtoken';
+let tokenClient,accessToken;
+function saveToken(tok,expiresIn){try{sessionStorage.setItem(TOKEN_KEY,JSON.stringify({token:tok,exp:Date.now()+((expiresIn||3600)*1000)-60000}));}catch(e){}}
+function loadToken(){try{const j=JSON.parse(sessionStorage.getItem(TOKEN_KEY)||'null');if(j&&j.token&&j.exp>Date.now())return j.token;}catch(e){}return null;}
+function clearToken(){try{sessionStorage.removeItem(TOKEN_KEY);}catch(e){}}
+function loadGSI(){
+  if(window.google&&window.google.accounts)return Promise.resolve();
+  return new Promise(r=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;document.head.appendChild(s);});
+}
+function show(id){['auth-screen','loading-screen','dashboard'].forEach(x=>document.getElementById(x).style.display=x===id?(x==='dashboard'?'block':'flex'):'none');}
+async function signIn(){
+  await loadGSI();
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:resp=>{
+    if(resp.error){document.getElementById('auth-err').textContent='Sign-in failed: '+resp.error;return;}
+    accessToken=resp.access_token;saveToken(resp.access_token,resp.expires_in);check();
+  }});
+  tokenClient.requestAccessToken({});
+}
+async function check(){
+  show('loading-screen');
+  try{
+    const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'?fields=properties.title',{headers:{Authorization:'Bearer '+accessToken}});
+    if(!r.ok)throw new Error(r.status);
+    show('dashboard');
+  }catch(e){
+    clearToken();accessToken=null;show('auth-screen');
+    document.getElementById('auth-err').textContent='This Google account does not have access to the dashboard.';
+  }
+}
+function signOut(){
+  if(accessToken&&window.google&&window.google.accounts)google.accounts.oauth2.revoke(accessToken);
+  clearToken();accessToken=null;show('auth-screen');
+}
+(function resume(){const t=loadToken();if(t){accessToken=t;check();}})();
+
+/* ---------- Link builder ---------- */
+// "Fall Cabins!" -> "fall-cabins"
+function cleanName(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60);}
+function currentKind(){return document.querySelector('input[name="kind"]:checked').value;}
+function build(){
+  document.querySelectorAll('.choice').forEach(l=>l.classList.toggle('sel',l.querySelector('input').checked));
+  const name=cleanName(document.getElementById('name').value);
+  const out=document.getElementById('result-text'),btn=document.getElementById('copy-btn');
+  document.getElementById('copied').textContent='';
+  if(!name){out.className='result-empty';out.textContent='Type a name above and the link appears here.';btn.disabled=true;return;}
+  const k=KINDS[currentKind()];
+  const link=SITE+'?utm_source='+k.source+'&utm_medium='+k.medium+'&utm_campaign='+k.prefix+'-'+name;
+  out.className='result-link';out.textContent=link;btn.disabled=false;
+}
+async function copyLink(){
+  const link=document.getElementById('result-text').textContent;const note=document.getElementById('copied');
+  try{await navigator.clipboard.writeText(link);note.textContent='Copied';}
+  catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('result-text'));const s=getSelection();s.removeAllRanges();s.addRange(r);note.textContent='Selected. Press Ctrl+C (or tap Copy) to copy.';}
+}
+document.getElementById('name').addEventListener('input',build);
+document.querySelectorAll('input[name="kind"]').forEach(i=>i.addEventListener('change',build));
+</script>
+</body>
+</html>
