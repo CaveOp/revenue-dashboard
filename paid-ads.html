@@ -348,7 +348,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 25</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 26</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -1116,10 +1116,12 @@ function renderKeywords(starts,s,label){
 function toggleFold(id){document.getElementById(id).classList.toggle('collapsed');}
 
 const barLabels={id:'barLabels',afterDatasetsDraw(chart,args,opts){const {ctx}=chart;const ds=chart.data.datasets[0];const meta=chart.getDatasetMeta(0);ctx.save();ctx.font='700 14px Raleway';ctx.fillStyle='#1a2530';ctx.textAlign='center';ctx.textBaseline='bottom';meta.data.forEach((bar,i)=>{const v=ds.data[i];if(v==null)return;ctx.fillText(opts.format(v),bar.x,bar.y-6);});ctx.restore();}};
-// Dashed line across the chart at opts.value (the All cycles figure from the cycle table), labeled at the right.
+// Dashed line across the chart at opts.value (the All cycles figure from the cycle table).
+// Its two-line label sits in the chart's left margin, clear of the bars and their values.
 const avgLine={id:'avgLine',afterDatasetsDraw(chart,args,opts){if(opts.value==null||!isFinite(opts.value))return;const {ctx,chartArea:a}=chart;const y=chart.scales.y.getPixelForValue(opts.value);
   ctx.save();ctx.strokeStyle='#8a9bb0';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);ctx.beginPath();ctx.moveTo(a.left,y);ctx.lineTo(a.right,y);ctx.stroke();
-  ctx.setLineDash([]);ctx.font='600 12px Raleway';ctx.fillStyle='#4a5568';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText(opts.label,a.right,y-3);ctx.restore();}};
+  ctx.setLineDash([]);ctx.font='600 12px Raleway';ctx.fillStyle='#4a5568';ctx.textAlign='right';ctx.textBaseline='bottom';
+  ctx.fillText(opts.label[0],a.left-8,y);ctx.textBaseline='top';ctx.fillText(opts.label[1],a.left-8,y);ctx.restore();}};
 function charts(per,allRet){
   const labels=per.map(({c})=>c.label.replace(/ 15 – /,' – ').replace(/ 15,.*$/,''));
   const tick={color:'#5f6f80',font:{family:'Raleway',size:13}};
@@ -1128,7 +1130,8 @@ function charts(per,allRet){
   if(cycleChart)cycleChart.destroy();if(campChart)campChart.destroy();
   const base=(fmt)=>({responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{enabled:false},barLabels:{format:fmt}},scales:{x:{grid:{display:false},ticks:tick},y:{display:false,beginAtZero:true}}});
   const retOpts=base(v=>'$'+v.toFixed(2));
-  retOpts.plugins.avgLine={value:allRet,label:'All cycles '+fmtX(allRet)};
+  retOpts.plugins.avgLine={value:allRet,label:['All cycles',fmtX(allRet)]};
+  retOpts.layout.padding.left=72;
   cycleChart=new Chart(document.getElementById('chart-ret'),{type:'bar',plugins:[barLabels,avgLine],data:{labels,datasets:[{data:per.map(p=>p.t.spendTotal?+(p.t.rn/p.t.spendTotal).toFixed(2):null),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:retOpts});
   campChart=new Chart(document.getElementById('chart-book'),{type:'bar',plugins:[barLabels],data:{labels,datasets:[{data:per.map(p=>p.t.web.length),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:base(v=>String(v))});
   // Small table under each chart: one column per bar, same labels as the chart.
