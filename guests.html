@@ -190,6 +190,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
 @media(max-width:1000px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
 @media(max-width:700px){.header,.nav-bar,.filter-bar{padding-left:16px;padding-right:16px;}.content{padding:20px 16px;}.scorecards{grid-template-columns:1fr;}.nav-bar{overflow-x:auto;}.nav-tab{flex-shrink:0;padding:0 10px;}.prof-tabs,.prof-insight,.prof-tools{padding-left:16px;padding-right:16px;}.prof-insight{margin-left:16px;margin-right:16px;}.header{height:auto;min-height:64px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px;}#map{height:400px;}.filter-note{margin-left:0;width:100%;}}
+/* PHONE: header buttons on one line each, filter labels beside their controls, wide tables keep
+   readable columns (names wrap, numbers stay on one line) and scroll sideways. Desktop and print unchanged. */
+@media(max-width:700px){
+  .header{position:static;}
+  .header-right{flex-wrap:wrap;gap:6px;}
+  .hdr-btn{white-space:nowrap;padding:5px 9px;}
+  .filter-bar{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:8px 12px;padding-top:10px;padding-bottom:10px;}
+  .filter-bar .filter-sep{display:none;}
+  .filter-bar .filter-label{margin-right:0;}
+  .filter-bar .seg,.filter-bar .filter-select{justify-self:start;}
+  .filter-bar .filter-note{grid-column:1/-1;margin-left:0;}
+  .panel-header{padding:14px 16px;}
+  .panel-body{padding:16px;}
+  .prof-tabs{padding-top:12px;}
+  .data-table th,.data-table td{padding:10px;}
+  .data-table td:first-child{min-width:140px;}
+  .data-table td:not(:first-child){white-space:nowrap;}
+  .table-scroll.more{-webkit-mask-image:linear-gradient(to right,#000 82%,transparent);mask-image:linear-gradient(to right,#000 82%,transparent);}
+}
 @media print{.header-right,.nav-bar,.import-overlay,.import-modal,.filter-bar{display:none!important;}.header{position:static;}}
 </style>
 </head>
@@ -1338,6 +1357,14 @@ function renderProfile(view){
   foot.textContent=footText+(profView!=='value'?' Shares follow the Measure switch ('+measureWord+').':'')+' Grey rows have fewer than '+PROF_MIN+' reservations — too few to read much into.';
   el.innerHTML='<table class="data-table prof"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
 }
+
+// Phones: scroll the menu so this page's tab is visible, and mark tables that can still be
+// swiped right so CSS fades their right edge.
+(function(){const n=document.querySelector('.nav-bar'),a=n&&n.querySelector('.nav-tab.active');if(a)n.scrollLeft=a.offsetLeft-16;})();
+function updateSwipeHints(){document.querySelectorAll('.table-scroll').forEach(e=>e.classList.toggle('more',e.scrollLeft+e.clientWidth<e.scrollWidth-2));}
+document.addEventListener('scroll',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('table-scroll'))updateSwipeHints();},true);
+window.addEventListener('resize',updateSwipeHints);
+new MutationObserver(()=>requestAnimationFrame(updateSwipeHints)).observe(document.documentElement,{childList:true,subtree:true});
 </script>
 </body>
 </html>

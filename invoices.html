@@ -170,6 +170,27 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 
 @media(max-width:1000px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}.yoy-summary{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:700px){.header,.nav-bar{padding:0 16px;}.content{padding:20px 16px;}.scorecards{grid-template-columns:1fr;}.yoy-summary{grid-template-columns:1fr;}.yoy-stat{padding:14px 16px;}.header{height:auto;min-height:64px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:8px;}}
+/* PHONE: header buttons wrap under the title, menu swipes sideways, wide tables keep readable
+   columns (names wrap, numbers and dates stay on one line) and scroll sideways. Desktop and print unchanged. */
+@media(max-width:700px){
+  .header{position:static;}
+  .header-right{flex-wrap:wrap;gap:6px;}
+  .hdr-btn{white-space:nowrap;padding:5px 9px;}
+  .nav-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .nav-tab{flex-shrink:0;white-space:nowrap;padding:0 10px;}
+  .panel-header{padding:14px 16px;}
+  .panel-body{padding:16px;}
+  .data-table th,.data-table td{padding:10px;}
+  .data-table td:first-child{min-width:140px;}
+  .data-table th,.data-table td:not(:first-child){white-space:nowrap;}
+  .import-modal{width:94%;}
+  .import-modal .data-table th,.import-modal .data-table td{padding:8px 5px;font-size:12px;}
+  .import-modal .data-table td:first-child{min-width:0;}
+  .import-modal{padding-left:18px;padding-right:18px;}
+  .detail-meta{gap:10px 20px;}
+  .alert-row{gap:8px;}
+  .table-scroll.more{-webkit-mask-image:linear-gradient(to right,#000 82%,transparent);mask-image:linear-gradient(to right,#000 82%,transparent);}
+}
 @media print{.header-right,.nav-bar,.import-overlay,.import-modal{display:none!important;}.header{position:static;}.list-scroll{max-height:none;}}
 </style>
 </head>
@@ -1177,6 +1198,14 @@ function spark(vals,color,isMoney){
   return '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;"><svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>'+
     '<div style="font-size:15px;font-weight:700;">'+lbl(vals[vals.length-1])+'</div></div>';
 }
+
+// Phones: scroll the menu so this page's tab is visible, and mark tables that can still be
+// swiped right so CSS fades their right edge.
+(function(){const n=document.querySelector('.nav-bar'),a=n&&n.querySelector('.nav-tab.active');if(a)n.scrollLeft=a.offsetLeft-16;})();
+function updateSwipeHints(){document.querySelectorAll('.table-scroll').forEach(e=>e.classList.toggle('more',e.scrollLeft+e.clientWidth<e.scrollWidth-2));}
+document.addEventListener('scroll',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('table-scroll'))updateSwipeHints();},true);
+window.addEventListener('resize',updateSwipeHints);
+new MutationObserver(()=>requestAnimationFrame(updateSwipeHints)).observe(document.documentElement,{childList:true,subtree:true});
 </script>
 </body>
 </html>

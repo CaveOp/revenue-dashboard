@@ -52,7 +52,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .panel-title{font-size:14px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);}
 .panel-body{padding:22px 24px;}
 .step{font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px;}
-.step + .step{margin-top:22px;}
+.step + .step,.hint + .step{margin-top:22px;}
 .choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px;}
 .choice{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border2);border-radius:10px;cursor:pointer;}
 .choice:hover{border-color:var(--slate3);}
@@ -219,6 +219,8 @@ async function copyLink(){
   try{await navigator.clipboard.writeText(link);note.textContent='Copied';}
   catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('result-text'));const s=getSelection();s.removeAllRanges();s.addRange(r);note.textContent='Selected. Press Ctrl+C (or tap Copy) to copy.';}
 }
+// Phones: scroll the menu so this page's tab is visible.
+(function(){const n=document.querySelector('.nav-bar'),a=n&&n.querySelector('.nav-tab.active');if(a)n.scrollLeft=a.offsetLeft-16;})();
 document.getElementById('name').addEventListener('input',build);
 document.getElementById('page').addEventListener('input',build);
 document.querySelectorAll('input[name="kind"]').forEach(i=>i.addEventListener('change',build));

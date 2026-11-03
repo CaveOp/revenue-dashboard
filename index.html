@@ -183,6 +183,37 @@ tr.unit-row.hidden{display:none;}
 .im-ok{background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--green);margin-top:14px;white-space:pre-wrap;}
 .im-warn{background:var(--amber-bg);border:1px solid rgba(184,124,42,0.3);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--amber);margin-top:14px;white-space:pre-wrap;}
 .im-privacy{font-size:11px;color:var(--text3);margin-top:14px;line-height:1.7;}
+.table-scroll{overflow-x:auto;}
+@media print{.table-scroll{overflow:visible!important;}}
+/* PHONE: header buttons become one row that swipes sideways, numbers fit their cards, channel
+   doughnut sits above its legend, wide tables keep readable columns and scroll sideways. Desktop and print unchanged. */
+@media(max-width:700px){
+  .header{height:auto;flex-direction:column;align-items:stretch;gap:8px;padding:10px 16px;position:static;}
+  .header-right{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:2px;}
+  .hdr-btn{white-space:nowrap;flex-shrink:0;padding:5px 9px;}
+  .filter-bar{padding:8px 16px;}
+  .filter-row .filter-btn{min-width:0;padding:4px 9px;}
+  .content{padding:16px;}
+  .scorecards{gap:10px;}
+  .scorecard{padding:16px;}
+  .scorecard-value{font-size:24px;}
+  .cat-grid{gap:10px;}
+  .cat-card{padding:14px 16px;}
+  .cat-card-rev{font-size:19px;}
+  .panel-header{padding:14px 16px 12px;}
+  .panel-body{padding:16px;}
+  .panel-body > div[style*="gap:28px"]{flex-direction:column;align-items:stretch!important;min-height:0!important;gap:16px!important;}
+  .panel-body > div[style*="gap:28px"] > div[style*="width:180px"]{align-self:center;}
+  .data-table th,.data-table td,.log-table th,.log-table td{padding:10px;}
+  .data-table td:first-child,.log-table td:first-child{min-width:110px;}
+  .data-table td:not(:first-child),.log-table td:not(:first-child){white-space:nowrap;}
+  #unit-tbody td:first-child{min-width:0;}
+  .panel-body > div[style*="repeat(3,1fr)"]{grid-template-columns:1fr 1fr!important;gap:10px!important;}
+  .panel-body > div[style*="repeat(3,1fr)"] > div{min-width:0;padding:14px!important;}
+  .data-table td.name-col{max-width:150px;}
+  .partial-alert{flex-wrap:wrap;gap:10px;}
+  .header-right.more,.table-scroll.more{-webkit-mask-image:linear-gradient(to right,#000 82%,transparent);mask-image:linear-gradient(to right,#000 82%,transparent);}
+}
 </style>
 </head>
 <body>
@@ -1580,6 +1611,16 @@ async function confirmImportWrite(){
     btn.disabled=false;btn.textContent='Confirm — write to sheet';
   }
 }
+
+// Phones: scroll the menu so this page's tab is visible, and mark tables that can still be
+// swiped right so CSS fades their right edge.
+(function(){const n=document.querySelector('.nav-bar'),a=n&&n.querySelector('.nav-tab.active');if(a)n.scrollLeft=a.offsetLeft-16;})();
+// Tables on this page sit straight in their cards; wrap each so it can scroll sideways on a phone.
+document.querySelectorAll('table.data-table,table.log-table').forEach(t=>{if(t.parentElement.classList.contains('table-scroll'))return;const w=document.createElement('div');w.className='table-scroll';t.parentNode.insertBefore(w,t);w.appendChild(t);});
+function updateSwipeHints(){document.querySelectorAll('.table-scroll,.header-right').forEach(e=>e.classList.toggle('more',e.scrollLeft+e.clientWidth<e.scrollWidth-2));}
+document.addEventListener('scroll',e=>{if(e.target&&e.target.classList&&(e.target.classList.contains('table-scroll')||e.target.classList.contains('header-right')))updateSwipeHints();},true);
+window.addEventListener('resize',updateSwipeHints);
+new MutationObserver(()=>requestAnimationFrame(updateSwipeHints)).observe(document.documentElement,{childList:true,subtree:true});
 </script>
 </body>
 </html>
