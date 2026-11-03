@@ -92,6 +92,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .panel-sub{font-size:13px;color:var(--text3);}
 .panel-body{padding:22px 24px;}
 .panel-foot{padding:12px 24px 16px;font-size:14px;color:var(--text3);line-height:1.6;border-top:1px solid var(--surface2);}
+.foot-table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;}
+.foot-table th,.foot-table td{padding:3px 0 3px 12px;text-align:right;white-space:nowrap;}
+.foot-table th:first-child,.foot-table td:first-child{text-align:left;padding-left:0;}
+.foot-table th{font-weight:600;color:var(--text3);}
+.foot-table td{color:var(--text2);}
+.foot-table td:first-child{color:var(--text3);}
 .chart-wrap{position:relative;}
 .legend{display:flex;gap:18px;font-size:14px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;}
 .legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c);}
@@ -136,7 +142,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .kv tr.group td{padding-top:18px;border-bottom:2px solid var(--border);font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--slate);text-align:left;}
 .kv .dim{font-weight:400;color:var(--text3);}
 .unit .u-line{font-size:15px;color:var(--text2);}
-.brand-box{margin-bottom:20px;padding:18px 24px;}
+.brand-box{margin-bottom:20px;padding:18px 24px;overflow:hidden;}
+.brand-box .u-label{margin:-18px -24px 8px;padding:12px 24px;background:var(--slate-bg);color:var(--slate);font-size:14px;letter-spacing:0;text-transform:none;border-bottom:2px solid var(--border);}
 @media(max-width:1100px){.units{grid-template-columns:1fr;}}
 
 .sec{margin:28px 0 12px;display:flex;align-items:baseline;gap:12px;}
@@ -145,6 +152,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .fold-head h2::before{content:'\25BE';display:inline-block;width:24px;font-size:22px;color:var(--slate);}
 .fold.collapsed .fold-head h2::before{content:'\25B8';}
 .fold.collapsed tbody{display:none;}
+.fold-head .panel-title::before{content:'\25BE';display:inline-block;width:20px;color:var(--slate);}
+.fold.collapsed .fold-head .panel-title::before{content:'\25B8';}
+.fold.collapsed > .panel-body{display:none;}
 .sec h2{font-size:20px;font-weight:700;letter-spacing:0.04em;color:var(--text);}
 .sec span{font-size:14px;color:var(--text3);}
 .hero{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
@@ -238,6 +248,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   .grid-2{grid-template-columns:1fr 1fr !important;}
   .fold-head h2::before{display:none;}
   .fold.collapsed tbody{display:table-row-group !important;}
+  .fold-head .panel-title::before{display:none;}
+  .fold.collapsed > .panel-body{display:block !important;}
 }
 </style>
 </head>
@@ -429,20 +441,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       </div>
 
       <div class="panel">
-        <div class="panel-header"><span class="panel-title">How complete the data is</span><span class="panel-sub" id="cov-sum"></span></div>
-        <div class="panel-body"><div class="grid-2" style="margin-bottom:0;gap:40px;">
-          <table class="kv"><tbody id="cov-tbody"></tbody></table>
-          <table class="kv"><tbody id="meta-tbody"></tbody></table>
-        </div>
-        <p class="help" style="margin-top:14px;" id="cov-note"></p></div>
-      </div>
-
-      <div class="panel">
         <div class="panel-header"><span class="panel-title">Reservations behind the numbers</span><span class="panel-sub" id="res-sum"></span></div>
         <div class="table-scroll"><table class="data-table">
           <thead><tr><th>Res#</th><th>Campaign</th><th id="res-q-th">Searched</th><th>Source / medium</th><th>Channel</th><th>Booked on</th><th>First night</th><th class="right">Nights</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th>ResNexus</th></tr></thead>
           <tbody id="res-tbody"></tbody><tfoot id="res-tfoot"></tfoot>
         </table></div>
+      </div>
+
+      <div class="panel fold collapsed" id="cov-fold">
+        <div class="panel-header fold-head" onclick="toggleFold('cov-fold')" title="Show or hide the data details"><span class="panel-title">How complete the data is</span><span class="panel-sub" id="cov-sum"></span></div>
+        <div class="panel-body"><div class="grid-2" style="margin-bottom:0;gap:40px;">
+          <table class="kv"><tbody id="cov-tbody"></tbody></table>
+          <table class="kv"><tbody id="meta-tbody"></tbody></table>
+        </div>
+        <p class="help" style="margin-top:14px;" id="cov-note"></p></div>
       </div>
 
     </div>
@@ -1035,7 +1047,7 @@ function render(){
   const multi=knownCycles.length>1;
   document.getElementById("charts-row").style.display=multi?"grid":"none";
   document.getElementById("trend-note").textContent=multi?"every cycle saved":"charts appear once a second cycle is saved";
-  if(multi)charts(per);
+  if(multi)charts(per,tot.spendTotal?tot.rn/tot.spendTotal:null);
 }
 
 // One cycle's booked revenue without bookings from searches for the resort's name, over the full spend.
@@ -1104,18 +1116,30 @@ function renderKeywords(starts,s,label){
 function toggleFold(id){document.getElementById(id).classList.toggle('collapsed');}
 
 const barLabels={id:'barLabels',afterDatasetsDraw(chart,args,opts){const {ctx}=chart;const ds=chart.data.datasets[0];const meta=chart.getDatasetMeta(0);ctx.save();ctx.font='700 14px Raleway';ctx.fillStyle='#1a2530';ctx.textAlign='center';ctx.textBaseline='bottom';meta.data.forEach((bar,i)=>{const v=ds.data[i];if(v==null)return;ctx.fillText(opts.format(v),bar.x,bar.y-6);});ctx.restore();}};
-function charts(per){
+// Dashed line across the chart at opts.value (the All cycles figure from the cycle table), labeled at the right.
+const avgLine={id:'avgLine',afterDatasetsDraw(chart,args,opts){if(opts.value==null||!isFinite(opts.value))return;const {ctx,chartArea:a}=chart;const y=chart.scales.y.getPixelForValue(opts.value);
+  ctx.save();ctx.strokeStyle='#8a9bb0';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);ctx.beginPath();ctx.moveTo(a.left,y);ctx.lineTo(a.right,y);ctx.stroke();
+  ctx.setLineDash([]);ctx.font='600 12px Raleway';ctx.fillStyle='#4a5568';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText(opts.label,a.right,y-3);ctx.restore();}};
+function charts(per,allRet){
   const labels=per.map(({c})=>c.label.replace(/ 15 – /,' – ').replace(/ 15,.*$/,''));
   const tick={color:'#8a9bb0',font:{family:'Raleway',size:13}};
   const sel=document.getElementById('cycle-select').value;
   const colors=per.map(({c})=>c.startISO===sel?'#c4572a':'#4a5e6d');
   if(cycleChart)cycleChart.destroy();if(campChart)campChart.destroy();
   const base=(fmt)=>({responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{enabled:false},barLabels:{format:fmt}},scales:{x:{grid:{display:false},ticks:tick},y:{display:false,beginAtZero:true}}});
-  cycleChart=new Chart(document.getElementById('chart-ret'),{type:'bar',plugins:[barLabels],data:{labels,datasets:[{data:per.map(p=>p.t.spendTotal?+(p.t.rn/p.t.spendTotal).toFixed(2):null),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:base(v=>'$'+v.toFixed(2))});
+  const retOpts=base(v=>'$'+v.toFixed(2));
+  retOpts.plugins.avgLine={value:allRet,label:'All cycles '+fmtX(allRet)};
+  cycleChart=new Chart(document.getElementById('chart-ret'),{type:'bar',plugins:[barLabels,avgLine],data:{labels,datasets:[{data:per.map(p=>p.t.spendTotal?+(p.t.rn/p.t.spendTotal).toFixed(2):null),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:retOpts});
   campChart=new Chart(document.getElementById('chart-book'),{type:'bar',plugins:[barLabels],data:{labels,datasets:[{data:per.map(p=>p.t.web.length),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:base(v=>String(v))});
-  const arrow=' → ';
-  document.getElementById('ret-foot').textContent='Spend '+per.map(p=>p.t.spend.length?fmt$(p.t.spendTotal):'not loaded').join(arrow)+'. Booked revenue '+per.map(p=>fmt$(p.t.rn)).join(arrow)+'.';
-  document.getElementById('book-foot').textContent='Cost per booking '+per.map(p=>p.t.web.length&&p.t.spendTotal?fmt$(p.t.spendTotal/p.t.web.length):'—').join(arrow)+'. Average booking value '+per.map(p=>p.t.web.length?fmt$(p.t.rn/p.t.web.length):'—').join(arrow)+'.';
+  // Small table under each chart: one column per bar, same labels as the chart.
+  const footTable=rows=>'<div class="table-scroll"><table class="foot-table"><thead><tr><th></th>'+labels.map(l=>'<th>'+esc(l)+'</th>').join('')+'</tr></thead><tbody>'+
+    rows.map(([name,vals])=>'<tr><td>'+name+'</td>'+vals.map(v=>'<td>'+v+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+  document.getElementById('ret-foot').innerHTML=footTable([
+    ['Spend',per.map(p=>p.t.spend.length?fmt$(p.t.spendTotal):'not loaded')],
+    ['Booked revenue',per.map(p=>fmt$(p.t.rn))]]);
+  document.getElementById('book-foot').innerHTML=footTable([
+    ['Cost per booking',per.map(p=>p.t.web.length&&p.t.spendTotal?fmt$(p.t.spendTotal/p.t.web.length):'—')],
+    ['Average booking value',per.map(p=>p.t.web.length?fmt$(p.t.rn/p.t.web.length):'—')]]);
 }
 </script>
 </body>
