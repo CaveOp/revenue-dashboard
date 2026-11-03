@@ -100,6 +100,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .foot-table td:first-child{color:var(--text3);}
 .chart-wrap{position:relative;}
 .chart-print{display:none;}
+.audit-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;}
+.audit-row label{font-size:14px;font-weight:700;color:var(--text2);display:flex;gap:8px;align-items:center;}
+.audit-row input{font-family:var(--sans);font-size:15px;color:var(--text);padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);}
+.audit-units{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;}
+@media(max-width:900px){.audit-units{grid-template-columns:1fr 1fr;}}
 .partial-tag{align-self:center;font-size:15px;font-weight:700;color:#7a4f10;background:var(--amber-bg);border:1px solid rgba(184,124,42,0.45);border-radius:20px;padding:4px 14px;}
 .legend{display:flex;gap:18px;font-size:14px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;}
 .legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c);}
@@ -329,7 +334,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
     <div class="im-field" style="margin-bottom:8px;">
       <label>Fix boundary days</label>
       <input type="file" id="im-fix" accept=".zip,application/zip,application/x-zip-compressed" multiple>
-      <div class="cheat-body note">For cycles already saved from a Google Ads zip that ran one day into the next cycle. Choose those zips; only their daily spend file is read. Saved campaign rows are not changed.</div>
+      <div class="cheat-body note">For cycles already saved from a Google Ads zip that ran one day into the next cycle, and to save daily spend for Audit by dates. Choose those zips; only their daily spend and Campaigns files are read. Saved campaign rows are not changed.</div>
     </div>
     <div class="im-row" style="margin-top:0;"><button class="im-btn ghost" onclick="fixBoundaries()">Fix boundary days</button></div>
     <div id="im-fix-out"></div>
@@ -338,7 +343,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   <div class="cheat" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
     <div class="im-row" style="margin-top:0;align-items:center;">
       <button class="im-btn ghost" onclick="clearSaved()">Clear everything saved on this page</button>
-      <span class="cheat-body note" style="margin:0;">Empties the AD_SPEND_CLEAN, AD_KEYWORDS_CLEAN and GA4_TXN_CLEAN tabs. Stays and retail data are not touched.</span>
+      <span class="cheat-body note" style="margin:0;">Empties the AD_SPEND_CLEAN, AD_DAILY_CLEAN, AD_KEYWORDS_CLEAN and GA4_TXN_CLEAN tabs. Stays and retail data are not touched.</span>
     </div>
     <div id="im-clear-out"></div>
   </div>
@@ -369,7 +374,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 37">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 38">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -430,6 +435,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         </table></div>
         <div class="panel-foot" id="trend-sum" style="display:none;"></div>
       </div>
+
+      <div class="sec"><h2>Audit by dates</h2><span>Google Ads, by booking date</span></div>
+      <div class="panel"><div class="panel-body">
+        <div class="audit-row">
+          <label>From <input type="date" id="aud-from" onchange="renderAudit()"></label>
+          <label>To <input type="date" id="aud-to" onchange="renderAudit()"></label>
+        </div>
+        <div class="audit-units">
+          <div class="unit"><span class="u-label">Spend</span><span class="u-value num" id="aud-spend">—</span></div>
+          <div class="unit"><span class="u-label">Bookings</span><span class="u-value num" id="aud-book">—</span></div>
+          <div class="unit"><span class="u-label">Booked revenue</span><span class="u-value num" id="aud-rn">—</span></div>
+          <div class="unit"><span class="u-label">GA4 revenue</span><span class="u-value num" id="aud-ga4">—</span></div>
+          <div class="unit"><span class="u-label">Return per $1 spent</span><span class="u-value num" id="aud-ret">—</span></div>
+        </div>
+        <p class="help" style="margin-top:14px;" id="aud-note"></p>
+      </div></div>
 
       <div class="sec"><h2>Which campaigns earned it</h2><span id="camp-sub"></span><span class="sec-right"><span id="camp-note" style="font-size:13px;color:var(--text3);"></span></span></div>
       <div class="panel">
@@ -498,6 +519,8 @@ const RETAIL_TAB= 'RETAIL_CLEAN';
 const SPEND_TAB = 'AD_SPEND_CLEAN';
 const GA4_TAB   = 'GA4_TXN_CLEAN';
 const KW_TAB    = 'AD_KEYWORDS_CLEAN';
+const DAILY_TAB = 'AD_DAILY_CLEAN';     // Google Ads spend per day, all campaigns together (from the zip's Time series file)
+const DAILY_HEADER=['Date','Cost','ImportedOn'];
 const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
 const SPEND_HEADER=['Cycle','CycleStart','Campaign','Cost','Impressions','Clicks','Conversions','ConvValue','PhoneCalls','ImportedOn','DataThrough','Adjustment'];
 const GA4_HEADER=['TransactionId','Date','Cycle','CycleStart','SourceMedium','Campaign','FirstUserSourceMedium','FirstUserCampaign','Revenue','ImportedOn','Keyword','SearchQuery'];
@@ -511,7 +534,7 @@ const CYCLE_FIRST=new Date(2026,4,CYCLE_DAY);   // first cycle offered in the im
 const ord=n=>n+([,'st','nd','rd'][n%100>>3^1&&n%10]||'th');
 
 let tokenClient, accessToken;
-let staysByRes={}, feeByRes={}, feeLoaded=false, spendRows=[], ga4Rows=[], kwRows=[];
+let staysByRes={}, feeByRes={}, feeLoaded=false, spendRows=[], ga4Rows=[], kwRows=[], dailyRows=[];
 let knownCycles=[];            // [{label,start}] oldest → newest, from saved data
 let cycleChart, campChart;
 
@@ -537,7 +560,7 @@ async function signIn(){
 }
 function signOut(){
   if(accessToken&&window.google&&window.google.accounts)google.accounts.oauth2.revoke(accessToken);
-  clearToken();accessToken=null;staysByRes={};feeByRes={};spendRows=[];ga4Rows=[];kwRows=[];
+  clearToken();accessToken=null;staysByRes={};feeByRes={};spendRows=[];ga4Rows=[];kwRows=[];dailyRows=[];
   document.getElementById('dashboard').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
   [cycleChart,campChart].forEach(c=>{if(c)c.destroy();});cycleChart=campChart=null;
@@ -841,7 +864,7 @@ async function analyzeImport(){
         const dpick=pickDailyEntry(entries);daily=dpick?parseDaily(dpick.text):null;}
       else rows=parseCSV(await readText(adsFile));
       ads=parseAdsReport(rows,fname);ads.file=fname;if(!ads.rows.length)throw new Error('No campaign rows found in '+fname+'.');
-      ads.adj=daily?boundaryAdj(daily,cycle):[];
+      ads.adj=daily?boundaryAdj(daily,cycle):[];ads.daily=daily||[];
       if(ads.rangeStart&&toISO(cycleFor(ads.rangeStart).start)!==cycle.startISO)warn.push('The Google Ads file starts '+fmtDay(ads.rangeStart)+', which is not in the chosen cycle. Check the cycle above.');}
     if(ga4Files.length){ga4={byId:{},columns:[],dropped:0};
       for(const f of ga4Files){const p=parseGa4Export(parseCSV(await readText(f)),f.name);ga4.dropped+=p.dropped;p.columns.forEach(c=>{if(!ga4.columns.includes(c))ga4.columns.push(c);});
@@ -876,6 +899,9 @@ async function analyzeImport(){
   }catch(e){status.textContent='';result.style.display='block';result.innerHTML='<div class="im-err">'+esc(e.message)+'</div>';}
 }
 
+// Daily spend is kept one row per date; a newer file replaces the same dates.
+function mergeDaily(list,stamp){const m=new Map(dailyRows.map(r=>[r.date,r]));list.forEach(d=>{const k=toISO(d.date);m.set(k,{date:k,cost:d.cost,imported:stamp});});return [...m.values()].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);}
+async function writeDaily(rows){await writeTab(DAILY_TAB,[DAILY_HEADER].concat(rows.map(r=>[r.date,r.cost,r.imported])));}
 function adjRow(a,cycle,stamp){return {cycle:cycle.label,cycleStart:cycle.startISO,campaign:a.campaign,cost:a.cost,impressions:'',clicks:'',conversions:'',convValue:'',calls:'',imported:stamp,through:'',adj:'boundary'};}
 async function writeSpend(rows){
   await writeTab(SPEND_TAB,[SPEND_HEADER].concat(rows.map(r=>[r.cycle,r.cycleStart,r.campaign,r.cost,r.impressions,r.clicks,r.conversions,r.convValue,r.calls,r.imported,r.through||'',r.adj||''])));
@@ -899,6 +925,7 @@ async function confirmImport(){
       const adj=(ads.adj||[]).map(a=>adjRow(a,cycle,stamp));
       const rows=keep.concat(add,adj);nSpend=add.length;
       await writeSpend(rows);
+      if(ads.daily&&ads.daily.length){dailyRows=mergeDaily(ads.daily,stamp);await writeDaily(dailyRows);}
       spendRows=rows;
     }
     if(ga4.length){
@@ -922,12 +949,15 @@ async function fixBoundaries(){
   const out=document.getElementById('im-fix-out');const files=Array.from(document.getElementById('im-fix').files);
   if(!files.length){out.innerHTML='<div class="im-err">Choose one or more Google Ads zips first.</div>';return;}
   out.innerHTML='<div class="im-status">Checking…</div>';
-  const lines=[];let rows=spendRows.slice();let changed=false;const stamp=fmtStamp(new Date());
+  const lines=[];let rows=spendRows.slice();let changed=false;const stamp=fmtStamp(new Date());const allDaily=[];
   try{
     for(const f of files){
       const entries=await unzip(f);const dpick=pickDailyEntry(entries),cpick=pickCampaignsEntry(entries);
-      if(!dpick||!cpick){lines.push(f.name+': no daily spend or Campaigns file inside, skipped.');continue;}
+      if(!dpick){lines.push(f.name+': no daily spend file inside, skipped.');continue;}
       const daily=parseDaily(dpick.text);if(!daily.length){lines.push(f.name+': daily spend file is empty, skipped.');continue;}
+      allDaily.push(...daily);
+      lines.push(f.name+': daily spend saved, '+fmtDay(daily[0].date)+' – '+fmtDay(daily[daily.length-1].date)+'.');
+      if(!cpick)continue;
       const cycle=cycleFor(daily[0].date);
       const saved=rows.filter(r=>r.cycleStart===cycle.startISO&&!r.adj);
       if(!saved.length){lines.push(f.name+': nothing saved for '+cycle.label+', skipped.');continue;}
@@ -937,26 +967,29 @@ async function fixBoundaries(){
       rows=rows.filter(r=>!(r.cycleStart===cycle.startISO&&r.adj)).concat(adj);changed=true;
       lines.push(cycle.label+': '+(adj.length?adj.map(a=>a.campaign+' −'+fmt$2(-a.cost)).join(' · '):'no spend outside the cycle, nothing to change')+'.');
     }
-    if(changed){out.innerHTML='<div class="im-status">Saving…</div>';await writeSpend(rows);spendRows=rows;buildCycles();render();}
-    out.innerHTML='<div class="'+(changed?'im-ok':'im-status')+'" style="white-space:pre-wrap;">'+esc(lines.join('\n'))+'</div>';
+    if(changed||allDaily.length){out.innerHTML='<div class="im-status">Saving…</div>';
+      if(changed){await writeSpend(rows);spendRows=rows;}
+      if(allDaily.length){dailyRows=mergeDaily(allDaily,stamp);await writeDaily(dailyRows);}
+      buildCycles();render();}
+    out.innerHTML='<div class="'+(changed||allDaily.length?'im-ok':'im-status')+'" style="white-space:pre-wrap;">'+esc(lines.join('\n'))+'</div>';
   }catch(e){out.innerHTML='<div class="im-err">Could not fix: '+esc(e.message)+'</div>';}
 }
 async function clearSaved(){
   const out=document.getElementById('im-clear-out');
-  if(!window.confirm('Delete every saved paid ads row (spend, keywords and GA4 transactions, all cycles)? The stays and retail data stay as they are.'))return;
+  if(!window.confirm('Delete every saved paid ads row (spend, daily spend, keywords and GA4 transactions, all cycles)? The stays and retail data stay as they are.'))return;
   out.innerHTML='<div class="im-status">Clearing…</div>';
   try{
     const titles=await listSheetTitles();
-    for(const tab of [SPEND_TAB,KW_TAB,GA4_TAB])if(titles.includes(tab))await clearTab(tab);
-    spendRows=[];ga4Rows=[];kwRows=[];knownCycles=[];buildCycles();render();
-    out.innerHTML='<div class="im-ok">Cleared. All three tabs are empty; import a cycle to start again.</div>';
+    for(const tab of [SPEND_TAB,KW_TAB,GA4_TAB,DAILY_TAB])if(titles.includes(tab))await clearTab(tab);
+    spendRows=[];ga4Rows=[];kwRows=[];dailyRows=[];knownCycles=[];buildCycles();render();
+    out.innerHTML='<div class="im-ok">Cleared. All four tabs are empty; import a cycle to start again.</div>';
   }catch(e){out.innerHTML='<div class="im-err">Could not clear: '+esc(e.message)+'</div>';}
 }
 
 /* ---------- Load ---------- */
 async function loadAll(){
   try{
-    const [stayRaw,retailRaw,spendRaw,ga4Raw,kwRaw]=await Promise.all([fetchTab(STAYS_TAB),fetchTab(RETAIL_TAB).catch(()=>[]),fetchTab(SPEND_TAB),fetchTab(GA4_TAB),fetchTab(KW_TAB)]);
+    const [stayRaw,retailRaw,spendRaw,ga4Raw,kwRaw,dailyRaw]=await Promise.all([fetchTab(STAYS_TAB),fetchTab(RETAIL_TAB).catch(()=>[]),fetchTab(SPEND_TAB),fetchTab(GA4_TAB),fetchTab(KW_TAB),fetchTab(DAILY_TAB).catch(()=>[])]);
     staysByRes={};
     toRows(stayRaw).forEach(r=>{
       const raw=String(r['Res#']||r['Res']||'').trim();if(!raw)return;const res=/^\d+$/.test(raw)?String(parseInt(raw,10)):raw;
@@ -977,6 +1010,7 @@ async function loadAll(){
     spendRows=toRows(spendRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],campaign:r['Campaign'],cost:pMoney(r['Cost']),impressions:r['Impressions']===''?'':pInt(r['Impressions']),clicks:r['Clicks']===''?'':pInt(r['Clicks']),conversions:r['Conversions']===''?'':pMoney(r['Conversions']),convValue:r['ConvValue']===''?'':pMoney(r['ConvValue']),calls:r['PhoneCalls']===''?'':pInt(r['PhoneCalls']),imported:r['ImportedOn'],through:r['DataThrough']||'',adj:r['Adjustment']||''})).filter(r=>r.cycleStart&&r.campaign);
     ga4Rows=toRows(ga4Raw).map(r=>({id:String(parseInt(r['TransactionId'],10)),date:r['Date'],cycle:r['Cycle'],cycleStart:r['CycleStart'],sm:r['SourceMedium'],campaign:r['Campaign'],fusm:r['FirstUserSourceMedium'],fcamp:r['FirstUserCampaign'],revenue:r['Revenue']===''?null:pMoney(r['Revenue']),imported:r['ImportedOn'],keyword:r['Keyword']||'',query:r['SearchQuery']||''})).filter(r=>r.id&&r.id!=='NaN'&&r.cycleStart);
     kwRows=toRows(kwRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],keyword:r['Keyword'],cost:pMoney(r['Cost']),clicks:pInt(r['Clicks']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.keyword);
+    dailyRows=toRows(dailyRaw).map(r=>{const d=parseDateLoose(r['Date']);return {date:d?toISO(d):'',cost:pMoney(r['Cost']),imported:r['ImportedOn']};}).filter(r=>r.date);
     showDash();buildCycles();render();
   }catch(e){
     if(e.auth){clearToken();accessToken=null;showAuth();return;}
@@ -1157,6 +1191,29 @@ function render(){
   document.getElementById("charts-row").style.display=multi?"grid":"none";
   document.getElementById("trend-note").textContent=multi?"every cycle saved":"charts appear once a second cycle is saved";
   if(multi)charts(per,tot.spendTotal?tot.rn/tot.spendTotal:null);
+  renderAudit();
+}
+// Audit by dates: any From–To range (inclusive). Spend comes from saved daily spend; bookings are
+// Google Ads bookings by the date GA4 recorded them. Starts on the selected cycle's dates.
+function renderAudit(){
+  const f=document.getElementById('aud-from'),t=document.getElementById('aud-to'),note=document.getElementById('aud-note');
+  if(!f.value||!t.value){const sel=document.getElementById('cycle-select').value;
+    const cs=sel==='ALL'?knownCycles:knownCycles.filter(c=>c.startISO===sel);
+    if(cs.length){const last=cs[cs.length-1].end;f.value=cs[0].startISO;t.value=toISO(new Date(last.getFullYear(),last.getMonth(),last.getDate()-1));}}
+  const ids=['aud-spend','aud-book','aud-rn','aud-ga4','aud-ret'];
+  const a=f.value,b=t.value;
+  if(!a||!b||a>b){ids.forEach(i=>document.getElementById(i).textContent='—');note.textContent=a>b?'From is after To.':'';return;}
+  let days=0;for(let d=parseDateLoose(a),e=parseDateLoose(b);d<=e;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1))days++;
+  const inDays=dailyRows.filter(r=>r.date>=a&&r.date<=b),spend=sum(inDays,r=>r.cost);
+  const web=ga4Rows.filter(r=>{if(!isGoogleAds(r.sm))return false;const d=parseDateLoose(r.date);if(!d)return false;const k=toISO(d);return k>=a&&k<=b;});
+  const rn=sum(web,r=>rnValue(r.id)||0),ga4=sum(web,r=>r.revenue||0);
+  document.getElementById('aud-spend').textContent=inDays.length?fmt$2(spend):'—';
+  document.getElementById('aud-book').textContent=fmtN(web.length);
+  document.getElementById('aud-rn').textContent=fmt$2(rn);
+  document.getElementById('aud-ga4').textContent=fmt$2(ga4);
+  document.getElementById('aud-ret').textContent=inDays.length&&spend?fmtX(rn/spend):'—';
+  note.textContent=!dailyRows.length?'No daily spend saved yet. Run your Google Ads zips through Fix boundary days in the import window.'
+    :inDays.length<days?'Daily spend is saved for '+inDays.length+' of the '+days+' days picked.':'';
 }
 
 // One cycle's booked revenue without bookings from searches for the resort's name, over the full spend.
