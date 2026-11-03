@@ -337,7 +337,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 22</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 23</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -1096,7 +1096,7 @@ function renderKeywords(starts,s,label){
   const searchCamps=new Set(web.filter(r=>hasKw(r.keyword)).map(r=>normName(r.campaign)));
   const campSpend=sum(spendRows.filter(r=>inSet(r.cycleStart)&&searchCamps.has(normName(r.campaign))),r=>r.cost);
   if(anySpend&&campSpend&&Math.round(campSpend)!==Math.round(kwSpend)){
-    foot.textContent="Keyword spend from Google Ads' keyword file: "+fmt$(kwSpend)+' of '+fmt$(campSpend)+' search campaign spend.';foot.style.display='block';
+    foot.textContent='Google Ads reports keyword spend ('+fmt$(kwSpend)+') and campaign spend ('+fmt$(campSpend)+') separately; the two don’t match exactly.';foot.style.display='block';
   }
 }
 
