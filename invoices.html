@@ -987,7 +987,8 @@ function render(){
   document.getElementById('sc-items').textContent=empty?'—':Object.keys(historyByKey).length;
 
   const newest=dated[0];
-  const lastImport=invoices.map(v=>v.importedOn).filter(Boolean).pop();
+  // Newest import time (saved as text like "Nov 3, 2026 10:38 AM"), compared as real dates.
+  const lastImport=invoices.map(v=>v.importedOn).filter(Boolean).reduce((best,t)=>{const a=Date.parse(t),b=best==null?NaN:Date.parse(best);return best==null||(!isNaN(a)&&(isNaN(b)||a>b))?t:best;},null);
   document.getElementById('status-line').textContent=empty?'':
     'Latest invoice '+(newest?fmtDay(newest.date)+' · #'+newest.number:'—')+(lastImport?' · last import '+lastImport:'');
 

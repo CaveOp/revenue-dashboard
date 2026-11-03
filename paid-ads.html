@@ -98,6 +98,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .foot-table th{font-weight:600;color:var(--text3);}
 .foot-table td{color:var(--text2);}
 .foot-table td:first-child{color:var(--text3);}
+.foot-down{display:none;}
 .chart-wrap{position:relative;}
 .chart-print{display:none;}
 .audit-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;}
@@ -256,7 +257,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   .table-scroll > .data-table{min-width:600px;}
   .data-table td:first-child{min-width:130px;}
   .brand-box .u-value{font-size:20px;}
-  .audit-units{grid-template-columns:1fr 1fr;gap:10px;}
+  .audit-units{grid-template-columns:1fr;gap:8px;}
+  .audit-units .unit{flex-direction:row;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;}
+  .audit-units .u-value{font-size:20px;white-space:nowrap;}
+  .foot-across{display:none;}
+  .foot-down{display:table;}
+  .foot-down th{white-space:normal;vertical-align:bottom;}
   .audit-row{gap:10px 16px;}
   .unit{padding:14px 16px;}
   .filter-sep{display:none;}
@@ -404,7 +410,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 44">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 45">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -1364,8 +1370,12 @@ function charts(per,allRet){
   cycleChart=new Chart(document.getElementById('chart-ret'),{type:'bar',plugins:[barLabels,avgLine],data:{labels,datasets:[{data:per.map(p=>p.t.spendTotal?+(p.t.rn/p.t.spendTotal).toFixed(2):null),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:retOpts});
   campChart=new Chart(document.getElementById('chart-book'),{type:'bar',plugins:[barLabels],data:{labels,datasets:[{data:per.map(p=>p.t.web.length),backgroundColor:colors,borderRadius:4,maxBarThickness:56}]},options:base(v=>String(v))});
   // Small table under each chart: one column per bar, same labels as the chart.
-  const footTable=rows=>'<div class="table-scroll"><table class="foot-table"><thead><tr><th></th>'+labels.map(l=>'<th>'+esc(l)+'</th>').join('')+'</tr></thead><tbody>'+
-    rows.map(([name,vals])=>'<tr><td>'+name+'</td>'+vals.map(v=>'<td>'+v+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+  // Two versions: across (one column per bar) for wide screens, and down (one row per bar) for phones,
+  // so every cycle stays visible on a narrow screen. CSS shows one of them.
+  const footTable=rows=>'<div class="table-scroll foot-across"><table class="foot-table"><thead><tr><th></th>'+labels.map(l=>'<th>'+esc(l)+'</th>').join('')+'</tr></thead><tbody>'+
+    rows.map(([name,vals])=>'<tr><td>'+name+'</td>'+vals.map(v=>'<td>'+v+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>'+
+    '<table class="foot-table foot-down"><thead><tr><th></th>'+rows.map(([name])=>'<th>'+name+'</th>').join('')+'</tr></thead><tbody>'+
+    labels.map((l,i)=>'<tr><td>'+esc(l)+'</td>'+rows.map(([,vals])=>'<td>'+vals[i]+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
   document.getElementById('ret-foot').innerHTML=footTable([
     ['Spend',per.map(p=>p.t.spend.length?fmt$(p.t.spendTotal):'not loaded')],
     ['Booked revenue',per.map(p=>fmt$(p.t.rn))]]);
