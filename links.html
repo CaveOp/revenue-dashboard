@@ -115,11 +115,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <label class="choice"><input type="radio" name="kind" value="fb-boost"><div><b>Facebook boost</b><span>Boosting a post on Facebook</span></div></label>
           <label class="choice"><input type="radio" name="kind" value="fb-post"><div><b>Facebook post</b><span>A regular post with a link, not boosted</span></div></label>
           <label class="choice"><input type="radio" name="kind" value="ig-story"><div><b>Instagram Story</b><span>A link sticker in a Story</span></div></label>
+          <label class="choice"><input type="radio" name="kind" value="email"><div><b>Email</b><span>A link in a Mailchimp email</span></div></label>
         </div>
 
         <div class="step">2 · Give it a short name</div>
         <input class="name-input" id="name" type="text" placeholder="for example: fall cabins" autocomplete="off">
         <div class="hint">A few words about the post. Use a new name for each post.</div>
+
+        <div class="step">3 · Page the link opens (optional)</div>
+        <input class="name-input" id="page" type="url" placeholder="https://cavesprings.com" autocomplete="off">
+        <div class="hint">Leave empty for the home page. Paste another address, such as the booking page, to link there instead.</div>
 
         <div class="result">
           <div id="result-text" class="result-empty">Type a name above and the link appears here.</div>
@@ -150,7 +155,8 @@ const KINDS={
   'ig-boost':{source:'instagram',medium:'paid_social',prefix:'boost'},
   'fb-boost':{source:'facebook',medium:'paid_social',prefix:'boost'},
   'fb-post': {source:'facebook',medium:'social',prefix:'post'},
-  'ig-story':{source:'instagram',medium:'social',prefix:'story'}
+  'ig-story':{source:'instagram',medium:'social',prefix:'story'},
+  'email':   {source:'mailchimp',medium:'email',prefix:''}   // no prefix: names match the flash-sale email, e.g. 2026-11-flash-sale
 };
 
 /* ---------- Sign-in: same Google account and token as the other pages ----------
@@ -202,7 +208,10 @@ function build(){
   document.getElementById('copied').textContent='';
   if(!name){out.className='result-empty';out.textContent='Type a name above and the link appears here.';btn.disabled=true;return;}
   const k=KINDS[currentKind()];
-  const link=SITE+'?utm_source='+k.source+'&utm_medium='+k.medium+'&utm_campaign='+k.prefix+'-'+name;
+  // Optional page: any web address; existing tracking tags on it are dropped so ours are the only ones.
+  let base=SITE;const typed=document.getElementById('page').value.trim();
+  if(typed){try{const u=new URL(/^https?:\/\//i.test(typed)?typed:'https://'+typed);[...u.searchParams.keys()].filter(p=>/^utm_/i.test(p)).forEach(p=>u.searchParams.delete(p));base=u.toString();}catch(e){base=SITE;}}
+  const link=base+(base.includes('?')?'&':'?')+'utm_source='+k.source+'&utm_medium='+k.medium+'&utm_campaign='+(k.prefix?k.prefix+'-':'')+name;
   out.className='result-link';out.textContent=link;btn.disabled=false;
 }
 async function copyLink(){
@@ -211,6 +220,7 @@ async function copyLink(){
   catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('result-text'));const s=getSelection();s.removeAllRanges();s.addRange(r);note.textContent='Selected. Press Ctrl+C (or tap Copy) to copy.';}
 }
 document.getElementById('name').addEventListener('input',build);
+document.getElementById('page').addEventListener('input',build);
 document.querySelectorAll('input[name="kind"]').forEach(i=>i.addEventListener('change',build));
 </script>
 </body>
