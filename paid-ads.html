@@ -100,6 +100,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .foot-table td:first-child{color:var(--text3);}
 .chart-wrap{position:relative;}
 .chart-print{display:none;}
+.partial-tag{align-self:center;font-size:15px;font-weight:700;color:#7a4f10;background:var(--amber-bg);border:1px solid rgba(184,124,42,0.45);border-radius:20px;padding:4px 14px;}
 .legend{display:flex;gap:18px;font-size:14px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;}
 .legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c);}
 .data-table{width:100%;border-collapse:collapse;font-size:15px;}
@@ -358,7 +359,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 31">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 32">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -385,7 +386,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
     </div>
     <div id="report-area">
 
-      <div class="sec"><h2>What the ads did</h2><span id="hero-sub"></span></div>
+      <div class="sec"><h2>What the ads did</h2><span id="hero-sub"></span><span class="partial-tag" id="hero-through" style="display:none;"></span></div>
       <div class="hero">
         <div class="scorecard spend"><div class="scorecard-label">Spend</div><div class="scorecard-value num" id="h-spend">—</div><div class="scorecard-meta" id="h-spend-m"></div><div class="scorecard-delta" id="h-spend-d"></div></div>
         <div class="scorecard book"><div class="scorecard-label">Bookings from ads</div><div class="scorecard-value num" id="h-book">—</div><div class="scorecard-meta" id="h-book-m"></div><div class="scorecard-delta" id="h-book-d"></div></div>
@@ -994,8 +995,9 @@ function render(){
   let through='';
   if(!all&&cyc){const th=spendRows.filter(r=>r.cycleStart===cyc.startISO&&r.through).map(r=>String(r.through)).sort().pop();
     const lastDay=toISO(new Date(cyc.end.getFullYear(),cyc.end.getMonth(),cyc.end.getDate()-1));
-    if(th&&th<lastDay)through=' · Google Ads data through '+fmtDay(th);}
-  document.getElementById('hero-sub').textContent=label+through;
+    if(th&&th<lastDay)through='Google Ads data through '+fmtDay(th);}
+  document.getElementById('hero-sub').textContent=label;
+  const tag=document.getElementById('hero-through');tag.textContent=through;tag.style.display=through?'':'none';
   document.getElementById('h-spend').textContent=hasSpend?fmt$(s.spendTotal):'—';
   document.getElementById('h-spend-m').textContent=hasSpend?s.order.filter(k=>s.by[k].spend>0).length+' campaigns in the Google Ads account':'no Google Ads file for this cycle';
   document.getElementById('h-book').textContent=fmtN(s.web.length);
