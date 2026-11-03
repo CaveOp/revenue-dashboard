@@ -137,9 +137,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .kv td:last-child{text-align:right;font-weight:700;white-space:nowrap;}
 .kv tr.group td{padding-top:18px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);text-align:left;}
 .kv .dim{font-weight:400;color:var(--text3);}
-.units.four{grid-template-columns:repeat(4,1fr);}
-.unit .u-line{font-size:13px;color:var(--text3);}
-@media(max-width:1100px){.units,.units.four{grid-template-columns:1fr;}}
+.unit .u-line{font-size:15px;color:var(--text2);}
+.brand-box{margin-bottom:20px;padding:18px 24px;}
+@media(max-width:1100px){.units{grid-template-columns:1fr;}}
 
 .sec{margin:28px 0 12px;display:flex;align-items:baseline;gap:12px;}
 .sec:first-child{margin-top:0;}
@@ -312,7 +312,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 18</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 19</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -351,7 +351,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <div class="unit"><span class="u-label">Cost per booking</span><span><span class="u-value num" id="u-cpb">—</span><span class="u-sub" id="u-cpb-s"></span></span></div>
         <div class="unit"><span class="u-label">Average booking value</span><span><span class="u-value num" id="u-abv">—</span><span class="u-sub" id="u-abv-s"></span></span></div>
         <div class="unit"><span class="u-label">Share of web bookings from ads</span><span><span class="u-value num" id="u-share">—</span><span class="u-sub" id="u-share-s"></span></span></div>
-        <div class="unit" id="u-brand-box" style="display:none;"><span class="u-label">Searches for “cave springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-rn"></span><span class="u-line" id="u-brand-c"></span></div>
       </div>
 
       <div class="sec"><h2>Cycle to cycle</h2><span id="trend-note">every cycle saved</span></div>
@@ -382,6 +381,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <tbody id="camp-tbody"></tbody><tfoot id="camp-tfoot"></tfoot>
         </table></div>
       </div>
+      <div class="unit brand-box" id="u-brand-box" style="display:none;"><span class="u-label">Bookings from people who searched “Cave Springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-c"></span></div>
 
       <div class="sec"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
       <div class="panel">
@@ -1021,17 +1021,15 @@ function perNoBrand(iso,t){
    import carried the keyword column are counted, so older imports don't land in "No keyword recorded". */
 function renderKeywords(starts,s,label){
   const tbody=document.getElementById('kw-tbody'),tfoot=document.getElementById('kw-tfoot'),foot=document.getElementById('kw-foot');
-  // Searches for the resort's name: a tile beside the unit figures, only for cycles whose GA4 import carried the search-text tab.
+  // Searches for the resort's name: a box under the campaign table, only for cycles whose GA4 import carried the search-text tab.
   const box=document.getElementById('u-brand-box');
   const withQ=starts.filter(iso=>ga4Rows.some(r=>r.cycleStart===iso&&r.query));
   box.style.display=withQ.length?'flex':'none';
-  box.parentNode.classList.toggle('four',withQ.length>0);
   if(withQ.length){
     const hits=s.web.filter(r=>withQ.includes(r.cycleStart)&&isBrand(r.query));
     const byC={};hits.forEach(r=>{const c=r.campaign||'(not set)';byC[c]=(byC[c]||0)+1;});
-    document.getElementById('u-brand').textContent=hits.length+' booking'+(hits.length===1?'':'s');
-    document.getElementById('u-brand-rn').textContent=fmt$(sum(hits,r=>r.rn))+' booked revenue'+(withQ.length<starts.length?' · '+withQ.length+' of '+starts.length+' cycles':'');
-    document.getElementById('u-brand-c').textContent=Object.keys(byC).sort().map(c=>c+' '+byC[c]).join(' · ');
+    document.getElementById('u-brand').textContent=hits.length+' booking'+(hits.length===1?'':'s')+' · '+fmt$(sum(hits,r=>r.rn))+' booked revenue';
+    document.getElementById('u-brand-c').textContent=Object.keys(byC).sort().map(c=>c+' '+byC[c]).join(' · ')+(withQ.length<starts.length?' · '+withQ.length+' of '+starts.length+' cycles':'');
   }
   const withKw=starts.filter(iso=>ga4Rows.some(r=>r.cycleStart===iso&&r.keyword));
   document.getElementById('kw-sub').textContent='search campaigns · '+label+(withKw.length&&withKw.length<starts.length?' · '+withKw.length+' of '+starts.length+' cycles':'');
