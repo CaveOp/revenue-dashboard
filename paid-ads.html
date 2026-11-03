@@ -357,7 +357,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 27">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 28">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -479,7 +479,7 @@ const SPEND_TAB = 'AD_SPEND_CLEAN';
 const GA4_TAB   = 'GA4_TXN_CLEAN';
 const KW_TAB    = 'AD_KEYWORDS_CLEAN';
 const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
-const SPEND_HEADER=['Cycle','CycleStart','Campaign','Cost','Impressions','Clicks','Conversions','ConvValue','PhoneCalls','ImportedOn'];
+const SPEND_HEADER=['Cycle','CycleStart','Campaign','Cost','Impressions','Clicks','Conversions','ConvValue','PhoneCalls','ImportedOn','DataThrough'];
 const GA4_HEADER=['TransactionId','Date','Cycle','CycleStart','SourceMedium','Campaign','FirstUserSourceMedium','FirstUserCampaign','Revenue','ImportedOn','Keyword','SearchQuery'];
 const BRAND_SEARCH='cave springs';   // searches containing this count as searches for the resort's name
 const KW_HEADER=['Cycle','CycleStart','Keyword','Cost','Clicks','ImportedOn'];
@@ -597,9 +597,9 @@ function cycleFromStart(start){
 function cycleFor(d){if(!d)return null;const s=d.getDate()>=CYCLE_DAY?new Date(d.getFullYear(),d.getMonth(),CYCLE_DAY):new Date(d.getFullYear(),d.getMonth()-1,CYCLE_DAY);return cycleFromStart(s);}
 function cycleByStartISO(iso){const d=parseDateLoose(iso);return d?cycleFromStart(d):null;}
 function cycleOptions(){
-  // every completed cycle from May 2026 (reporting start); the cycle still running is left out
+  // every cycle from May 2026 (reporting start), including the one still running, so a part-cycle file can be saved
   const out=[];let s=new Date(CYCLE_FIRST);const today=startOfDay(new Date());
-  while(true){const c=cycleFromStart(s);if(c.end>today)break;out.push(c);s=new Date(s.getFullYear(),s.getMonth()+1,CYCLE_DAY);}
+  while(true){const c=cycleFromStart(s);if(c.start>today)break;out.push(c);s=new Date(s.getFullYear(),s.getMonth()+1,CYCLE_DAY);}
   if(!out.length)out.push(cycleFor(today));
   return out.reverse();
 }
@@ -662,15 +662,19 @@ function findHeader(rows,must){
   for(let i=0;i<Math.min(rows.length,25);i++){if(must.every(names=>findIdx(rows[i],names)!==-1))return i;}
   return -1;
 }
-function dateRangeIn(rows){
-  // "May 15, 2026 - Jun 14, 2026" somewhere in the first lines → suggests the cycle
+// Last date in a file name like "Campaigns(2026.10.15-2026.10.26).csv"
+function dateEndFromName(name){const m=String(name||'').match(/\d{4}[.\-]\d{2}[.\-]\d{2}/g);return m&&m.length>1?dateFromName(m[m.length-1]):null;}
+function dateRangeIn(rows){const r=dateRangeBoth(rows);return r?r[0]:null;}
+function dateRangeEndIn(rows){const r=dateRangeBoth(rows);return r?r[1]:null;}
+function dateRangeBoth(rows){
+  // "May 15, 2026 - Jun 14, 2026" somewhere in the first lines → [start, end]; start suggests the cycle
   for(let i=0;i<Math.min(rows.length,8);i++){const line=rows[i].join(' ');
     const m=line.match(/([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})\s*[-–—to]+\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})/);
-    if(m){const a=parseDateLoose(m[1]);if(a)return a;}
+    if(m){const a=parseDateLoose(m[1]);if(a)return [a,parseDateLoose(m[2])];}
     const m2=line.match(/(\d{8})\s*[-–—]\s*(\d{8})/);
-    if(m2){const a=parseDateLoose(m2[1]);if(a)return a;}
+    if(m2){const a=parseDateLoose(m2[1]);if(a)return [a,parseDateLoose(m2[2])];}
     const m3=line.match(/(\d{4}\.\d{2}\.\d{2})\s*[-–—]\s*(\d{4}\.\d{2}\.\d{2})/);
-    if(m3){const a=dateFromName(m3[1]);if(a)return a;}
+    if(m3){const a=dateFromName(m3[1]);if(a)return [a,dateFromName(m3[2])];}
   }
   return null;
 }
@@ -697,7 +701,7 @@ function parseAdsReport(rows,fname){
   });
   // the same campaign can appear on several rows (e.g. one per status); add them up
   const by={};out.forEach(o=>{const k=o.campaign;if(!by[k])by[k]=Object.assign({},o);else{['cost','impressions','clicks','conversions','convValue','calls'].forEach(f=>{if(o[f]!=='')by[k][f]=(by[k][f]===''?0:by[k][f])+o[f];});}});
-  return {rows:Object.values(by),columns:Object.keys(ix).filter(k=>ix[k]>=0),skipped,rangeStart:dateRangeIn(rows)||dateFromName(fname)};
+  return {rows:Object.values(by),columns:Object.keys(ix).filter(k=>ix[k]>=0),skipped,rangeStart:dateRangeIn(rows)||dateFromName(fname),rangeEnd:dateRangeEndIn(rows)||dateEndFromName(fname)};
 }
 
 const KW_ALIASES={keyword:['Search Keyword','Search keyword','Keyword']};
@@ -840,9 +844,9 @@ async function confirmImport(){
     }
     if(ads){
       const keep=replace?spendRows.filter(r=>r.cycleStart!==cycle.startISO):spendRows.slice();
-      const add=ads.rows.map(r=>({cycle:cycle.label,cycleStart:cycle.startISO,campaign:r.campaign,cost:r.cost,impressions:r.impressions,clicks:r.clicks,conversions:r.conversions,convValue:r.convValue,calls:r.calls,imported:stamp}));
+      const add=ads.rows.map(r=>({cycle:cycle.label,cycleStart:cycle.startISO,campaign:r.campaign,cost:r.cost,impressions:r.impressions,clicks:r.clicks,conversions:r.conversions,convValue:r.convValue,calls:r.calls,imported:stamp,through:ads.rangeEnd?toISO(ads.rangeEnd):''}));
       const rows=keep.concat(add);nSpend=add.length;
-      await writeTab(SPEND_TAB,[SPEND_HEADER].concat(rows.map(r=>[r.cycle,r.cycleStart,r.campaign,r.cost,r.impressions,r.clicks,r.conversions,r.convValue,r.calls,r.imported])));
+      await writeTab(SPEND_TAB,[SPEND_HEADER].concat(rows.map(r=>[r.cycle,r.cycleStart,r.campaign,r.cost,r.impressions,r.clicks,r.conversions,r.convValue,r.calls,r.imported,r.through||''])));
       spendRows=rows;
     }
     if(ga4.length){
@@ -893,7 +897,7 @@ async function loadAll(){
       if(!/resort fee/i.test((r['Bucket']||'')+' '+(r['Item']||'')))return;
       feeByRes[res]=(feeByRes[res]||0)+pMoney(r['Total']);feeLoaded=true;
     });
-    spendRows=toRows(spendRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],campaign:r['Campaign'],cost:pMoney(r['Cost']),impressions:r['Impressions']===''?'':pInt(r['Impressions']),clicks:r['Clicks']===''?'':pInt(r['Clicks']),conversions:r['Conversions']===''?'':pMoney(r['Conversions']),convValue:r['ConvValue']===''?'':pMoney(r['ConvValue']),calls:r['PhoneCalls']===''?'':pInt(r['PhoneCalls']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.campaign);
+    spendRows=toRows(spendRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],campaign:r['Campaign'],cost:pMoney(r['Cost']),impressions:r['Impressions']===''?'':pInt(r['Impressions']),clicks:r['Clicks']===''?'':pInt(r['Clicks']),conversions:r['Conversions']===''?'':pMoney(r['Conversions']),convValue:r['ConvValue']===''?'':pMoney(r['ConvValue']),calls:r['PhoneCalls']===''?'':pInt(r['PhoneCalls']),imported:r['ImportedOn'],through:r['DataThrough']||''})).filter(r=>r.cycleStart&&r.campaign);
     ga4Rows=toRows(ga4Raw).map(r=>({id:String(parseInt(r['TransactionId'],10)),date:r['Date'],cycle:r['Cycle'],cycleStart:r['CycleStart'],sm:r['SourceMedium'],campaign:r['Campaign'],fusm:r['FirstUserSourceMedium'],fcamp:r['FirstUserCampaign'],revenue:r['Revenue']===''?null:pMoney(r['Revenue']),imported:r['ImportedOn'],keyword:r['Keyword']||'',query:r['SearchQuery']||''})).filter(r=>r.id&&r.id!=='NaN'&&r.cycleStart);
     kwRows=toRows(kwRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],keyword:r['Keyword'],cost:pMoney(r['Cost']),clicks:pInt(r['Clicks']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.keyword);
     showDash();buildCycles();render();
@@ -981,7 +985,12 @@ function render(){
 
   // hero
   const ret=s.spendTotal?s.rn/s.spendTotal:null;
-  document.getElementById('hero-sub').textContent=label;
+  // A Google Ads file that stops before the cycle's last day: say how far it goes.
+  let through='';
+  if(!all&&cyc){const th=spendRows.filter(r=>r.cycleStart===cyc.startISO&&r.through).map(r=>String(r.through)).sort().pop();
+    const lastDay=toISO(new Date(cyc.end.getFullYear(),cyc.end.getMonth(),cyc.end.getDate()-1));
+    if(th&&th<lastDay)through=' · Google Ads data through '+fmtDay(th);}
+  document.getElementById('hero-sub').textContent=label+through;
   document.getElementById('h-spend').textContent=hasSpend?fmt$(s.spendTotal):'—';
   document.getElementById('h-spend-m').textContent=hasSpend?s.order.filter(k=>s.by[k].spend>0).length+' campaigns in the Google Ads account':'no Google Ads file for this cycle';
   document.getElementById('h-book').textContent=fmtN(s.web.length);
