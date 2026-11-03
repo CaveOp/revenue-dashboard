@@ -254,8 +254,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   .panel-foot{padding:10px 16px 14px;}
   .data-table{font-size:14px;}
   .data-table th,.data-table td,.camp-table th,.camp-table td{padding:10px;}
-  .table-scroll > .data-table{min-width:600px;}
-  .data-table td:first-child{min-width:130px;}
   .brand-box .u-value{font-size:20px;}
   .audit-units{grid-template-columns:1fr;gap:8px;}
   .audit-units .unit{flex-direction:row;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;}
@@ -267,7 +265,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   .unit{padding:14px 16px;}
   .filter-sep{display:none;}
   /* soft fade on the right edge while there is more to swipe to (class set by updateSwipeHints) */
-  .table-scroll.more{-webkit-mask-image:linear-gradient(to right,#000 82%,transparent);mask-image:linear-gradient(to right,#000 82%,transparent);}
+  /* Tables: each row becomes a block with one "label  value" line per column (labels come from the
+     table's header, set by labelTableCells). No sideways scrolling needed. */
+  .data-table thead{display:none;}
+  .data-table,.data-table tbody,.data-table tfoot{display:block;width:100%;}
+  .data-table tr{display:block;padding:12px 16px;border-bottom:1px solid var(--border);}
+  .data-table tbody tr:last-child{border-bottom:none;}
+  .data-table tfoot tr{border-top:2px solid var(--border);border-bottom:none;}
+  .data-table td,.data-table td.det,.camp-table td{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:3px 0;border:0;text-align:right;white-space:normal;width:auto;}
+  .data-table td::before{content:attr(data-label);color:var(--text3);font-size:13px;font-weight:500;text-align:left;flex-shrink:0;}
+  .data-table td:first-child{display:block;text-align:left;font-size:15px;padding-bottom:6px;}
+  .data-table td:first-child::before{display:none;}
+  .data-table td[data-label=""]::before{display:none;}
+  .data-table td.empty-state{display:block;text-align:center;}
+  .data-table td.empty-state::before{display:none;}
+  .data-table tfoot td{font-weight:700;border:0;}
+  .camp-table td:first-child{width:auto;}
+  .data-table td{overflow-wrap:anywhere;}
+  .data-table td::before{overflow-wrap:normal;}
+  .data-table tr:hover td{background:none;}
 }
 @page{size:letter landscape;margin:0.4in;}
 @media print{
@@ -410,7 +426,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 45">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 46">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -1344,8 +1360,12 @@ function renderKeywords(starts,s,label){
 // Folding a card hides its rows; the header row and total row stay visible. Printing always shows every row (CSS).
 function toggleFold(id){document.getElementById(id).classList.toggle('collapsed');}
 
+// Phones: give every table cell its column name (data-label) so CSS can show rows as stacked blocks.
+function labelTableCells(){document.querySelectorAll('table.data-table').forEach(t=>{const hr=t.tHead&&t.tHead.rows[t.tHead.rows.length-1];if(!hr)return;
+  const names=[];[...hr.cells].forEach(c=>{const n=c.textContent.trim();for(let k=0;k<(c.colSpan||1);k++)names.push(n);});
+  [...t.querySelectorAll('tbody tr,tfoot tr')].forEach(tr=>{let col=0;[...tr.cells].forEach(td=>{if(!td.hasAttribute('data-label'))td.setAttribute('data-label',td.colSpan>1?'':(names[col]||''));col+=td.colSpan||1;});});});}
 // Phones: mark tables that can still be swiped right, so CSS fades their right edge.
-function updateSwipeHints(){document.querySelectorAll('.table-scroll').forEach(e=>e.classList.toggle('more',e.scrollLeft+e.clientWidth<e.scrollWidth-2));}
+function updateSwipeHints(){labelTableCells();document.querySelectorAll('.table-scroll').forEach(e=>e.classList.toggle('more',e.scrollLeft+e.clientWidth<e.scrollWidth-2));}
 document.addEventListener('scroll',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('table-scroll'))updateSwipeHints();},true);
 window.addEventListener('resize',updateSwipeHints);
 new MutationObserver(()=>requestAnimationFrame(updateSwipeHints)).observe(document.documentElement,{childList:true,subtree:true});
