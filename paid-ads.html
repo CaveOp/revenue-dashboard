@@ -99,6 +99,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .foot-table td{color:var(--text2);}
 .foot-table td:first-child{color:var(--text3);}
 .chart-wrap{position:relative;}
+.chart-print{display:none;}
 .legend{display:flex;gap:18px;font-size:14px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;}
 .legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c);}
 .data-table{width:100%;border-collapse:collapse;font-size:15px;}
@@ -250,6 +251,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   .fold.collapsed tbody{display:table-row-group !important;}
   .fold-head .panel-title::before{display:none;}
   .fold.collapsed > .panel-body{display:block !important;}
+  /* charts print as a scaled picture so all bars fit; small tables under them shrink to fit */
+  .chart-wrap{height:auto !important;}
+  .chart-wrap canvas{display:none !important;}
+  .chart-print{display:block !important;width:100%;height:auto;}
+  .foot-table{font-size:11px;}
+  .foot-table th,.foot-table td{padding-left:6px;}
+  .foot-table th{white-space:normal;}
+  .panel-foot{break-before:avoid;}
 }
 </style>
 </head>
@@ -348,7 +357,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 26">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 27">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -393,12 +402,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       <div class="grid-2" id="charts-row">
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-header"><span class="panel-title">Booked revenue per $1 spent</span></div>
-          <div class="panel-body"><div class="chart-wrap" style="height:220px"><canvas id="chart-ret"></canvas></div></div>
+          <div class="panel-body"><div class="chart-wrap" style="height:220px"><canvas id="chart-ret"></canvas><img class="chart-print" alt=""></div></div>
           <div class="panel-foot" id="ret-foot"></div>
         </div>
         <div class="panel" style="margin-bottom:0;">
           <div class="panel-header"><span class="panel-title">Bookings from ads</span><span class="panel-sub">web bookings GA4 traced to a Google ad</span></div>
-          <div class="panel-body"><div class="chart-wrap" style="height:220px"><canvas id="chart-book"></canvas></div></div>
+          <div class="panel-body"><div class="chart-wrap" style="height:220px"><canvas id="chart-book"></canvas><img class="chart-print" alt=""></div></div>
           <div class="panel-foot" id="book-foot"></div>
         </div>
       </div>
@@ -929,10 +938,11 @@ function stats(starts){
   const spendTotal=sum(spend,r=>r.cost),ga4=sum(web,r=>r.revenue),rn=sum(web,r=>r.rn),um=web.filter(r=>r.rn==null).length;
   const calls=sum(spend,r=>r.calls===''?0:r.calls),hasCalls=spend.some(r=>r.calls!=='');
   // coverage from stays, by reserved-on date
-  const cov={web:0,webRn:0,rec:0,recRn:0,phone:0,phoneRn:0};const ga4Ids=new Set(allGa4.map(r=>r.id));
+  const cov={web:0,webRn:0,rec:0,recRn:0,phone:0,phoneRn:0,ota:0,otaRn:0};const ga4Ids=new Set(allGa4.map(r=>r.id));
   Object.keys(staysByRes).forEach(res=>{const s=staysByRes[res];if(!s.reservedOn)return;const c=cycleFor(s.reservedOn);if(!inSet(c.startISO))return;const v=rnValue(res);
     if(s.channel==='Direct'){cov.web++;cov.webRn+=v;if(ga4Ids.has(res)){cov.rec++;cov.recRn+=v;}}
-    else if(s.channel==='Phone/Manual'){cov.phone++;cov.phoneRn+=v;}});
+    else if(s.channel==='Phone/Manual'){cov.phone++;cov.phoneRn+=v;}
+    else if(s.channel==='OTA'){cov.ota++;cov.otaRn+=v;}});
   cov.ga4only=allGa4.filter(r=>!staysByRes[r.id]).length;
   cov.ref=allGa4.filter(r=>/cavesprings\.com\s*\/\s*referral/i.test(r.sm)).length;
   return {spend,web,phAttr,meta,by,order,spendTotal,ga4,rn,um,calls,hasCalls,cov,metaGa4:sum(meta,r=>r.revenue),metaRn:sum(meta,r=>r.rn),allGa4};
@@ -1014,7 +1024,7 @@ function render(){
   // coverage + meta
   const cv=s.cov;
   document.getElementById('cov-sum').textContent=(cv.web?'GA4 saw '+(cv.rec/cv.web*100).toFixed(0)+'% of website bookings · ':'')+label;
-  document.getElementById('cov-note').textContent='The ad numbers above only count bookings GA4 saw. The '+fmtN(cv.web-cv.rec)+' bookings GA4 missed can’t be linked to any source, so the real ad totals are the same or higher.';
+  document.getElementById('cov-note').textContent='GA4 only sees bookings made on the website’s booking engine. Phone, manual and OTA bookings never pass through the website, so GA4 can’t link them to an ad. The ad numbers above only count bookings GA4 saw. The '+fmtN(cv.web-cv.rec)+' bookings GA4 missed can’t be linked to any source, so the real ad totals are the same or higher.';
   const kv=rows2=>rows2.map(r=>r.length===1?'<tr class="group"><td colspan="2">'+r[0]+'</td></tr>':'<tr><td>'+r[0]+'</td><td class="num">'+r[1]+'</td></tr>').join('');
   document.getElementById('cov-tbody').innerHTML=kv([
     ['Website bookings (by date booked)'],
@@ -1030,6 +1040,8 @@ function render(){
   document.getElementById('meta-tbody').innerHTML=kv([
     ['Phone'],
     ['Phone or manual bookings in ResNexus',fmtN(cv.phone)+' <span class="dim">· '+fmt$(cv.phoneRn)+'</span>'],
+    ['OTA'],
+    ['OTA bookings in ResNexus',fmtN(cv.ota)+' <span class="dim">· '+fmt$(cv.otaRn)+'</span>'],
     ['Meta'],
     ['Meta spend','<span class="dim">not imported</span>']
   ].concat(Object.keys(metaBy).length?Object.keys(metaBy).map(k=>['Paid Meta bookings, '+esc(k),metaBy[k].n+' <span class="dim">· GA4 '+fmt$(metaBy[k].ga4)+' · booked '+fmt$(metaBy[k].rn)+'</span>']):[['Paid Meta bookings in GA4','0']]));
@@ -1143,7 +1155,12 @@ function charts(per,allRet){
   document.getElementById('book-foot').innerHTML=footTable([
     ['Cost per booking',per.map(p=>p.t.web.length&&p.t.spendTotal?fmt$(p.t.spendTotal/p.t.web.length):'—')],
     ['Average booking value',per.map(p=>p.t.web.length?fmt$(p.t.rn/p.t.web.length):'—')]]);
+  chartPictures();
 }
+// Printing: the charts are drawn at screen width and would be cut off on the narrower page,
+// so print shows a picture of each chart scaled to fit instead (CSS swaps canvas for picture).
+function chartPictures(){[cycleChart,campChart].forEach(c=>{if(c&&c.canvas.nextElementSibling)c.canvas.nextElementSibling.src=c.toBase64Image();});}
+window.addEventListener('beforeprint',chartPictures);
 </script>
 </body>
 </html>
