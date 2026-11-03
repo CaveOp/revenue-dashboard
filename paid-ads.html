@@ -358,7 +358,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 30">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 31">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -376,7 +376,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
     <select class="filter-select" id="cycle-select" onchange="render()"></select>
     <span class="filter-sep"></span>
     <span class="status" id="status-line"></span>
-    <span class="filter-note" id="cycle-note"></span>
   </div>
 
   <div class="content">
@@ -914,10 +913,8 @@ async function loadAll(){
     showErr('Error loading data: '+e.message);showDash();
   }
 }
-function cycleWords(){const e=new Date(2026,0,CYCLE_DAY-1).getDate();return 'Billing cycle: the '+ord(CYCLE_DAY)+' through the '+ord(e)+' of the next month';}
 function buildCycles(){
-  document.getElementById('cycle-note').textContent=cycleWords();
-  document.getElementById('im-cycle-hint').textContent=cycleWords()+'. Choosing a file sets this from the dates in the file.';
+  document.getElementById('im-cycle-hint').textContent='Choosing a file sets this from the dates in the file.';
   const by={};spendRows.concat(ga4Rows).forEach(r=>{if(r.cycleStart&&!by[r.cycleStart])by[r.cycleStart]=cycleByStartISO(r.cycleStart);});
   knownCycles=Object.values(by).filter(Boolean).sort((a,b)=>a.start-b.start);
   const sel=document.getElementById('cycle-select');const prev=sel.value;
