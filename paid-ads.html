@@ -312,7 +312,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 16</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 17</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -386,9 +386,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       </div>
       <div class="panel">
         <div class="table-scroll"><table class="data-table trend-table">
-          <thead><tr><th>Cycle</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th></tr></thead>
+          <thead><tr><th>Cycle</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right">Per $1 without “cave springs” searches</th></tr></thead>
           <tbody id="trend-tbody"></tbody><tfoot id="trend-tfoot"></tfoot>
         </table></div>
+        <div class="panel-foot">Per $1 without “cave springs” searches: booked revenue minus the bookings from searches for “cave springs”, divided by the full spend.</div>
       </div>
 
       <div class="sec"><h2>Behind the numbers</h2><span>the measurement behind the figures above</span></div>
@@ -963,9 +964,9 @@ function render(){
 
   // trend
   const per=knownCycles.map(c=>({c,t:stats([c.startISO])}));
-  document.getElementById('trend-tbody').innerHTML=per.map(({c,t})=>'<tr'+(c.startISO===sel?' style="background:var(--surface2)"':'')+'><td><b>'+esc(c.label)+'</b></td><td class="right">'+(t.spend.length?fmt$(t.spendTotal):'<span class="dim">not loaded</span>')+'</td><td class="right">'+t.web.length+'</td><td class="right">'+fmt$(t.rn)+'</td><td class="right">'+(t.spendTotal?fmtX(t.rn/t.spendTotal):'—')+'</td></tr>').join('');
+  document.getElementById('trend-tbody').innerHTML=per.map(({c,t})=>'<tr'+(c.startISO===sel?' style="background:var(--surface2)"':'')+'><td><b>'+esc(c.label)+'</b></td><td class="right">'+(t.spend.length?fmt$(t.spendTotal):'<span class="dim">not loaded</span>')+'</td><td class="right">'+t.web.length+'</td><td class="right">'+fmt$(t.rn)+'</td><td class="right">'+(t.spendTotal?fmtX(t.rn/t.spendTotal):'—')+'</td><td class="right">'+perNoBrand(c.startISO,t)+'</td></tr>').join('');
   const tot=stats(knownCycles.map(c=>c.startISO));
-  document.getElementById('trend-tfoot').innerHTML=knownCycles.length>1?'<tr><td>All cycles</td><td class="right">'+fmt$(tot.spendTotal)+'</td><td class="right">'+tot.web.length+'</td><td class="right">'+fmt$(tot.rn)+'</td><td class="right">'+(tot.spendTotal?fmtX(tot.rn/tot.spendTotal):'—')+'</td></tr>':'';
+  document.getElementById('trend-tfoot').innerHTML=knownCycles.length>1?'<tr><td>All cycles</td><td class="right">'+fmt$(tot.spendTotal)+'</td><td class="right">'+tot.web.length+'</td><td class="right">'+fmt$(tot.rn)+'</td><td class="right">'+(tot.spendTotal?fmtX(tot.rn/tot.spendTotal):'—')+'</td><td class="right">—</td></tr>':'';
 
   // GA4 vs booked
   document.getElementById('cmp-sum').textContent=signed(s.ga4-s.rn)+' GA4 vs booked';
@@ -1006,6 +1007,13 @@ function render(){
   document.getElementById("charts-row").style.display=multi?"grid":"none";
   document.getElementById("trend-note").textContent=multi?"every cycle saved":"charts appear once a second cycle is saved";
   if(multi)charts(per);
+}
+
+// One cycle's booked revenue without bookings from searches for the resort's name, over the full spend.
+function perNoBrand(iso,t){
+  if(!ga4Rows.some(r=>r.cycleStart===iso&&r.query))return '<span class="dim">no search data</span>';
+  if(!t.spendTotal)return '—';
+  return fmtX((t.rn-sum(t.web.filter(r=>isBrand(r.query)),r=>r.rn))/t.spendTotal);
 }
 
 /* Keywords: spend and clicks from the Google Ads Search keywords card, bookings from the
