@@ -312,7 +312,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 17</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 18</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -354,23 +354,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <div class="unit" id="u-brand-box" style="display:none;"><span class="u-label">Searches for “cave springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-rn"></span><span class="u-line" id="u-brand-c"></span></div>
       </div>
 
-      <div class="sec"><h2>Which campaigns earned it</h2><span id="camp-sub"></span><span class="sec-right"><span id="camp-note" style="font-size:13px;color:var(--text3);"></span></span></div>
-      <div class="panel">
-        <div class="table-scroll"><table class="data-table camp-table" id="camp-table">
-          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right det">Cost / booking</th><th class="right det">GA4 revenue</th><th class="right det">Not in ResNexus</th><th class="right det">Clicks</th><th class="right det">Google conversions</th></tr></thead>
-          <tbody id="camp-tbody"></tbody><tfoot id="camp-tfoot"></tfoot>
-        </table></div>
-      </div>
-
-      <div class="sec"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
-      <div class="panel">
-        <div class="table-scroll"><table class="data-table camp-table" id="kw-table">
-          <thead><tr><th>Keyword</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right">Cost / booking</th><th class="right">GA4 revenue</th><th class="right">Not in ResNexus</th><th class="right">Clicks</th></tr></thead>
-          <tbody id="kw-tbody"></tbody><tfoot id="kw-tfoot"></tfoot>
-        </table></div>
-        <div class="panel-foot" id="kw-foot" style="display:none;"></div>
-      </div>
-
       <div class="sec"><h2>Cycle to cycle</h2><span id="trend-note">every cycle saved</span></div>
       <div class="grid-2" id="charts-row">
         <div class="panel" style="margin-bottom:0;">
@@ -390,6 +373,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <tbody id="trend-tbody"></tbody><tfoot id="trend-tfoot"></tfoot>
         </table></div>
         <div class="panel-foot">Per $1 without “cave springs” searches: booked revenue minus the bookings from searches for “cave springs”, divided by the full spend.</div>
+      </div>
+
+      <div class="sec"><h2>Which campaigns earned it</h2><span id="camp-sub"></span><span class="sec-right"><span id="camp-note" style="font-size:13px;color:var(--text3);"></span></span></div>
+      <div class="panel">
+        <div class="table-scroll"><table class="data-table camp-table" id="camp-table">
+          <thead><tr><th>Campaign</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right det">Cost / booking</th><th class="right det">GA4 revenue</th><th class="right det">Not in ResNexus</th><th class="right det">Clicks</th><th class="right det">Google conversions</th></tr></thead>
+          <tbody id="camp-tbody"></tbody><tfoot id="camp-tfoot"></tfoot>
+        </table></div>
+      </div>
+
+      <div class="sec"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
+      <div class="panel">
+        <div class="table-scroll"><table class="data-table camp-table" id="kw-table">
+          <thead><tr><th>Keyword</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right">Cost / booking</th><th class="right">GA4 revenue</th><th class="right">Not in ResNexus</th><th class="right">Clicks</th></tr></thead>
+          <tbody id="kw-tbody"></tbody><tfoot id="kw-tfoot"></tfoot>
+        </table></div>
+        <div class="panel-foot" id="kw-foot" style="display:none;"></div>
       </div>
 
       <div class="sec"><h2>Behind the numbers</h2><span>the measurement behind the figures above</span></div>
