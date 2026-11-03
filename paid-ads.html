@@ -217,7 +217,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 
 @media(max-width:1100px){.scorecards{grid-template-columns:repeat(2,1fr);}.grid-2{grid-template-columns:1fr;}}
 @media(max-width:700px){.header,.nav-bar,.filter-bar,.content{padding-left:16px;padding-right:16px;}.scorecards{grid-template-columns:1fr;}}
-@media print{.hdr-btn,.nav-bar,.import-overlay,.import-modal,.error-banner{display:none !important;}.header{position:static;}.panel{break-inside:avoid;box-shadow:none;}.content{padding:12px 0;}body{background:#fff;}}
+@page{size:letter landscape;margin:0.4in;}
+@media print{
+  .hdr-btn,.nav-bar,.import-overlay,.import-modal,.error-banner{display:none !important;}
+  .header{position:static;}.content{padding:12px 0;}body{background:#fff;}
+  .panel{box-shadow:none;break-inside:auto;}
+  .unit,.scorecard,.brand-box,.panel-body,.panel:has(>.panel-body){box-shadow:none;break-inside:avoid;}
+  .panel-header{break-after:avoid;}
+  /* nothing cut off: tables wrap instead of scrolling, header row repeats on each page */
+  .table-scroll{overflow:visible !important;}
+  .data-table{font-size:12px;}
+  .data-table th{font-size:12px;padding:7px 8px;}
+  .data-table td{padding:6px 8px;}
+  .data-table thead{display:table-header-group;}
+  .data-table tfoot{display:table-row-group;}   /* total row once, at the end, not on every page */
+  .data-table tr{break-inside:avoid;}
+  .sec{break-after:avoid;}
+  /* page width is under 1100px when printing; keep the screen layout */
+  .hero{grid-template-columns:repeat(4,1fr) !important;}
+  .units{grid-template-columns:repeat(3,1fr) !important;}
+  .grid-2{grid-template-columns:1fr 1fr !important;}
+  .fold>summary h2::before{display:none;}
+  .fold>summary{cursor:default;}
+}
 </style>
 </head>
 <body>
@@ -315,7 +337,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 21</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 22</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -374,7 +396,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <thead><tr><th>Cycle</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right">Per $1 without “cave springs” searches</th></tr></thead>
           <tbody id="trend-tbody"></tbody><tfoot id="trend-tfoot"></tfoot>
         </table></div>
-        <div class="panel-foot">Per $1 without “cave springs” searches: booked revenue minus the bookings from searches for “cave springs”, divided by the full spend.</div>
+        <div class="panel-foot" id="trend-sum" style="display:none;"></div>
       </div>
 
       <div class="sec"><h2>Which campaigns earned it</h2><span id="camp-sub"></span><span class="sec-right"><span id="camp-note" style="font-size:13px;color:var(--text3);"></span></span></div>
@@ -970,6 +992,7 @@ function render(){
   // trend
   const per=knownCycles.map(c=>({c,t:stats([c.startISO])}));
   document.getElementById('trend-tbody').innerHTML=per.map(({c,t})=>'<tr'+(c.startISO===sel?' style="background:var(--surface2)"':'')+'><td><b>'+esc(c.label)+'</b></td><td class="right">'+(t.spend.length?fmt$(t.spendTotal):'<span class="dim">not loaded</span>')+'</td><td class="right">'+t.web.length+'</td><td class="right">'+fmt$(t.rn)+'</td><td class="right">'+(t.spendTotal?fmtX(t.rn/t.spendTotal):'—')+'</td><td class="right">'+perNoBrand(c.startISO,t)+'</td></tr>').join('');
+  trendSum(per,sel);
   const tot=stats(knownCycles.map(c=>c.startISO));
   document.getElementById('trend-tfoot').innerHTML=knownCycles.length>1?'<tr><td>All cycles</td><td class="right">'+fmt$(tot.spendTotal)+'</td><td class="right">'+tot.web.length+'</td><td class="right">'+fmt$(tot.rn)+'</td><td class="right">'+(tot.spendTotal?fmtX(tot.rn/tot.spendTotal):'—')+'</td><td class="right">—</td></tr>':'';
 
@@ -1015,10 +1038,21 @@ function render(){
 }
 
 // One cycle's booked revenue without bookings from searches for the resort's name, over the full spend.
+const hasQuery=iso=>ga4Rows.some(r=>r.cycleStart===iso&&r.query);
+const brandRn=t=>sum(t.web.filter(r=>isBrand(r.query)),r=>r.rn);
 function perNoBrand(iso,t){
-  if(!ga4Rows.some(r=>r.cycleStart===iso&&r.query))return '<span class="dim">no search data</span>';
+  if(!hasQuery(iso))return '<span class="dim">no search data</span>';
   if(!t.spendTotal)return '—';
-  return fmtX((t.rn-sum(t.web.filter(r=>isBrand(r.query)),r=>r.rn))/t.spendTotal);
+  return fmtX((t.rn-brandRn(t))/t.spendTotal);
+}
+// The sum behind that column, written out for the selected cycle (or the latest cycle with search data in "All cycles").
+function trendSum(per,sel){
+  const el=document.getElementById('trend-sum');
+  const pick=per.filter(p=>hasQuery(p.c.startISO)&&p.t.spendTotal&&(sel==='ALL'||p.c.startISO===sel)).pop();
+  if(!pick){el.style.display='none';return;}
+  const t=pick.t,b=brandRn(t);
+  el.textContent=pick.c.label+': '+fmt$(t.rn)+' booked revenue − '+fmt$(b)+' from people who searched “Cave Springs” = '+fmt$(t.rn-b)+' ÷ '+fmt$(t.spendTotal)+' spend = '+fmtX((t.rn-b)/t.spendTotal);
+  el.style.display='block';
 }
 
 /* Keywords: spend and clicks from the Google Ads Search keywords card, bookings from the
@@ -1065,6 +1099,11 @@ function renderKeywords(starts,s,label){
     foot.textContent="Keyword spend from Google Ads' keyword file: "+fmt$(kwSpend)+' of '+fmt$(campSpend)+' search campaign spend.';foot.style.display='block';
   }
 }
+
+// Printing: open every folded section so the PDF has everything, then put them back.
+let foldState=[];
+window.addEventListener('beforeprint',()=>{foldState=Array.from(document.querySelectorAll('details.fold')).map(d=>{const o=d.open;d.open=true;return [d,o];});});
+window.addEventListener('afterprint',()=>{foldState.forEach(([d,o])=>d.open=o);foldState=[];});
 
 const barLabels={id:'barLabels',afterDatasetsDraw(chart,args,opts){const {ctx}=chart;const ds=chart.data.datasets[0];const meta=chart.getDatasetMeta(0);ctx.save();ctx.font='700 14px Raleway';ctx.fillStyle='#1a2530';ctx.textAlign='center';ctx.textBaseline='bottom';meta.data.forEach((bar,i)=>{const v=ds.data[i];if(v==null)return;ctx.fillText(opts.format(v),bar.x,bar.y-6);});ctx.restore();}};
 function charts(per){
