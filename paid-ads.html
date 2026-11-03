@@ -96,7 +96,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .legend{display:flex;gap:18px;font-size:14px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;}
 .legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c);}
 .data-table{width:100%;border-collapse:collapse;font-size:15px;}
-.data-table th{text-align:left;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:bottom;}
+.data-table th{text-align:left;font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--slate);background:var(--slate-bg);padding:12px 14px;border-bottom:2px solid var(--border);vertical-align:bottom;}
 .data-table td{padding:12px 14px;border-bottom:1px solid var(--surface2);vertical-align:top;}
 .data-table tr:last-child td{border-bottom:none;}
 .data-table .right{text-align:right;}
@@ -126,16 +126,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .unit .u-sub{font-size:13px;color:var(--text3);margin-left:8px;font-weight:400;}
 .camp-table th:first-child,.camp-table td:first-child{width:24%;}
 .camp-table th,.camp-table td{padding:14px 16px;}
-.camp-table thead th{background:var(--surface2);}
 .camp-table .flag{display:inline-block;margin:0 0 0 10px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:12px;background:var(--surface2);color:var(--text3);vertical-align:1px;}
 .camp-table .flag.warn{background:var(--amber-bg);color:var(--amber);}
 .camp-table .flag.bad{background:var(--terra-bg);color:var(--terra);}
-.trend-table thead th{background:var(--surface2);}
 .sec .sec-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
 .kv{width:100%;border-collapse:collapse;font-size:15px;}
 .kv td{padding:11px 0;border-bottom:1px solid var(--surface2);}
 .kv td:last-child{text-align:right;font-weight:700;white-space:nowrap;}
-.kv tr.group td{padding-top:18px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);text-align:left;}
+.kv tr.group td{padding-top:18px;border-bottom:2px solid var(--border);font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--slate);text-align:left;}
 .kv .dim{font-weight:400;color:var(--text3);}
 .unit .u-line{font-size:15px;color:var(--text2);}
 .brand-box{margin-bottom:20px;padding:18px 24px;}
@@ -312,7 +310,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 19</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 20</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
