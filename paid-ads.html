@@ -283,12 +283,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 
   <div class="im-field">
     <label>1 · Billing cycle these files cover</label>
-    <select id="im-cycle"></select>
+    <select id="im-cycle" onchange="modeWarn()"></select>
     <div class="cheat-body note" id="im-cycle-hint"></div>
   </div>
   <div class="im-field">
     <label>2 · Google Ads export (the Overview .zip, or a campaigns report .csv)</label>
-    <input type="file" id="im-ads" accept=".csv,.zip,text/csv,application/zip,application/x-zip-compressed" onchange="suggestCycle()">
+    <input type="file" id="im-ads" accept=".csv,.zip,text/csv,application/zip,application/x-zip-compressed" onchange="suggestCycle().then(modeWarn)">
     <div class="cheat-body note">The Overview page download is a .zip holding one CSV per card; choose the zip as it is and the Campaigns and Search keywords files inside are used.</div>
   </div>
   <div class="im-field">
@@ -307,6 +307,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <span><span class="im-mode-t">Add to what is saved</span><span class="im-mode-d">Keeps everything already saved and adds these rows. Transactions already in the sheet are skipped.</span></span>
       </label>
     </div>
+    <div class="im-warn" id="im-mode-warn" style="display:none;">This cycle already has Google Ads data. Adding will count that spend twice. Use Replace this cycle.</div>
   </div>
 
   <div class="im-row">
@@ -357,7 +358,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 28">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 29">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -774,9 +775,14 @@ function openImport(){
   sel.innerHTML=cycleOptions().map(c=>`<option value="${c.startISO}">${esc(c.label)}</option>`).join('');
   document.getElementById('import-overlay').style.display='block';document.getElementById('import-modal').style.display='block';
   cancelPreview();document.getElementById('im-result').style.display='none';document.getElementById('im-status').textContent='';
+  modeWarn();
 }
 function closeImport(){document.getElementById('import-overlay').style.display='none';document.getElementById('import-modal').style.display='none';}
-function onModeChange(){document.querySelectorAll('.im-mode').forEach(l=>l.classList.toggle('sel',l.querySelector('input').checked));}
+function onModeChange(){document.querySelectorAll('.im-mode').forEach(l=>l.classList.toggle('sel',l.querySelector('input').checked));modeWarn();}
+// "Add" with a Google Ads file into a cycle that already has Google Ads rows would count that spend twice.
+function modeWarn(){const iso=document.getElementById('im-cycle').value;
+  const show=importMode()==='add'&&document.getElementById('im-ads').files.length>0&&(spendRows.some(r=>r.cycleStart===iso)||kwRows.some(r=>r.cycleStart===iso));
+  document.getElementById('im-mode-warn').style.display=show?'block':'none';}
 function cancelPreview(){pending=null;document.getElementById('im-preview-wrap').style.display='none';document.getElementById('im-analyze-btn').disabled=false;}
 function importMode(){const r=document.querySelector('input[name="im-mode"]:checked');return r?r.value:'cycle';}
 
