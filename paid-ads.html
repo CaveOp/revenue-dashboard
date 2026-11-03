@@ -141,11 +141,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 
 .sec{margin:28px 0 12px;display:flex;align-items:baseline;gap:12px;}
 .sec:first-child{margin-top:0;}
-.fold>summary{list-style:none;cursor:pointer;}
-.fold>summary::-webkit-details-marker{display:none;}
-.fold>summary h2::before{content:'\25BE';display:inline-block;width:24px;font-size:22px;color:var(--slate);}
-.fold:not([open])>summary h2::before{content:'\25B8';}
-.fold:not([open])>summary{margin-bottom:20px;}
+.fold-head{cursor:pointer;user-select:none;}
+.fold-head h2::before{content:'\25BE';display:inline-block;width:24px;font-size:22px;color:var(--slate);}
+.fold.collapsed .fold-head h2::before{content:'\25B8';}
+.fold.collapsed tbody{display:none;}
 .sec h2{font-size:20px;font-weight:700;letter-spacing:0.04em;color:var(--text);}
 .sec span{font-size:14px;color:var(--text3);}
 .hero{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
@@ -237,8 +236,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
   .hero{grid-template-columns:repeat(4,1fr) !important;}
   .units{grid-template-columns:repeat(3,1fr) !important;}
   .grid-2{grid-template-columns:1fr 1fr !important;}
-  .fold>summary h2::before{display:none;}
-  .fold>summary{cursor:default;}
+  .fold-head h2::before{display:none;}
+  .fold.collapsed tbody{display:table-row-group !important;}
 }
 </style>
 </head>
@@ -337,7 +336,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 23</div></div>
+    <div><div class="header-title">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA · build 24</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -408,16 +407,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       </div>
       <div class="unit brand-box" id="u-brand-box" style="display:none;"><span class="u-label">Bookings from people who searched “Cave Springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-c"></span></div>
 
-      <details class="fold" open>
-      <summary class="sec"><h2>Which keywords earned it</h2><span id="kw-sub"></span></summary>
+      <div class="fold" id="kw-fold">
+      <div class="sec fold-head" onclick="toggleFold('kw-fold')" title="Show or hide the keyword rows"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
       <div class="panel">
         <div class="table-scroll"><table class="data-table camp-table" id="kw-table">
           <thead><tr><th>Keyword</th><th class="right">Spend</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">Per $1</th><th class="right">Cost / booking</th><th class="right">GA4 revenue</th><th class="right">Not in ResNexus</th><th class="right">Clicks</th></tr></thead>
           <tbody id="kw-tbody"></tbody><tfoot id="kw-tfoot"></tfoot>
         </table></div>
-        <div class="panel-foot" id="kw-foot" style="display:none;"></div>
       </div>
-      </details>
+      </div>
 
       <div class="sec"><h2>Behind the numbers</h2><span>the measurement behind the figures above</span></div>
 
@@ -1059,7 +1057,7 @@ function trendSum(per,sel){
    GA4 Session Google Ads keyword text of each Google Ads booking. Only cycles whose GA4
    import carried the keyword column are counted, so older imports don't land in "No keyword recorded". */
 function renderKeywords(starts,s,label){
-  const tbody=document.getElementById('kw-tbody'),tfoot=document.getElementById('kw-tfoot'),foot=document.getElementById('kw-foot');
+  const tbody=document.getElementById('kw-tbody'),tfoot=document.getElementById('kw-tfoot');
   // Searches for the resort's name: a box under the campaign table, only for cycles whose GA4 import carried the search-text tab.
   const box=document.getElementById('u-brand-box');
   const withQ=starts.filter(iso=>ga4Rows.some(r=>r.cycleStart===iso&&r.query));
@@ -1072,7 +1070,6 @@ function renderKeywords(starts,s,label){
   }
   const withKw=starts.filter(iso=>ga4Rows.some(r=>r.cycleStart===iso&&r.keyword));
   const sub=document.getElementById('kw-sub');sub.textContent=label;
-  foot.style.display='none';
   if(!withKw.length){
     tbody.innerHTML='<tr><td colspan="9" class="empty-state">No keyword data for this cycle. Re-import it with the GA4 "Ads keywords" file.</td></tr>';tfoot.innerHTML='';return;
   }
@@ -1087,23 +1084,21 @@ function renderKeywords(starts,s,label){
   const rows=Object.values(by).sort((a,b)=>b.spend-a.spend||b.web-a.web||a.name.localeCompare(b.name));
   if(none)rows.push(none);
   const tr=(r,bold)=>'<tr><td>'+(bold?'<b>'+esc(r.name)+'</b>':esc(r.name))+'</td><td class="right">'+(r.hasSpend?fmt$(r.spend):'—')+'</td><td class="right">'+fmtN(r.web)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+(r.hasSpend&&r.spend?fmtX(r.rn/r.spend):'—')+'</td><td class="right">'+(r.hasSpend&&r.web&&r.spend?fmt$(r.spend/r.web):'—')+'</td><td class="right">'+fmt$(r.ga4)+'</td><td class="right">'+(r.um||'—')+'</td><td class="right">'+(r.hasSpend?fmtN(r.clicks):'—')+'</td></tr>';
-  tbody.innerHTML=rows.map(r=>tr(r,r!==none)).join('');
   const kwSpend=sum(rows,r=>r.spend),anySpend=rows.some(r=>r.hasSpend);
-  const nKw=rows.filter(r=>r.hasSpend).length,nBooked=web.filter(r=>hasKw(r.keyword)).length;
-  sub.textContent=nKw+' keyword'+(nKw===1?'':'s')+' · '+fmt$(kwSpend)+' spend · '+nBooked+' booking'+(nBooked===1?'':'s')+' with a keyword'+(withKw.length<starts.length?' · '+withKw.length+' of '+starts.length+' cycles':'');
-  tfoot.innerHTML='<tr><td>All keywords</td><td class="right">'+(anySpend?fmt$(kwSpend):'—')+'</td><td class="right">'+fmtN(web.length)+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">—</td><td class="right">—</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">'+(sum(rows,r=>r.um)||'—')+'</td><td class="right">'+(anySpend?fmtN(sum(rows,r=>r.clicks)):'—')+'</td></tr>';
-  // Search campaigns = campaigns with at least one keyword booking; their spend from the campaigns file.
+  // Google's keyword report doesn't account for all of the search campaigns' spend. Show the gap as its own
+  // row so the total matches the campaign table. Search campaigns = campaigns with at least one keyword booking.
   const searchCamps=new Set(web.filter(r=>hasKw(r.keyword)).map(r=>normName(r.campaign)));
   const campSpend=sum(spendRows.filter(r=>inSet(r.cycleStart)&&searchCamps.has(normName(r.campaign))),r=>r.cost);
-  if(anySpend&&campSpend&&Math.round(campSpend)!==Math.round(kwSpend)){
-    foot.textContent='Google Ads reports keyword spend ('+fmt$(kwSpend)+') and campaign spend ('+fmt$(campSpend)+') separately; the two don’t match exactly.';foot.style.display='block';
-  }
+  const gap=anySpend&&campSpend-kwSpend>=1?campSpend-kwSpend:0;
+  const totSpend=kwSpend+gap,totRn=sum(rows,r=>r.rn);
+  tbody.innerHTML=rows.map(r=>tr(r,r!==none)).join('')+(gap?'<tr><td>Spend not broken out by keyword</td><td class="right">'+fmt$(gap)+'</td><td class="right">—</td><td class="right">—</td><td class="right">—</td><td class="right">—</td><td class="right">—</td><td class="right">—</td><td class="right">—</td></tr>':'');
+  const nKw=rows.filter(r=>r.hasSpend).length,nBooked=web.filter(r=>hasKw(r.keyword)).length;
+  sub.textContent=nKw+' keyword'+(nKw===1?'':'s')+' · '+nBooked+' booking'+(nBooked===1?'':'s')+' with a keyword'+(withKw.length<starts.length?' · '+withKw.length+' of '+starts.length+' cycles':'');
+  tfoot.innerHTML='<tr><td>All keywords</td><td class="right">'+(anySpend?fmt$(totSpend):'—')+'</td><td class="right">'+fmtN(web.length)+'</td><td class="right">'+fmt$(totRn)+'</td><td class="right">'+(anySpend&&totSpend?fmtX(totRn/totSpend):'—')+'</td><td class="right">'+(anySpend&&totSpend&&web.length?fmt$(totSpend/web.length):'—')+'</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">'+(sum(rows,r=>r.um)||'—')+'</td><td class="right">'+(anySpend?fmtN(sum(rows,r=>r.clicks)):'—')+'</td></tr>';
 }
 
-// Printing: open every folded section so the PDF has everything, then put them back.
-let foldState=[];
-window.addEventListener('beforeprint',()=>{foldState=Array.from(document.querySelectorAll('details.fold')).map(d=>{const o=d.open;d.open=true;return [d,o];});});
-window.addEventListener('afterprint',()=>{foldState.forEach(([d,o])=>d.open=o);foldState=[];});
+// Folding a card hides its rows; the header row and total row stay visible. Printing always shows every row (CSS).
+function toggleFold(id){document.getElementById(id).classList.toggle('collapsed');}
 
 const barLabels={id:'barLabels',afterDatasetsDraw(chart,args,opts){const {ctx}=chart;const ds=chart.data.datasets[0];const meta=chart.getDatasetMeta(0);ctx.save();ctx.font='700 14px Raleway';ctx.fillStyle='#1a2530';ctx.textAlign='center';ctx.textBaseline='bottom';meta.data.forEach((bar,i)=>{const v=ds.data[i];if(v==null)return;ctx.fillText(opts.format(v),bar.x,bar.y-6);});ctx.restore();}};
 function charts(per){
