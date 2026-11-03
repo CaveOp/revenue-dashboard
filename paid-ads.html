@@ -358,7 +358,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 29">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 30">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -592,7 +592,9 @@ const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 /* ---------- Billing cycles: CYCLE_DAY of one month through the day before it the next month ---------- */
 function cycleFromStart(start){
   const end=new Date(start.getFullYear(),start.getMonth()+1,CYCLE_DAY);
-  const label=MON[start.getMonth()]+' '+CYCLE_DAY+' – '+MON[end.getMonth()]+' '+CYCLE_DAY+', '+end.getFullYear();
+  // label shows the cycle's last day (the day before the next cycle starts), e.g. "Oct 15 – Nov 14, 2026"
+  const last=new Date(end.getFullYear(),end.getMonth(),end.getDate()-1);
+  const label=MON[start.getMonth()]+' '+start.getDate()+' – '+MON[last.getMonth()]+' '+last.getDate()+', '+last.getFullYear();
   return {label,start,startISO:toISO(start),end};
 }
 function cycleFor(d){if(!d)return null;const s=d.getDate()>=CYCLE_DAY?new Date(d.getFullYear(),d.getMonth(),CYCLE_DAY):new Date(d.getFullYear(),d.getMonth()-1,CYCLE_DAY);return cycleFromStart(s);}
@@ -1150,7 +1152,7 @@ const avgLine={id:'avgLine',afterDatasetsDraw(chart,args,opts){if(opts.value==nu
   ctx.setLineDash([]);ctx.font='600 12px Raleway';ctx.fillStyle='#4a5568';ctx.textAlign='right';ctx.textBaseline='bottom';
   ctx.fillText(opts.label[0],a.left-8,y);ctx.textBaseline='top';ctx.fillText(opts.label[1],a.left-8,y);ctx.restore();}};
 function charts(per,allRet){
-  const labels=per.map(({c})=>c.label.replace(/ 15 – /,' – ').replace(/ 15,.*$/,''));
+  const labels=per.map(({c})=>c.label.replace(/ \d+ – /,' – ').replace(/ \d+,.*$/,''));
   const tick={color:'#5f6f80',font:{family:'Raleway',size:13}};
   const sel=document.getElementById('cycle-select').value;
   const colors=per.map(({c})=>c.startISO===sel?'#3a4d5c':'#c3ced7');
