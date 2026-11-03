@@ -369,7 +369,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 34">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 35">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -397,17 +397,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
     </div>
     <div id="report-area">
 
-      <div class="sec"><h2>What the ads did</h2><span id="hero-sub"></span><span class="partial-tag" id="hero-through" style="display:none;"></span></div>
+      <div class="sec"><h2>What Google Ads did</h2><span id="hero-sub"></span><span class="partial-tag" id="hero-through" style="display:none;"></span></div>
       <div class="hero">
         <div class="scorecard spend"><div class="scorecard-label">Spend</div><div class="scorecard-value num" id="h-spend">—</div><div class="scorecard-meta" id="h-spend-m"></div><div class="scorecard-delta" id="h-spend-d"></div></div>
-        <div class="scorecard book"><div class="scorecard-label">Bookings from ads</div><div class="scorecard-value num" id="h-book">—</div><div class="scorecard-meta" id="h-book-m"></div><div class="scorecard-delta" id="h-book-d"></div></div>
+        <div class="scorecard book"><div class="scorecard-label">Bookings</div><div class="scorecard-value num" id="h-book">—</div><div class="scorecard-meta" id="h-book-m"></div><div class="scorecard-delta" id="h-book-d"></div></div>
         <div class="scorecard rn"><div class="scorecard-label">Booked revenue</div><div class="scorecard-value num" id="h-rn">—</div><div class="scorecard-meta" id="h-rn-m"></div><div class="scorecard-delta" id="h-rn-d"></div></div>
         <div class="scorecard ret"><div class="scorecard-label">Return per $1 spent</div><div class="scorecard-value num" id="h-ret">—</div><div class="scorecard-meta" id="h-ret-m"></div><div class="scorecard-delta" id="h-ret-d"></div></div>
       </div>
       <div class="units">
         <div class="unit"><span class="u-label">Cost per booking</span><span><span class="u-value num" id="u-cpb">—</span><span class="u-sub" id="u-cpb-s"></span></span></div>
         <div class="unit"><span class="u-label">Average booking value</span><span><span class="u-value num" id="u-abv">—</span><span class="u-sub" id="u-abv-s"></span></span></div>
-        <div class="unit"><span class="u-label">Share of web bookings from ads</span><span><span class="u-value num" id="u-share">—</span><span class="u-sub" id="u-share-s"></span></span></div>
+        <div class="unit"><span class="u-label">Share of web bookings</span><span><span class="u-value num" id="u-share">—</span><span class="u-sub" id="u-share-s"></span></span></div>
       </div>
 
       <div class="sec"><h2>Cycle to cycle</h2><span id="trend-note">every cycle saved</span></div>
@@ -439,6 +439,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         </table></div>
       </div>
       <div class="unit brand-box" id="u-brand-box" style="display:none;"><span class="u-label">Bookings from people who searched “Cave Springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-c"></span><span class="u-line">Each booking’s Res# is in Reservations behind the numbers, in the Searched column.</span></div>
+
+      <div class="sec"><h2>Facebook &amp; Instagram</h2><span id="social-sub"></span></div>
+      <div class="panel">
+        <div class="table-scroll"><table class="data-table">
+          <thead><tr><th>Tag</th><th>Where</th><th>Name</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">GA4 revenue</th><th class="right">Spend</th></tr></thead>
+          <tbody id="social-tbody"></tbody><tfoot id="social-tfoot"></tfoot>
+        </table></div>
+      </div>
 
       <div class="fold" id="kw-fold">
       <div class="sec fold-head" onclick="toggleFold('kw-fold')" title="Show or hide the keyword rows"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
@@ -988,6 +996,11 @@ function buildCycles(){
 function splitSM(sm){const p=String(sm||'').split('/');return {source:(p[0]||'').trim().toLowerCase(),medium:(p[1]||'').trim().toLowerCase()};}
 function isGoogleAds(sm){const {source,medium}=splitSM(sm);return source==='google'&&/^(cpc|ppc|paid)$/.test(medium);}
 function isMetaPaid(sm){const {source,medium}=splitSM(sm);return /^(fb|ig|facebook|instagram|meta)$/.test(source)&&/^(paid|cpc|paid_social|paidsocial)$/.test(medium);}
+// Facebook or Instagram as the GA4 source: tagged (fb, ig, facebook, instagram, meta) or the sites themselves (l.facebook.com, instagram.com …)
+function isMetaSource(sm){const {source}=splitSM(sm);return /^(fb|ig|facebook|instagram|meta)$/.test(source)||/(^|\.)(facebook|instagram)\.com$/.test(source);}
+function metaWhere(sm){return /instagram|^ig$/.test(splitSM(sm).source)?'Instagram':'Facebook';}
+// Tag group, straight from the GA4 medium: paid tags, the "social" tag, or no tag at all (a plain link from the site)
+function metaTag(sm){const m=splitSM(sm).medium;return isMetaPaid(sm)?'Paid':m==='social'?'Social':'No tag';}
 function isBrand(q){return String(q||'').toLowerCase().replace(/\s+/g,' ').includes(BRAND_SEARCH);}
 function hasKw(k){const t=kwKey(k);return !!t&&t!=='(not set)'&&t!=='(not provided)';}
 function rnValue(res){const s=staysByRes[res];if(!s)return null;return +(s.room+(feeByRes[res]||0)).toFixed(2);}
@@ -1087,6 +1100,7 @@ function render(){
     :'<tr><td colspan="10" class="empty-state">Nothing saved for this cycle yet</td></tr>';
   document.getElementById('camp-tfoot').innerHTML=rows.length?'<tr><td>All campaigns</td><td class="right">'+fmt$(s.spendTotal)+'</td><td class="right">'+fmtN(s.web.length)+'</td><td class="right">'+fmt$(s.rn)+'</td><td class="right">'+fmtX(ret)+'</td><td class="right det">'+(s.web.length&&s.spendTotal?fmt$(s.spendTotal/s.web.length):'—')+'</td><td class="right det">'+fmt$(s.ga4)+'</td><td class="right det">'+(s.um||'—')+'</td><td class="right det">'+(rows.some(r=>r.hasClicks)?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right det">'+(rows.some(r=>r.hasConv)?sum(rows,r=>r.conv).toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>':'';
 
+  renderSocial(s,label);
   renderKeywords(starts,s,label);
 
   // trend
@@ -1163,6 +1177,22 @@ function trendSum(per,sel){
 /* Keywords: spend and clicks from the Google Ads Search keywords card, bookings from the
    GA4 Session Google Ads keyword text of each Google Ads booking. Only cycles whose GA4
    import carried the keyword column are counted, so older imports don't land in "No keyword recorded". */
+// Facebook & Instagram: every GA4 booking with a Facebook or Instagram source, one row per tag + where + name.
+// Spend stays "—" until Meta spend is imported.
+function renderSocial(s,label){
+  document.getElementById('social-sub').textContent=label;
+  const by={};
+  s.allGa4.filter(r=>isMetaSource(r.sm)).forEach(r=>{
+    const camp=String(r.campaign||'').trim();const name=!camp||/^\((not set|referral|direct|none)\)$/i.test(camp)?'':camp;
+    const tag=metaTag(r.sm),where=metaWhere(r.sm),k=tag+'|'+where+'|'+name.toLowerCase();
+    const e=by[k]||(by[k]={tag,where,name,n:0,ga4:0,rn:0});const v=rnValue(r.id);
+    e.n++;e.ga4+=r.revenue||0;if(v!=null)e.rn+=v;});
+  const order={'Paid':0,'Social':1,'No tag':2};
+  const rows=Object.values(by).sort((a,b)=>order[a.tag]-order[b.tag]||b.n-a.n||a.name.localeCompare(b.name));
+  document.getElementById('social-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+r.tag+'</b></td><td>'+r.where+'</td><td>'+(r.name?esc(r.name):'—')+'</td><td class="right">'+fmtN(r.n)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+fmt$(r.ga4)+'</td><td class="right">—</td></tr>').join('')
+    :'<tr><td colspan="7" class="empty-state">No Facebook or Instagram bookings in this cycle</td></tr>';
+  document.getElementById('social-tfoot').innerHTML=rows.length?'<tr><td colspan="3">All Facebook &amp; Instagram</td><td class="right">'+fmtN(sum(rows,r=>r.n))+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">—</td></tr>':'';
+}
 function renderKeywords(starts,s,label){
   const tbody=document.getElementById('kw-tbody'),tfoot=document.getElementById('kw-tfoot');
   // Searches for the resort's name: a box under the campaign table, only for cycles whose GA4 import carried the search-text tab.
