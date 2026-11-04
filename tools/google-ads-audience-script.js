@@ -10,6 +10,7 @@
  *   - Billing cycles run from the 15th through the 14th of the next month, the same as the dashboard.
  *     The cycle still running is filled through today.
  *
+ * Location (city and state) is where the people who saw the ads were.
  * Run it any time with the Run button; schedule it daily to keep the dashboard fresh.
  * If any report fails, nothing is written and the tab keeps what it had.
  */
@@ -39,6 +40,7 @@ function main() {
 
   // Build every row first; write only if all reports came back.
   var rows = [HEADER];
+  var geoProblem = '';
   cycles(today).forEach(function (c) {
     var add = function (report, group, item, m) {
       rows.push([c.label, c.start, report, group || '', item, m.impressions, m.clicks, m.cost, m.conversions, stamp, c.through]);
@@ -68,7 +70,18 @@ function main() {
 
     collect('SELECT search_term_view.search_term, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions FROM search_term_view' + range,
       function (r) { return ['', String(r.searchTermView.searchTerm || '').toLowerCase()]; }).forEach(function (x) { add('search', x.group, x.item, x.m); });
+
+    // Where people were (their physical location). Kept separate: if Google refuses these
+    // reports, the log says so and every other report above is still written.
+    try {
+      var cities = geo('city', range), states = geo('state', range);   // both first, so a cycle never gets only half
+      cities.forEach(function (x) { add('city', '', x.item, x.m); });
+      states.forEach(function (x) { add('state', '', x.item, x.m); });
+    } catch (e) {
+      geoProblem = String(e && e.message || e);
+    }
   });
+  if (geoProblem) Logger.log('Location reports skipped: ' + geoProblem);
 
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var sh = ss.getSheetByName(TAB) || ss.insertSheet(TAB);
@@ -116,6 +129,42 @@ function collect(query, keyOf) {
     if (x.conversions != null) m.conversions = Math.round(((Number(m.conversions) || 0) + Number(x.conversions)) * 100) / 100;
   }
   return order.map(function (id) { return by[id]; });
+}
+
+// Location report for one cycle: 'city' or 'state'. Google returns location codes; their names are looked up after.
+var STATE_FIELD = null;   // 'geo_target_state', or 'geo_target_region' if this account's API version has no state field
+function geo(level, range) {
+  var fields = level === 'city' ? ['geo_target_city'] : (STATE_FIELD ? [STATE_FIELD] : ['geo_target_state', 'geo_target_region']);
+  var last;
+  for (var i = 0; i < fields.length; i++) {
+    var fld = fields[i], key = fld.replace(/_([a-z])/g, function (a, c) { return c.toUpperCase(); });
+    try {
+      var rows = collect('SELECT segments.' + fld + ', metrics.impressions, metrics.clicks, metrics.cost_micros FROM user_location_view' + range,
+        function (r) { return ['', r.segments && r.segments[key] || '']; });
+      if (level === 'state') STATE_FIELD = fld;
+      var names = geoNames(rows.map(function (x) { return x.item; }), level);
+      return rows.map(function (x) { return { item: names[x.item] || 'Unknown', m: x.m }; });
+    } catch (e) { last = e; }
+  }
+  throw last;
+}
+// geoTargetConstants/1014221 → 'Redding, California' (city) or 'California' (state). Remembered between cycles.
+var GEO_NAMES = {};
+function geoNames(ids, level) {
+  var need = ids.filter(function (id) { return id && !(id in GEO_NAMES); });
+  for (var i = 0; i < need.length; i += 200) {
+    var list = need.slice(i, i + 200).map(function (id) { return "'" + id + "'"; }).join(',');
+    var it = AdsApp.search('SELECT geo_target_constant.resource_name, geo_target_constant.name, geo_target_constant.canonical_name FROM geo_target_constant WHERE geo_target_constant.resource_name IN (' + list + ')');
+    while (it.hasNext()) {
+      var g = it.next().geoTargetConstant;
+      var parts = String(g.canonicalName || g.name || '').split(',');
+      if (parts.length > 1) parts.pop();               // drop the country
+      GEO_NAMES[g.resourceName] = { city: parts.join(', '), state: g.name };
+    }
+  }
+  var out = {};
+  ids.forEach(function (id) { var n = GEO_NAMES[id]; if (n) out[id] = level === 'city' ? n.city : n.state; });
+  return out;
 }
 
 function name(map, code) { return map[code] || (code ? String(code).charAt(0) + String(code).slice(1).toLowerCase().replace(/_/g, ' ') : ''); }

@@ -212,7 +212,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 1">Cave Springs</div><div class="header-sub">Ad Audience · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 2">Cave Springs</div><div class="header-sub">Ad Audience · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print</button>
       <button class="hdr-btn" onclick="signOut()">Sign out</button>
@@ -246,6 +246,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <div class="panel"><div class="panel-header"><span class="panel-title">Gender</span></div><div id="gender-out"></div></div>
       </div>
 
+      <div class="sec"><h2>Where people were</h2></div>
+      <div class="grid-2">
+        <div class="panel"><div class="panel-header"><span class="panel-title">States</span></div><div id="state-out"></div></div>
+        <div class="panel"><div class="panel-header"><span class="panel-title">Cities</span></div><div id="city-out"></div></div>
+      </div>
+
       <div class="sec"><h2>Devices</h2></div>
       <div class="panel"><div id="device-out"></div></div>
 
@@ -271,8 +277,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 const CLIENT_ID = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
 const SHEET_ID  = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
 const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
-// One tab holds every audience report. Written by the import on Paid Ads (and later by the Google Ads script).
-// Report: age · gender · device · day · hour · day_hour · network · search
+// One tab holds every audience report. Written by the Google Ads script (tools/google-ads-audience-script.js).
+// Report: age · gender · state · city · device · day · hour · day_hour · network · search
 // Group: the day for day_hour, blank otherwise. Blank numbers = not in that report.
 const AUD_TAB   = 'AD_AUDIENCE_CLEAN';
 const CYCLE_DAY = 15;
@@ -280,10 +286,11 @@ const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const AGE_ORDER=['18-24','25-34','35-44','45-54','55-64','65+'];
 const GENDER_ORDER=['Female','Male'];
 const DAY_ORDER=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const SEARCH_TOP=15;   // rows shown before "Show all"
+const SEARCH_TOP=15;   // search rows shown before "Show all"
+const PLACE_TOP=10;    // state / city rows shown before "Show all"
 
 let tokenClient, accessToken;
-let audRows=[], knownCycles=[], searchAll=false;
+let audRows=[], knownCycles=[], searchAll=false, placeAll={state:false,city:false};
 
 /* ---------- Auth (same as the other pages; token kept for this tab only) ---------- */
 const TOKEN_KEY='cs_gtoken';
@@ -410,6 +417,8 @@ function render(){
   renderHours(agg('hour',starts));
   renderDayHour(agg('day_hour',starts));
   renderNetworks(agg('network',starts));
+  renderPlaces('state',starts);
+  renderPlaces('city',starts);
   renderSearch(starts);
   labelTableCells();
 }
@@ -466,6 +475,18 @@ function renderNetworks(rows){
   el.innerHTML='<table class="data-table"><thead><tr><th>Network</th><th class="right">Clicks</th><th class="right">Spend</th><th class="right">Cost per click</th></tr></thead><tbody>'+
     rows.map(r=>'<tr><td class="name">'+esc(r.item)+'</td><td class="right">'+fmtN(r.clicks)+'</td><td class="right">'+bar(r.cost||0,max,fmt$(r.cost),r.cost===max)+'</td><td class="right">'+(r.clicks?fmt$2(r.cost/r.clicks):'—')+'</td></tr>').join('')+
     '</tbody><tfoot><tr><td>All</td><td class="right">'+fmtN(tk)+'</td><td class="right">'+fmt$(tc)+'</td><td class="right">'+(tk?fmt$2(tc/tk):'—')+'</td></tr></tfoot></table>';
+}
+function togglePlaceAll(k){placeAll[k]=!placeAll[k];render();}
+// Where people were: one table per level (state, city), biggest spend first.
+function renderPlaces(level,starts){
+  const el=document.getElementById(level+'-out');const rows=agg(level,starts);
+  if(!rows.length){el.innerHTML=NOT_LOADED;return;}
+  rows.sort((a,b)=>(b.cost||0)-(a.cost||0)||(b.impressions||0)-(a.impressions||0));
+  const shown=placeAll[level]?rows:rows.slice(0,PLACE_TOP);const max=Math.max(...rows.map(r=>r.cost||0));
+  el.innerHTML='<table class="data-table"><thead><tr><th>Location</th><th class="right">Impressions</th><th class="right">Clicks</th><th class="right">Spend</th></tr></thead><tbody>'+
+    shown.map(r=>'<tr><td class="name">'+esc(r.item)+'</td><td class="right">'+fmtN(r.impressions)+'</td><td class="right">'+fmtN(r.clicks)+'</td><td class="right">'+bar(r.cost||0,max,fmt$(r.cost),r.cost===max)+'</td></tr>').join('')+
+    '</tbody><tfoot><tr><td>All '+rows.length+'</td><td class="right">'+fmtN(sum(rows,r=>r.impressions))+'</td><td class="right">'+fmtN(sum(rows,r=>r.clicks))+'</td><td class="right">'+fmt$(sum(rows,r=>r.cost))+'</td></tr></tfoot></table>'+
+    (rows.length>PLACE_TOP?'<div class="more-row"><button class="more-btn" onclick="togglePlaceAll(\''+level+'\')">'+(placeAll[level]?'Show top '+PLACE_TOP:'Show all '+rows.length)+'</button></div>':'');
 }
 function toggleSearchAll(){searchAll=!searchAll;render();}
 function renderSearch(starts){
