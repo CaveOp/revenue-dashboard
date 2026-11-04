@@ -212,7 +212,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 2">Cave Springs</div><div class="header-sub">Ad Audience · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 3">Cave Springs</div><div class="header-sub">Ad Audience · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print</button>
       <button class="hdr-btn" onclick="signOut()">Sign out</button>
@@ -439,7 +439,7 @@ function renderDevices(rows){
   const el=document.getElementById('device-out');
   if(!rows.length){el.innerHTML=NOT_LOADED;return;}
   rows.sort((a,b)=>(b.cost||0)-(a.cost||0));const max=Math.max(...rows.map(r=>r.cost||0));
-  el.innerHTML='<table class="data-table"><thead><tr><th>Device</th><th class="right">Spend</th><th class="right">Clicks</th><th class="right">Google conversions</th></tr></thead><tbody>'+
+  el.innerHTML='<table class="data-table"><thead><tr><th>Device</th><th class="right">Ad spend</th><th class="right">Clicks</th><th class="right">Google conversions</th></tr></thead><tbody>'+
     rows.map(r=>'<tr><td class="name">'+esc(r.item)+'</td><td class="right">'+bar(r.cost||0,max,fmt$(r.cost),r.cost===max)+'</td><td class="right">'+fmtN(r.clicks)+'</td><td class="right">'+fmtConv(r.conversions)+'</td></tr>').join('')+
     '</tbody><tfoot><tr><td>All</td><td class="right">'+fmt$(sum(rows,r=>r.cost))+'</td><td class="right">'+(has(rows,'clicks')?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right">'+(has(rows,'conversions')?fmtConv(sum(rows,r=>r.conversions)):'—')+'</td></tr></tfoot></table>';
 }
@@ -472,7 +472,7 @@ function renderNetworks(rows){
   if(!rows.length){el.innerHTML=NOT_LOADED;return;}
   rows.sort((a,b)=>(b.cost||0)-(a.cost||0));const max=Math.max(...rows.map(r=>r.cost||0));
   const tc=sum(rows,r=>r.cost),tk=sum(rows,r=>r.clicks);
-  el.innerHTML='<table class="data-table"><thead><tr><th>Network</th><th class="right">Clicks</th><th class="right">Spend</th><th class="right">Cost per click</th></tr></thead><tbody>'+
+  el.innerHTML='<table class="data-table"><thead><tr><th>Network</th><th class="right">Clicks</th><th class="right">Ad spend</th><th class="right">Cost per click</th></tr></thead><tbody>'+
     rows.map(r=>'<tr><td class="name">'+esc(r.item)+'</td><td class="right">'+fmtN(r.clicks)+'</td><td class="right">'+bar(r.cost||0,max,fmt$(r.cost),r.cost===max)+'</td><td class="right">'+(r.clicks?fmt$2(r.cost/r.clicks):'—')+'</td></tr>').join('')+
     '</tbody><tfoot><tr><td>All</td><td class="right">'+fmtN(tk)+'</td><td class="right">'+fmt$(tc)+'</td><td class="right">'+(tk?fmt$2(tc/tk):'—')+'</td></tr></tfoot></table>';
 }
@@ -483,7 +483,7 @@ function renderPlaces(level,starts){
   if(!rows.length){el.innerHTML=NOT_LOADED;return;}
   rows.sort((a,b)=>(b.cost||0)-(a.cost||0)||(b.impressions||0)-(a.impressions||0));
   const shown=placeAll[level]?rows:rows.slice(0,PLACE_TOP);const max=Math.max(...rows.map(r=>r.cost||0));
-  el.innerHTML='<table class="data-table"><thead><tr><th>Location</th><th class="right">Impressions</th><th class="right">Clicks</th><th class="right">Spend</th></tr></thead><tbody>'+
+  el.innerHTML='<table class="data-table"><thead><tr><th>Location</th><th class="right">Impressions</th><th class="right">Clicks</th><th class="right">Ad spend</th></tr></thead><tbody>'+
     shown.map(r=>'<tr><td class="name">'+esc(r.item)+'</td><td class="right">'+fmtN(r.impressions)+'</td><td class="right">'+fmtN(r.clicks)+'</td><td class="right">'+bar(r.cost||0,max,fmt$(r.cost),r.cost===max)+'</td></tr>').join('')+
     '</tbody><tfoot><tr><td>All '+rows.length+'</td><td class="right">'+fmtN(sum(rows,r=>r.impressions))+'</td><td class="right">'+fmtN(sum(rows,r=>r.clicks))+'</td><td class="right">'+fmt$(sum(rows,r=>r.cost))+'</td></tr></tfoot></table>'+
     (rows.length>PLACE_TOP?'<div class="more-row"><button class="more-btn" onclick="togglePlaceAll(\''+level+'\')">'+(placeAll[level]?'Show top '+PLACE_TOP:'Show all '+rows.length)+'</button></div>':'');
@@ -495,7 +495,7 @@ function renderSearch(starts){
   rows.sort((a,b)=>(b.cost||0)-(a.cost||0)||(b.clicks||0)-(a.clicks||0));
   const shown=searchAll?rows:rows.slice(0,SEARCH_TOP);const max=Math.max(...rows.map(r=>r.cost||0));
   const tc=sum(rows,r=>r.cost),tk=sum(rows,r=>r.clicks),ti=sum(rows,r=>r.impressions);
-  el.innerHTML='<table class="data-table"><thead><tr><th>Search term</th><th class="right">Spend</th><th class="right">Clicks</th><th class="right">Impressions</th><th class="right">Click-through rate</th><th class="right">Google conversions</th></tr></thead><tbody>'+
+  el.innerHTML='<table class="data-table"><thead><tr><th>Search term</th><th class="right">Ad spend</th><th class="right">Clicks</th><th class="right">Impressions</th><th class="right">Click-through rate</th><th class="right">Google conversions</th></tr></thead><tbody>'+
     shown.map(r=>'<tr><td class="name">'+esc(r.item)+'</td><td class="right">'+bar(r.cost||0,max,fmt$(r.cost),r.cost===max)+'</td><td class="right">'+fmtN(r.clicks)+'</td><td class="right">'+fmtN(r.impressions)+'</td><td class="right">'+fmtPct(div(r.clicks,r.impressions))+'</td><td class="right">'+fmtConv(r.conversions)+'</td></tr>').join('')+
     '</tbody><tfoot><tr><td>All '+rows.length+'</td><td class="right">'+fmt$(tc)+'</td><td class="right">'+fmtN(tk)+'</td><td class="right">'+fmtN(ti)+'</td><td class="right">'+fmtPct(div(tk,ti))+'</td><td class="right">'+(has(rows,'conversions')?fmtConv(sum(rows,r=>r.conversions)):'—')+'</td></tr></tfoot></table>'+
     (rows.length>SEARCH_TOP?'<div class="more-row"><button class="more-btn" onclick="toggleSearchAll()">'+(searchAll?'Show top '+SEARCH_TOP:'Show all '+rows.length)+'</button></div>':'');
