@@ -104,7 +104,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .audit-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;}
 .audit-row label{font-size:14px;font-weight:700;color:var(--text2);display:flex;gap:8px;align-items:center;}
 .audit-row input{font-family:var(--sans);font-size:15px;color:var(--text);padding:6px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);}
-.audit-units{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;}
+.audit-units{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;}
 @media(max-width:900px){.audit-units{grid-template-columns:1fr 1fr;}}
 .partial-tag{align-self:center;font-size:15px;font-weight:700;color:#7a4f10;background:var(--amber-bg);border:1px solid rgba(184,124,42,0.45);border-radius:20px;padding:4px 14px;}
 .legend{display:flex;gap:18px;font-size:14px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap;}
@@ -426,7 +426,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 46">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 47">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -480,6 +480,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <div class="unit"><span class="u-label">Booked revenue</span><span class="u-value num" id="aud-rn">—</span></div>
           <div class="unit"><span class="u-label">GA4 revenue</span><span class="u-value num" id="aud-ga4">—</span></div>
           <div class="unit"><span class="u-label">Return per $1 spent</span><span class="u-value num" id="aud-ret">—</span></div>
+          <div class="unit"><span class="u-label">Per $1 without “cave springs” searches</span><span class="u-value num" id="aud-nob">—</span></div>
         </div>
         <p class="help" style="margin-top:14px;" id="aud-note"></p>
       </div></div>
@@ -1260,7 +1261,7 @@ function renderAudit(){
   if(sel!==auditSel||!f.value||!t.value){auditSel=sel;
     const cs=sel==='ALL'?knownCycles:knownCycles.filter(c=>c.startISO===sel);
     if(cs.length){const last=cs[cs.length-1].end;f.value=cs[0].startISO;t.value=toISO(new Date(last.getFullYear(),last.getMonth(),last.getDate()-1));}}
-  const ids=['aud-spend','aud-book','aud-rn','aud-ga4','aud-ret'];
+  const ids=['aud-spend','aud-book','aud-rn','aud-ga4','aud-ret','aud-nob'];
   const a=f.value,b=t.value;
   if(!a||!b||a>b){ids.forEach(i=>document.getElementById(i).textContent='—');note.textContent=a>b?'From is after To.':'';return;}
   let days=0;for(let d=parseDateLoose(a),e=parseDateLoose(b);d<=e;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1))days++;
@@ -1276,6 +1277,10 @@ function renderAudit(){
   document.getElementById('aud-rn').textContent=fmt$2(rn);
   document.getElementById('aud-ga4').textContent=fmt$2(ga4);
   document.getElementById('aud-ret').textContent=inDays.length&&spend?fmtX(rn/spend):'—';
+  // Same rule as the Cycle to cycle column: booked revenue less bookings from "cave springs" searches, over all spend.
+  const nob=document.getElementById('aud-nob');
+  if(!web.some(r=>r.query)){nob.innerHTML='<span style="font-size:15px;font-weight:400;color:var(--text3);">no search data</span>';}
+  else nob.textContent=inDays.length&&spend?fmtX((rn-sum(web.filter(r=>isBrand(r.query)),r=>rnValue(r.id)||0))/spend):'—';
   note.textContent='';
 }
 
