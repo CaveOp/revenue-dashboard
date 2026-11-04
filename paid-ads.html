@@ -426,7 +426,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 47">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 48">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -1267,10 +1267,12 @@ function renderAudit(){
   let days=0;for(let d=parseDateLoose(a),e=parseDateLoose(b);d<=e;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1))days++;
   const inDays=dailyRows.filter(r=>r.date>=a&&r.date<=b),spend=sum(inDays,r=>r.cost);
   // Booking date: the GA4 file has no date column, so use the ResNexus "reserved on" date for the same Res#.
-  // Bookings not in ResNexus have no booking date, so they are left out here.
+  // Bookings not in ResNexus have no booking date. Like the top cards, they count in the cycle they were
+  // imported with, when the dates chosen here cover that whole cycle; otherwise they are left out.
   const bookedOn=r=>{const st=staysByRes[r.id];if(st&&st.reservedOn)return toISO(st.reservedOn);const d=parseDateLoose(r.date);return d?toISO(d):'';};
+  const coversCycle=iso=>{const c=cycleByStartISO(iso);if(!c)return false;const last=toISO(new Date(c.end.getFullYear(),c.end.getMonth(),c.end.getDate()-1));return c.startISO>=a&&last<=b;};
   const gads=ga4Rows.filter(r=>isGoogleAds(r.sm));
-  const web=gads.filter(r=>{const k=bookedOn(r);return k&&k>=a&&k<=b;});
+  const web=gads.filter(r=>{const k=bookedOn(r);return k?(k>=a&&k<=b):coversCycle(r.cycleStart);});
   const rn=sum(web,r=>rnValue(r.id)||0),ga4=sum(web,r=>r.revenue||0);
   document.getElementById('aud-spend').textContent=inDays.length?fmt$2(spend):'—';
   document.getElementById('aud-book').textContent=fmtN(web.length);
