@@ -125,7 +125,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <div class="hint">A few words about the post. Use a new name for each post.</div>
 
         <div class="step">3 · Page the link opens (optional)</div>
-        <input class="name-input" id="page" type="url" placeholder="https://cavesprings.com" autocomplete="off">
+        <input class="name-input" id="page" type="url" placeholder="https://www.cavesprings.com" autocomplete="off">
         <div class="hint">Leave empty for the home page. Paste another address, such as the booking page, to link there instead.</div>
 
         <div class="result">
@@ -151,7 +151,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 const CLIENT_ID='535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleusercontent.com';
 const SHEET_ID='18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
 const SCOPE='https://www.googleapis.com/auth/spreadsheets';
-const SITE='https://cavesprings.com';
+// Use www: cavesprings.com redirects to www.cavesprings.com and drops the tracking tags.
+const SITE='https://www.cavesprings.com/';
 // Tags for each kind of link. "paid_social" is what the Paid Ads page counts as paid Meta.
 const KINDS={
   'ig-boost':{source:'instagram',medium:'paid_social',prefix:'boost'},
@@ -213,7 +214,7 @@ function build(){
   const k=KINDS[currentKind()];
   // Optional page: any web address; existing tracking tags on it are dropped so ours are the only ones.
   let base=SITE;const typed=document.getElementById('page').value.trim();
-  if(typed){try{const u=new URL(/^https?:\/\//i.test(typed)?typed:'https://'+typed);[...u.searchParams.keys()].filter(p=>/^utm_/i.test(p)).forEach(p=>u.searchParams.delete(p));base=u.toString();}catch(e){base=SITE;}}
+  if(typed){try{const u=new URL(/^https?:\/\//i.test(typed)?typed:'https://'+typed);if(u.hostname==='cavesprings.com')u.hostname='www.cavesprings.com';[...u.searchParams.keys()].filter(p=>/^utm_/i.test(p)).forEach(p=>u.searchParams.delete(p));base=u.toString();}catch(e){base=SITE;}}
   const link=base+(base.includes('?')?'&':'?')+'utm_source='+k.source+'&utm_medium='+k.medium+'&utm_campaign='+(k.prefix?k.prefix+'-':'')+name;
   out.className='result-link';out.textContent=link;btn.disabled=false;
 }
