@@ -69,6 +69,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .copy-btn{margin-top:12px;background:var(--slate);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-family:var(--sans);font-size:15px;font-weight:700;cursor:pointer;}
 .copy-btn:hover{background:var(--slate2);}
 .copy-btn:disabled{background:var(--border2);cursor:default;}
+.result + .step{margin-top:22px;}
+.result-label{font-size:14px;font-weight:700;color:var(--text2);margin-bottom:6px;}
 .copied{margin-left:12px;font-size:14px;font-weight:700;color:var(--green);}
 .tips{list-style:none;}
 .tips li{padding:12px 0;border-bottom:1px solid var(--surface2);font-size:16px;color:var(--text2);}
@@ -131,6 +133,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <div class="result">
           <div id="result-text" class="result-empty">Type a name above and the link appears here.</div>
           <button class="copy-btn" id="copy-btn" onclick="copyLink()" disabled>Copy link</button><span class="copied" id="copied"></span>
+        </div>
+
+        <!-- Only shown when the page is opened as links.html?squarespace -->
+        <div id="sq" hidden>
+          <div class="step">Short link (Squarespace)</div>
+          <input class="name-input" id="short" type="text" placeholder="for example: river50" autocomplete="off">
+          <div class="result">
+            <div class="result-label">Line for Squarespace URL Mappings</div>
+            <div id="sq-line" class="result-empty">Make the link above and type a short name.</div>
+            <button class="copy-btn" id="sq-line-btn" onclick="copyFrom('sq-line','sq-line-copied')" disabled>Copy line</button><span class="copied" id="sq-line-copied"></span>
+          </div>
+          <div class="result">
+            <div class="result-label">Link to send</div>
+            <div id="sq-link" class="result-empty">Make the link above and type a short name.</div>
+            <button class="copy-btn" id="sq-link-btn" onclick="copyFrom('sq-link','sq-link-copied')" disabled>Copy link</button><span class="copied" id="sq-link-copied"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -210,13 +228,34 @@ function build(){
   const name=cleanName(document.getElementById('name').value);
   const out=document.getElementById('result-text'),btn=document.getElementById('copy-btn');
   document.getElementById('copied').textContent='';
-  if(!name){out.className='result-empty';out.textContent='Type a name above and the link appears here.';btn.disabled=true;return;}
+  if(!name){out.className='result-empty';out.textContent='Type a name above and the link appears here.';btn.disabled=true;buildShort('');return;}
   const k=KINDS[currentKind()];
   // Optional page: any web address; existing tracking tags on it are dropped so ours are the only ones.
   let base=SITE;const typed=document.getElementById('page').value.trim();
   if(typed){try{const u=new URL(/^https?:\/\//i.test(typed)?typed:'https://'+typed);if(u.hostname==='cavesprings.com')u.hostname='www.cavesprings.com';[...u.searchParams.keys()].filter(p=>/^utm_/i.test(p)).forEach(p=>u.searchParams.delete(p));base=u.toString();}catch(e){base=SITE;}}
   const link=base+(base.includes('?')?'&':'?')+'utm_source='+k.source+'&utm_medium='+k.medium+'&utm_campaign='+(k.prefix?k.prefix+'-':'')+name;
   out.className='result-link';out.textContent=link;btn.disabled=false;
+  buildShort(link);
+}
+/* ---------- Squarespace short link: only for links.html?squarespace ----------
+   Makes the URL Mappings line (302 so phones don't remember it) and the short link to send. */
+const SQ=new URLSearchParams(location.search).has('squarespace');
+if(SQ)document.getElementById('sq').hidden=false;
+function buildShort(link){
+  if(!SQ)return;
+  const s=cleanName(document.getElementById('short').value);
+  const line=document.getElementById('sq-line'),short=document.getElementById('sq-link');
+  ['sq-line-copied','sq-link-copied'].forEach(id=>document.getElementById(id).textContent='');
+  const ok=!!(link&&s);
+  for(const [el,txt] of [[line,'/'+s+' -> '+link+' 302'],[short,'cavesprings.com/'+s]]){
+    el.className=ok?'result-link':'result-empty';el.textContent=ok?txt:'Make the link above and type a short name.';
+  }
+  document.getElementById('sq-line-btn').disabled=!ok;document.getElementById('sq-link-btn').disabled=!ok;
+}
+async function copyFrom(id,noteId){
+  const el=document.getElementById(id),note=document.getElementById(noteId);
+  try{await navigator.clipboard.writeText(el.textContent);note.textContent='Copied';}
+  catch(e){const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);note.textContent='Selected. Press Ctrl+C (or tap Copy) to copy.';}
 }
 async function copyLink(){
   const link=document.getElementById('result-text').textContent;const note=document.getElementById('copied');
@@ -227,6 +266,7 @@ async function copyLink(){
 (function(){const n=document.querySelector('.nav-bar'),a=n&&n.querySelector('.nav-tab.active');if(a)n.scrollLeft=a.offsetLeft-16;})();
 document.getElementById('name').addEventListener('input',build);
 document.getElementById('page').addEventListener('input',build);
+document.getElementById('short').addEventListener('input',build);
 document.querySelectorAll('input[name="kind"]').forEach(i=>i.addEventListener('change',build));
 </script>
 </body>
