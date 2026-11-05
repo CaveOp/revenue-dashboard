@@ -117,6 +117,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <label class="choice"><input type="radio" name="kind" value="fb-post"><div><b>Facebook post</b><span>A regular post with a link, not boosted</span></div></label>
           <label class="choice"><input type="radio" name="kind" value="ig-story"><div><b>Instagram Story</b><span>A link sticker in a Story</span></div></label>
           <label class="choice"><input type="radio" name="kind" value="email"><div><b>Email</b><span>A link in a Mailchimp email</span></div></label>
+          <label class="choice"><input type="radio" name="kind" value="sms"><div><b>Text message</b><span>A link in a text message</span></div></label>
         </div>
 
         <div class="step">2 · Give it a short name</div>
@@ -157,7 +158,8 @@ const KINDS={
   'fb-boost':{source:'facebook',medium:'paid_social',prefix:'boost'},
   'fb-post': {source:'facebook',medium:'social',prefix:'post'},
   'ig-story':{source:'instagram',medium:'social',prefix:'story'},
-  'email':   {source:'mailchimp',medium:'email',prefix:''}   // no prefix: names match the flash-sale email, e.g. 2026-11-flash-sale
+  'email':   {source:'mailchimp',medium:'email',prefix:''},
+  'sms':     {source:'sms',medium:'sms',prefix:'text'}   // no prefix: names match the flash-sale email, e.g. 2026-11-flash-sale
 };
 
 /* ---------- Sign-in: same Google account and token as the other pages ----------
