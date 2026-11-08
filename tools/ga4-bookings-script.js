@@ -16,7 +16,7 @@
  * If GA4 returns an error, nothing is written and the tab keeps what it had.
  */
 
-var GA4_PROPERTY_ID = '';            // numbers only, from GA4 → Admin → Property details
+var GA4_PROPERTY_ID = '376866382';          // numbers only, from GA4 → Admin → Property details
 var TAB             = 'GA4_AUTO';
 var FIRST_DAY       = '2026-05-15';
 var CYCLE_DAY       = 15;
