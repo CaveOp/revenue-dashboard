@@ -1,18 +1,23 @@
 /**
- * Cave Springs — Ad Audience (Google Ads script)
+ * Cave Springs — Ad Audience and Ad Spend (Google Ads script)
  *
  * Paste this into Google Ads: Tools → Bulk actions → Scripts → + (new script).
  *
  * What it does:
  *   - READS reports from Google Ads. It never changes campaigns, budgets, bids, ads or tracking.
- *   - WRITES only to one tab of the dashboard sheet: AD_AUDIENCE_CLEAN.
- *     Each run rebuilds that tab from scratch, for every billing cycle from FIRST_CYCLE to today.
+ *   - WRITES only to these tabs of the dashboard sheet:
+ *       AD_AUDIENCE_CLEAN  (Ad Audience page)
+ *       AD_SPEND_AUTO, AD_KEYWORDS_AUTO, AD_DAILY_AUTO  (spend for the Paid Ads page, test copy at paid-ads.html?auto)
+ *     Each run rebuilds those tabs from scratch, for every billing cycle from FIRST_CYCLE to today.
+ *     It never touches AD_SPEND_CLEAN, AD_KEYWORDS_CLEAN or AD_DAILY_CLEAN (the imported spend).
  *   - Billing cycles run from the 15th through the 14th of the next month, the same as the dashboard.
  *     The cycle still running is filled through today.
  *
  * Location (city and state) is where the people who saw the ads were.
  * Run it any time with the Run button; schedule it daily to keep the dashboard fresh.
  * If any report fails, nothing is written and the tab keeps what it had.
+ * Audience and spend are separate: if one fails, the other is still written.
+ * Spend stops at yesterday, so a day's spend is only saved once the day is over.
  */
 
 var SHEET_ID    = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
@@ -34,6 +39,13 @@ var DAY = { MONDAY: 'Monday', TUESDAY: 'Tuesday', WEDNESDAY: 'Wednesday', THURSD
             SATURDAY: 'Saturday', SUNDAY: 'Sunday' };
 
 function main() {
+  var failed = [];
+  try { audience(); } catch (e) { failed.push('Audience: ' + (e && e.message || e)); }
+  try { spend(); } catch (e) { failed.push('Spend: ' + (e && e.message || e)); }
+  if (failed.length) throw new Error(failed.join(' | '));
+}
+
+function audience() {
   var tz = AdsApp.currentAccount().getTimeZone();
   var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
   var stamp = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm');
@@ -93,6 +105,56 @@ function main() {
 }
 
 // Every cycle from FIRST_CYCLE through the one running today. Dates as yyyy-MM-dd text.
+// Spend per campaign and per search keyword for each cycle, plus spend per day.
+// Same columns as the tabs the Paid Ads import fills, so the page reads them the same way.
+var SPEND_TAB = 'AD_SPEND_AUTO', KW_TAB = 'AD_KEYWORDS_AUTO', DAILY_TAB = 'AD_DAILY_AUTO';
+var SPEND_HEADER = ['Cycle', 'CycleStart', 'Campaign', 'Cost', 'Impressions', 'Clicks', 'Conversions', 'ConvValue', 'PhoneCalls', 'ImportedOn', 'DataThrough', 'Adjustment'];
+var KW_HEADER = ['Cycle', 'CycleStart', 'Keyword', 'Cost', 'Clicks', 'ImportedOn'];
+var DAILY_HEADER = ['Date', 'Cost', 'ImportedOn'];
+
+function spend() {
+  var tz = AdsApp.currentAccount().getTimeZone();
+  var now = new Date();
+  var stamp = Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm');
+  var t = Utilities.formatDate(now, tz, 'yyyy-MM-dd').split('-');
+  var yesterday = iso(Number(t[0]), Number(t[1]) - 1, Number(t[2]) - 1);
+
+  var spendRows = [SPEND_HEADER], kwRows = [KW_HEADER], dailyRows = [DAILY_HEADER];
+  var list = cycles(yesterday);
+  list.forEach(function (c) {
+    var range = " WHERE segments.date BETWEEN '" + c.start + "' AND '" + c.through + "'";
+    collect('SELECT campaign.name, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions FROM campaign' + range,
+      function (r) { return ['', r.campaign.name]; }).forEach(function (x) {
+        spendRows.push([c.label, c.start, x.item, x.m.cost || 0, x.m.impressions, x.m.clicks, x.m.conversions, '', '', stamp, c.through, '']);
+      });
+    collect('SELECT ad_group_criterion.keyword.text, metrics.clicks, metrics.cost_micros FROM keyword_view' + range,
+      function (r) { return ['', r.adGroupCriterion.keyword.text]; }).forEach(function (x) {
+        kwRows.push([c.label, c.start, x.item, x.m.cost || 0, x.m.clicks || 0, stamp]);
+      });
+  });
+  if (list.length) {
+    collect("SELECT segments.date, metrics.cost_micros FROM customer WHERE segments.date BETWEEN '" + FIRST_CYCLE + "' AND '" + yesterday + "'",
+      function (r) { return ['', r.segments.date]; }).forEach(function (x) { dailyRows.push([x.item, x.m.cost || 0, stamp]); });
+    dailyRows = [DAILY_HEADER].concat(dailyRows.slice(1).sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; }));
+  }
+
+  // All three reports are in hand; now write them.
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  writeTab(ss, SPEND_TAB, spendRows);
+  writeTab(ss, KW_TAB, kwRows);
+  writeTab(ss, DAILY_TAB, dailyRows);
+  Logger.log('Spend: wrote ' + (spendRows.length - 1) + ' campaign rows, ' + (kwRows.length - 1) + ' keyword rows and ' +
+             (dailyRows.length - 1) + ' days, through ' + yesterday + '.');
+}
+
+function writeTab(ss, name, rows) {
+  var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clear();
+  var r = sh.getRange(1, 1, rows.length, rows[0].length);
+  r.setNumberFormat('@');
+  r.setValues(rows);
+}
+
 function cycles(today) {
   var out = [];
   var p = FIRST_CYCLE.split('-');
