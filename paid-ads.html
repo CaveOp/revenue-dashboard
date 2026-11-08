@@ -426,7 +426,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 50">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 51">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" id="import-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -570,8 +570,9 @@ const CLIENT_ID = '535469622511-vq8ku5bbjc8561v7l4h9klt7opm2jbi3.apps.googleuser
 const SHEET_ID  = '18Jn8voijFQHCLfZn6xwrkqjvDhTO2E3A5tVshtGRRyc';
 const STAYS_TAB = 'STAYS_CLEAN';
 const RETAIL_TAB= 'RETAIL_CLEAN';
-// paid-ads.html?auto is a test copy: spend comes from the tabs the Google Ads script fills (*_AUTO), and importing is off.
-const AUTO      = new URLSearchParams(location.search).has('auto');
+// Spend and GA4 bookings come from the tabs the daily scripts fill (*_AUTO); importing is off.
+// paid-ads.html?imported shows the old hand-imported tabs (*_CLEAN) instead, with the import button.
+const AUTO      = !new URLSearchParams(location.search).has('imported');
 const SPEND_TAB = AUTO?'AD_SPEND_AUTO':'AD_SPEND_CLEAN';
 const GA4_TAB   = AUTO?'GA4_AUTO':'GA4_TXN_CLEAN';
 const KW_TAB    = AUTO?'AD_KEYWORDS_AUTO':'AD_KEYWORDS_CLEAN';
