@@ -523,7 +523,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         </table></div>
       </div>
 
-      <div class="fold" id="kw-fold">
+      <div class="fold collapsed" id="kw-fold">
       <div class="sec fold-head" onclick="toggleFold('kw-fold')" title="Show or hide the keyword rows"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
       <div class="panel">
         <div class="table-scroll"><table class="data-table camp-table" id="kw-table">
@@ -1167,6 +1167,10 @@ function render(){
   const hasSpend=s.spend.length>0,hasGa4=s.allGa4.length>0,hasStays=Object.keys(staysByRes).length>0;
 
   const missing=[];if(!hasSpend)missing.push('Google Ads spend not loaded for this cycle');if(!hasGa4)missing.push('GA4 transactions not loaded for this cycle');if(!hasStays)missing.push('stays data not loaded');if(hasStays&&!feeLoaded)missing.push('resort fee lines not found, booked revenue is room charge only');
+  // The daily Google Ads script fills in yesterday. Warn when the newest day is more than 2 days old.
+  if(AUTO){const newest=spendRows.map(r=>{const d=r.through?parseDateLoose(String(r.through)):null;return d?toISO(d):'';}).concat(dailyRows.map(r=>r.date)).filter(Boolean).sort().pop();
+    const t=new Date(),cutoff=toISO(new Date(t.getFullYear(),t.getMonth(),t.getDate()-2));
+    if(newest&&newest<cutoff)missing.unshift('Google Ads data hasn’t updated since '+fmtDay(newest));}
   document.getElementById('status-line').innerHTML=missing.length?'<span class="bad">'+esc(missing.join(' · '))+'</span>':'Google Ads, GA4 and ResNexus loaded';
 
   // hero
