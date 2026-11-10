@@ -183,6 +183,10 @@ tr.unit-row.hidden{display:none;}
 .im-btn:disabled{opacity:0.45;cursor:not-allowed;}
 .im-btn.confirm{background:var(--green);}
 .im-btn.ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}
+.im-batch-sec{border-top:1px solid var(--border);padding-top:14px;margin-top:18px;}
+.im-batch-sec:first-child{border-top:none;padding-top:0;margin-top:0;}
+.im-batch-head{font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.im-batch-head span{font-size:12px;font-weight:400;color:var(--text3);margin-left:6px;}
 .im-status{font-size:13px;color:var(--text2);margin-top:12px;}
 .im-err{background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px 16px;font-size:13px;color:#c0392b;margin-top:14px;white-space:pre-wrap;}
 .im-ok{background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--green);margin-top:14px;white-space:pre-wrap;}
@@ -264,6 +268,7 @@ tr.unit-row.hidden{display:none;}
       <label><input type="radio" name="im-type" value="pace" onchange="imTypeChanged()"> <span><strong>Pace report</strong> — booking pace, year over year</span></label>
       <label><input type="radio" name="im-type" value="discounts" onchange="imTypeChanged()"> <span><strong>Discounts report</strong> — packages &amp; discounts</span></label>
       <label><input type="radio" name="im-type" value="retail" onchange="imTypeChanged()"> <span><strong>Retail report</strong> — resort fees &amp; retail items</span></label>
+      <label><input type="radio" name="im-type" value="all" onchange="imTypeChanged()"> <span><strong>All reports at once</strong> — choose the stay, pace, discounts and retail files together</span></label>
     </div>
     <input type="file" id="im-file" accept=".csv,text/csv">
     <div class="im-mode-row" id="im-mode-row">
@@ -1002,12 +1007,105 @@ function imTypeChanged(){
   document.getElementById('im-mode-row').style.display=t==='stays'?'flex':'none';
   document.getElementById('im-dmode-row').style.display=t==='discounts'?'flex':'none';
   document.getElementById('im-rmode-row').style.display=t==='retail'?'flex':'none';
+  const fi=document.getElementById('im-file');if(fi.multiple!==(t==='all')){fi.multiple=t==='all';fi.value='';}
   const h=document.getElementById('im-type-hint');
   if(t==='pace'){h.textContent='Pace imports replace all existing pace data each time — same as the Apps Script.';h.style.display='block';}
+  else if(t==='all'){h.textContent='Each file is recognized by its columns. Stay, discounts and retail files replace only the dates in each file; a pace file replaces all pace data. One preview shows every report before anything is written.';h.style.display='block';}
   else h.style.display='none';
 }
+/* ==================== ALL REPORTS AT ONCE ====================
+   Runs the same analyze and write steps as the single-report import, one report after another.
+   While imBatch is set, the analyze steps use "Replace only the dates in this file" and hand their
+   preview back here instead of showing it. Nothing is written until the one Confirm. */
+let imBatch=null,imBatchPending=null;
+const IM_TYPE_NAMES={stays:'Stay report',pace:'Pace report',discounts:'Discounts report',retail:'Retail report'};
+function imMode(name){return imBatch?'range':document.querySelector('input[name='+name+']:checked').value;}
+function imGate(){if(imBatch)imBatch.cur.gate=true;else document.getElementById('im-confirm-btn').disabled=true;}
+// Which report a file is, from its column headers. Returns '' when none or more than one fits.
+function imDetectType(rows){
+  const hits=new Set();
+  for(let r=0;r<Math.min(rows.length,15);r++){
+    const H=rows[r].map(h=>String(h).trim());
+    const has=(al)=>imFindIdx(H,al)!==-1;
+    if(has(IM_AL.res)&&has(IM_AL.date)&&has(IM_AL.accom)&&has(IM_AL.amount)&&has(IM_AL.bookedOnline))hits.add('stays');
+    else if(has(IM_RETAIL_AL.res)&&has(IM_RETAIL_AL.date)&&has(IM_RETAIL_AL.item)&&(has(IM_RETAIL_AL.total)||has(IM_RETAIL_AL.amount)))hits.add('retail');
+    else if(has(IM_DISC_AL.res)&&has(IM_DISC_AL.date)&&has(IM_DISC_AL.details)&&has(IM_DISC_AL.amount))hits.add('discounts');
+    else if(H[1]==='ReservationDates'||H[1]==='NightDate')hits.add('pace');
+  }
+  return hits.size===1?[...hits][0]:'';
+}
+async function analyzeAll(files,status){
+  status.textContent='Reading files…';
+  const found={},problems=[];
+  for(const f of files){
+    let rows;try{rows=imParseCSV(await f.text());}catch(e){problems.push(f.name+': could not be read ('+e.message+')');continue;}
+    if(rows.length<2){problems.push(f.name+': the file appears to be empty');continue;}
+    const t=imDetectType(rows);
+    if(!t){problems.push(f.name+': not recognized as a stay, pace, discounts or retail report');continue;}
+    if(found[t]){problems.push(f.name+' and '+found[t].file.name+' are both a '+IM_TYPE_NAMES[t]);continue;}
+    found[t]={file:f,rows};
+  }
+  const items=[];
+  if(!problems.length){
+    imBatch={cur:null};
+    try{
+      for(const t of ['stays','retail','discounts','pace']){
+        if(!found[t])continue;
+        const st={textContent:''};imPending=null;imBatch.cur={lines:[],note:'',warnings:[],gate:false};
+        status.textContent='Checking '+IM_TYPE_NAMES[t]+'…';
+        if(t==='stays')await imAnalyzeStays(found[t].rows,st);
+        else if(t==='retail')await imAnalyzeRetail(found[t].rows,st);
+        else if(t==='discounts')await imAnalyzeDiscounts(found[t].rows,st);
+        else imAnalyzePace(found[t].rows,st);
+        if(!imPending){problems.push(IM_TYPE_NAMES[t]+' ('+found[t].file.name+'): '+(st.textContent||'could not be read'));continue;}
+        items.push({type:t,name:IM_TYPE_NAMES[t],file:found[t].file.name,pending:imPending,preview:imBatch.cur});
+      }
+    }catch(e){problems.push(e.message);}
+    finally{imBatch=null;imPending=null;}
+  }
+  if(problems.length){status.textContent=problems.join('\n')+'\nNothing was written.';return;}
+  imBatchPending=items;
+  const missing=Object.keys(IM_TYPE_NAMES).filter(t=>!found[t]).map(t=>IM_TYPE_NAMES[t]);
+  let html=items.map(it=>'<div class="im-batch-sec"><div class="im-batch-head">'+it.name+' <span>'+escHtml(it.file)+'</span></div>'+imPreviewHtml(it.preview.lines,it.preview.note,it.preview.warnings)+'</div>').join('');
+  if(missing.length)html+='<p style="font-size:13px;color:var(--text3);margin-top:14px;">Not included: '+missing.join(', ')+'. Those stay as they are.</p>';
+  document.getElementById('im-preview-body').innerHTML=html;
+  status.textContent='';
+  document.getElementById('im-step-preview').style.display='block';
+  // every "I have checked" box in the preview has to be ticked before Confirm works
+  const btn=document.getElementById('im-confirm-btn');
+  const boxes=[...document.querySelectorAll('#im-preview-body input[type=checkbox]')];
+  btn.disabled=boxes.length>0;
+  boxes.forEach(b=>b.onchange=()=>{btn.disabled=!boxes.every(x=>x.checked);});
+}
+function escHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// Writes each report in turn. If one fails, the rest are not written and the result says which were saved.
+async function confirmBatch(){
+  const items=imBatchPending;if(!items)return;
+  const btn=document.getElementById('im-confirm-btn');
+  btn.disabled=true;btn.textContent='Writing…';
+  let html='';const saved=[];
+  try{
+    for(let i=0;i<items.length;i++){
+      const it=items[i],step={v:'start'};
+      try{html+=await imWriteOne(it.pending,step);saved.push(it.name);}
+      catch(e){
+        const notSaved=items.slice(i).map(x=>x.name);
+        html+='<div class="im-err">'+it.name+' failed while '+escHtml(step.v)+':\n'+escHtml(e.message)+'\n\n'+(saved.length?'Saved: '+saved.join(', ')+'.\n':'')+'Not saved: '+notSaved.join(', ')+'.\nImport the reports that were not saved again once the issue is fixed.</div>';
+        break;
+      }
+    }
+    imBatchPending=null;
+    document.getElementById('im-step-preview').style.display='none';
+    html+='<p style="font-size:12px;color:var(--text3);margin-top:12px;">Refreshing dashboard…</p>';
+    document.getElementById('im-result-body').innerHTML=html;
+    document.getElementById('im-step-result').style.display='block';
+    try{await loadAll();}catch(e){}
+  }finally{
+    btn.disabled=false;btn.textContent='Confirm — write to sheet';
+  }
+}
 function openImport(){
-  imPending=null;
+  imPending=null;imBatchPending=null;
   document.getElementById('im-file').value='';
   document.getElementById('im-file-status').textContent='';
   document.getElementById('im-step-preview').style.display='none';
@@ -1018,12 +1116,12 @@ function openImport(){
   document.getElementById('import-modal').style.display='block';
 }
 function closeImport(){
-  imPending=null;
+  imPending=null;imBatchPending=null;
   document.getElementById('import-overlay').style.display='none';
   document.getElementById('import-modal').style.display='none';
 }
 function cancelImportPreview(){
-  imPending=null;
+  imPending=null;imBatchPending=null;
   document.getElementById('im-step-preview').style.display='none';
   document.getElementById('im-file-status').textContent='Cancelled — nothing was written.';
 }
@@ -1032,7 +1130,12 @@ async function analyzeImport(){
   const status=document.getElementById('im-file-status');
   document.getElementById('im-step-preview').style.display='none';
   document.getElementById('im-step-result').style.display='none';
+  imBatchPending=null;
   if(!fileInput.files||!fileInput.files.length){status.textContent='Choose a CSV file first.';return;}
+  if(document.querySelector('input[name=im-type]:checked').value==='all'){
+    try{await analyzeAll([...fileInput.files],status);}catch(e){imBatch=null;status.textContent='Analyze failed: '+e.message+'\nNothing was written.';}
+    return;
+  }
   status.textContent='Reading file…';
   let text;
   try{text=await fileInput.files[0].text();}
@@ -1047,11 +1150,15 @@ async function analyzeImport(){
     else if(type==='retail')await imAnalyzeRetail(rows,status);
   }catch(e){status.textContent='Analyze failed: '+e.message;}
 }
-function imShowPreview(lines,note,warnings){
+function imPreviewHtml(lines,note,warnings){
   let html='<table class="data-table"><tbody>'+lines.map(l=>'<tr><td>'+l[0]+'</td><td class="right" style="font-weight:600;color:var(--text)">'+l[1]+'</td></tr>').join('')+'</tbody></table>';
   html+='<p style="font-size:13px;color:var(--text2);margin-top:14px;">'+note+'</p>';
   if(warnings&&warnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+warnings.join('\n')+'</div>';
-  document.getElementById('im-preview-body').innerHTML=html;
+  return html;
+}
+function imShowPreview(lines,note,warnings){
+  if(imBatch){imBatch.cur.lines=lines;imBatch.cur.note=note;imBatch.cur.warnings=warnings||[];return;}
+  document.getElementById('im-preview-body').innerHTML=imPreviewHtml(lines,note,warnings);
   document.getElementById('im-file-status').textContent='';
   document.getElementById('im-step-preview').style.display='block';
 }
@@ -1203,7 +1310,7 @@ async function imAnalyzeStays(rows,status){
   if(idx.directConnect===-1)missing.push('DirectConnect');
   if(idx.reservedOn===-1)missing.push('ReservedOn');
   if(missing.length){status.textContent='Missing required column(s): '+missing.join(', ');return;}
-  const mode=document.querySelector('input[name=im-mode]:checked').value;
+  const mode=imMode('im-mode');
   status.textContent='Loading current sheet data for comparison…';
   let existingRaw;
   let existingImportRaw=[];
@@ -1300,7 +1407,7 @@ async function imAnalyzeStays(rows,status){
     }
   }
   imShowPreview(lines,note,dupWarnings);
-  if(gate)document.getElementById('im-confirm-btn').disabled=true;
+  if(gate)imGate();
 }
 function imAnalyzePace(rows,status){
   const output=[];
@@ -1358,7 +1465,7 @@ async function imAnalyzeDiscounts(rows,status){
     total+=amount;packages.add(cleanDetails);
   }
   if(!output.length){status.textContent='No usable discount rows found in this file.';return;}
-  const dmode=document.querySelector('input[name=im-dmode]:checked').value;
+  const dmode=imMode('im-dmode');
   if(dmode==='range'){
     status.textContent='Loading current sheet data for comparison…';
     let raw;try{raw=await imFetchRaw(DISCOUNTS_TAB);}catch(e){status.textContent='Could not load '+DISCOUNTS_TAB+': '+e.message;return;}
@@ -1414,7 +1521,7 @@ async function imAnalyzeRetail(rows,status){
     if(t.res!==-1&&t.date!==-1&&t.item!==-1&&(t.total!==-1||t.amount!==-1)){headerRow=r;idx=t;break;}
   }
   if(headerRow===-1){status.textContent='Could not find the expected columns (Res#, Date, Item, Total/Amount). Is this the retail report export?';return;}
-  if(document.querySelector('input[name=im-rmode]:checked').value==='range')return imAnalyzeRetailRange(rows,headerRow,idx,status);
+  if(imMode('im-rmode')==='range')return imAnalyzeRetailRange(rows,headerRow,idx,status);
   status.textContent='Loading current retail data for duplicate check…';
   let existingRaw=[];
   try{existingRaw=await fetchTab(IM_RETAIL_CLEAN);}catch(e){existingRaw=[];}
@@ -1514,116 +1621,122 @@ async function imAnalyzeRetailRange(rows,headerRow,idx,status){
     +plan.months.map(m=>'<tr style="text-align:right;'+(m.goneCount?'':'color:var(--text3);')+'"><td style="text-align:left;">'+monthName(m.key)+'</td><td>'+fmt$(m.saved)+'</td><td>'+fmt$(m.file)+'</td><td>'+(m.goneCount?m.goneCount.toLocaleString()+' · '+fmt$(m.gone):'—')+'</td></tr>').join('')+'</table>';
   if(gate)note+='<br><br><span style="color:var(--terra);font-weight:600;">That is '+plan.unmatched+' of the '+plan.removed+' saved line items in these dates with no match in this file — more than cancellations usually explain. Check that this export is not filtered to one retail group or a shorter range. (The first import after this change can legitimately remove many, if earlier imports doubled up.)</span><br><label style="display:inline-flex;gap:8px;align-items:center;margin-top:8px;cursor:pointer;"><input type="checkbox" onchange="document.getElementById(\'im-confirm-btn\').disabled=!this.checked"> I have checked — replace them</label>';
   imShowPreview(lines,note,[]);
-  if(gate)document.getElementById('im-confirm-btn').disabled=true;
+  if(gate)imGate();
 }
 async function imEnsureLogHeader(){
   let logRaw=[];
   try{logRaw=await fetchTab(LOG_TAB);}catch(e){}
   if(logRaw.length===0)await imPutValues(LOG_TAB,[IM_LOG_HEADER]);
 }
+// The writes for one analyzed report. Throws on failure; step.v says what it was doing.
+async function imWriteOne(p,step){
+  let html='';
+  if(p.type==='stays'){
+    if(p.mode==='range'){
+      step.v='writing '+p.writeRows.length+' night rows to '+STAYS_TAB;
+      await imPutValues(STAYS_TAB,imPadded(IM_CLEAN_HEADER,p.writeRows,p.prevLen));
+      step.v='rebuilding '+IMPORT_TAB;
+      await imPutValues(IMPORT_TAB,imPadded(IM_IMPORT_HEADER,p.importWriteRows,p.prevImportLen));
+    }else if(p.mode==='replace'){
+      step.v='clearing '+STAYS_TAB;
+      await imClearTab(STAYS_TAB);
+      step.v='writing '+p.newRows.length+' night rows';
+      await imPutValues(STAYS_TAB,[IM_CLEAN_HEADER].concat(p.newRows));
+      step.v='rebuilding '+IMPORT_TAB;
+      await imClearTab(IMPORT_TAB);
+      await imPutValues(IMPORT_TAB,[IM_IMPORT_HEADER].concat(p.importRows));
+    }else{
+      step.v='appending to '+STAYS_TAB;
+      await imAppendValues(STAYS_TAB,p.newRows);
+      step.v='appending to '+IMPORT_TAB;
+      await imAppendValues(IMPORT_TAB,p.importRows);
+    }
+    step.v='logging import';
+    await imEnsureLogHeader();
+    const m=p.afterMetrics;
+    await imAppendValues(LOG_TAB,[[imNowStamp(),'STAYS (dashboard import)',p.newResCount,m.revenue,Math.round(m.adr),Math.round(m.revpar*100)/100,Math.round(m.occupancy*10)/10,m.reservations,m.period,p.mode==='range'?'replace dates '+p.rangeText+' ('+p.absentCount+' removed as cancelled)':p.mode]]);
+    step.v='saving snapshots';
+    let snapRaw=[];
+    try{snapRaw=await fetchTab(SNAPSHOTS_TAB);}catch(e){}
+    if(snapRaw.length===0)await imPutValues(SNAPSHOTS_TAB,[IM_SNAP_HEADER]);
+    const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
+    const ytdRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr;});
+    const monthRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr&&d.getMonth()===mo;});
+    const snaps=[];
+    if(ytdRows.length>0)snaps.push(imSnapRow('Range '+yr,imComputeScope(ytdRows)));
+    if(monthRows.length>0)snaps.push(imSnapRow('Month '+now.toLocaleString('en-US',{month:'short',year:'numeric'}),imComputeScope(monthRows)));
+    if(snaps.length)await imAppendValues(SNAPSHOTS_TAB,snaps);
+    const dupWarnings=imDuplicateCheck(p.finalRows);
+    html='<div class="im-ok">Stay import complete ✓\n'
+      +p.newResCount+' reservations ('+p.newRows.length+' night rows) written.\n'
+      +'Total revenue: '+fmt$(m.revenue)+'\n'
+      +'ADR: $'+m.adr.toFixed(0)+'\n'
+      +'Occupancy: '+m.occupancy.toFixed(1)+'%\n'
+      +'Period: '+m.period+'</div>';
+    if(dupWarnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
+  }else if(p.type==='pace'){
+    step.v='replacing '+PACE_TAB;
+    await imClearTab(PACE_TAB);
+    await imPutValues(PACE_TAB,[IM_PACE_HEADER].concat(p.rows));
+    step.v='logging import';
+    await imEnsureLogHeader();
+    await imAppendValues(LOG_TAB,[[imNowStamp(),'PACE (dashboard import)',p.rows.length,'','','','','','','replace']]);
+    html='<div class="im-ok">Pace report processed ✓\n'+p.rows.length+' rows loaded.</div>';
+  }else if(p.type==='discounts'){
+    if(p.mode==='range'){
+      step.v='writing '+p.writeRows.length+' rows to '+DISCOUNTS_TAB;
+      await imPutValues(DISCOUNTS_TAB,imPadded(IM_DISC_HEADER,p.writeRows,p.prevLen));
+    }else{
+      step.v='replacing '+DISCOUNTS_TAB;
+      await imClearTab(DISCOUNTS_TAB);
+      await imPutValues(DISCOUNTS_TAB,[IM_DISC_HEADER].concat(p.rows));
+    }
+    step.v='logging import';
+    await imEnsureLogHeader();
+    await imAppendValues(LOG_TAB,[[imNowStamp(),'DISCOUNTS (dashboard import)',p.rows.length,'','','','','','',p.mode==='range'?'replace dates '+p.rangeText:'replace']]);
+    html='<div class="im-ok">Discounts report processed ✓\n'+p.rows.length+' rows loaded.\nTotal discounted: '+fmt$(p.total)+'</div>';
+  }else if(p.type==='retail'&&p.mode==='range'){
+    step.v='writing '+p.writeRows.length+' rows to '+IM_RETAIL_CLEAN;
+    await imPutValues(IM_RETAIL_CLEAN,imPadded(IM_RETAIL_HEADER,p.writeRows,p.prevLen));
+    step.v='rebuilding '+RETAIL_TAB;
+    await imClearTab(RETAIL_TAB);
+    await imPutValues(RETAIL_TAB,[IM_RETAIL_MONTHLY_HEADER].concat(p.monthlyRows));
+    step.v='logging import';
+    await imEnsureLogHeader();
+    await imAppendValues(LOG_TAB,[[imNowStamp(),'RETAIL (dashboard import)',p.newRows.length,'','','','','','','replace dates '+p.rangeText+' ('+p.unmatched+' removed as not in file)']]);
+    html='<div class="im-ok">Retail report processed ✓\n'
+      +p.newRows.length+' line item(s) written for '+p.rangeText+'.\n'
+      +p.removed+' saved item(s) in those dates replaced, '+p.unmatched+' of them not in the file.\n\n'
+      +'Resort fee revenue: '+fmt$(p.resortFeeTotal)+'\n'
+      +'Retail/Other revenue: '+fmt$(p.otherTotal)+'</div>';
+  }else if(p.type==='retail'){
+    step.v='appending to '+IM_RETAIL_CLEAN;
+    if(p.retailEmpty)await imPutValues(IM_RETAIL_CLEAN,[IM_RETAIL_HEADER]);
+    if(p.newRows.length)await imAppendValues(IM_RETAIL_CLEAN,p.newRows);
+    step.v='rebuilding '+RETAIL_TAB;
+    await imClearTab(RETAIL_TAB);
+    await imPutValues(RETAIL_TAB,[IM_RETAIL_MONTHLY_HEADER].concat(p.monthlyRows));
+    step.v='logging import';
+    await imEnsureLogHeader();
+    await imAppendValues(LOG_TAB,[[imNowStamp(),'RETAIL (dashboard import)',p.newRows.length,'','','','','','','add']]);
+    html='<div class="im-ok">Retail report processed ✓\n'
+      +p.newRows.length+' new line item(s) added.\n'
+      +p.skippedDup+' row(s) skipped as already-imported.\n\n'
+      +'Resort fee revenue: '+fmt$(p.resortFeeTotal)+'\n'
+      +'Retail/Other revenue: '+fmt$(p.otherTotal)+'</div>';
+    if(p.zeroOverlap)html+='<div class="im-warn">Note: none of these rows matched existing data — if you expected overlap with last week’s export, double-check you picked the right file.</div>';
+  }
+  return html;
+}
 async function confirmImportWrite(){
+  if(imBatchPending)return confirmBatch();
   if(!imPending)return;
   const p=imPending;
   const btn=document.getElementById('im-confirm-btn');
   btn.disabled=true;btn.textContent='Writing…';
-  let lastStep='start';
+  const step={v:'start'};
   try{
-    let html='';
-    if(p.type==='stays'){
-      if(p.mode==='range'){
-        lastStep='writing '+p.writeRows.length+' night rows to '+STAYS_TAB;
-        await imPutValues(STAYS_TAB,imPadded(IM_CLEAN_HEADER,p.writeRows,p.prevLen));
-        lastStep='rebuilding '+IMPORT_TAB;
-        await imPutValues(IMPORT_TAB,imPadded(IM_IMPORT_HEADER,p.importWriteRows,p.prevImportLen));
-      }else if(p.mode==='replace'){
-        lastStep='clearing '+STAYS_TAB;
-        await imClearTab(STAYS_TAB);
-        lastStep='writing '+p.newRows.length+' night rows';
-        await imPutValues(STAYS_TAB,[IM_CLEAN_HEADER].concat(p.newRows));
-        lastStep='rebuilding '+IMPORT_TAB;
-        await imClearTab(IMPORT_TAB);
-        await imPutValues(IMPORT_TAB,[IM_IMPORT_HEADER].concat(p.importRows));
-      }else{
-        lastStep='appending to '+STAYS_TAB;
-        await imAppendValues(STAYS_TAB,p.newRows);
-        lastStep='appending to '+IMPORT_TAB;
-        await imAppendValues(IMPORT_TAB,p.importRows);
-      }
-      lastStep='logging import';
-      await imEnsureLogHeader();
-      const m=p.afterMetrics;
-      await imAppendValues(LOG_TAB,[[imNowStamp(),'STAYS (dashboard import)',p.newResCount,m.revenue,Math.round(m.adr),Math.round(m.revpar*100)/100,Math.round(m.occupancy*10)/10,m.reservations,m.period,p.mode==='range'?'replace dates '+p.rangeText+' ('+p.absentCount+' removed as cancelled)':p.mode]]);
-      lastStep='saving snapshots';
-      let snapRaw=[];
-      try{snapRaw=await fetchTab(SNAPSHOTS_TAB);}catch(e){}
-      if(snapRaw.length===0)await imPutValues(SNAPSHOTS_TAB,[IM_SNAP_HEADER]);
-      const now=new Date(),yr=now.getFullYear(),mo=now.getMonth();
-      const ytdRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr;});
-      const monthRows=p.finalRows.filter(r=>{const d=imParseFlexDate(r[1]);return d&&d.getFullYear()===yr&&d.getMonth()===mo;});
-      const snaps=[];
-      if(ytdRows.length>0)snaps.push(imSnapRow('Range '+yr,imComputeScope(ytdRows)));
-      if(monthRows.length>0)snaps.push(imSnapRow('Month '+now.toLocaleString('en-US',{month:'short',year:'numeric'}),imComputeScope(monthRows)));
-      if(snaps.length)await imAppendValues(SNAPSHOTS_TAB,snaps);
-      const dupWarnings=imDuplicateCheck(p.finalRows);
-      html='<div class="im-ok">Stay import complete ✓\n'
-        +p.newResCount+' reservations ('+p.newRows.length+' night rows) written.\n'
-        +'Total revenue: '+fmt$(m.revenue)+'\n'
-        +'ADR: $'+m.adr.toFixed(0)+'\n'
-        +'Occupancy: '+m.occupancy.toFixed(1)+'%\n'
-        +'Period: '+m.period+'</div>';
-      if(dupWarnings.length)html+='<div class="im-warn">⚠️ Duplicate check:\n'+dupWarnings.join('\n')+'</div>';
-    }else if(p.type==='pace'){
-      lastStep='replacing '+PACE_TAB;
-      await imClearTab(PACE_TAB);
-      await imPutValues(PACE_TAB,[IM_PACE_HEADER].concat(p.rows));
-      lastStep='logging import';
-      await imEnsureLogHeader();
-      await imAppendValues(LOG_TAB,[[imNowStamp(),'PACE (dashboard import)',p.rows.length,'','','','','','','replace']]);
-      html='<div class="im-ok">Pace report processed ✓\n'+p.rows.length+' rows loaded.</div>';
-    }else if(p.type==='discounts'){
-      if(p.mode==='range'){
-        lastStep='writing '+p.writeRows.length+' rows to '+DISCOUNTS_TAB;
-        await imPutValues(DISCOUNTS_TAB,imPadded(IM_DISC_HEADER,p.writeRows,p.prevLen));
-      }else{
-        lastStep='replacing '+DISCOUNTS_TAB;
-        await imClearTab(DISCOUNTS_TAB);
-        await imPutValues(DISCOUNTS_TAB,[IM_DISC_HEADER].concat(p.rows));
-      }
-      lastStep='logging import';
-      await imEnsureLogHeader();
-      await imAppendValues(LOG_TAB,[[imNowStamp(),'DISCOUNTS (dashboard import)',p.rows.length,'','','','','','',p.mode==='range'?'replace dates '+p.rangeText:'replace']]);
-      html='<div class="im-ok">Discounts report processed ✓\n'+p.rows.length+' rows loaded.\nTotal discounted: '+fmt$(p.total)+'</div>';
-    }else if(p.type==='retail'&&p.mode==='range'){
-      lastStep='writing '+p.writeRows.length+' rows to '+IM_RETAIL_CLEAN;
-      await imPutValues(IM_RETAIL_CLEAN,imPadded(IM_RETAIL_HEADER,p.writeRows,p.prevLen));
-      lastStep='rebuilding '+RETAIL_TAB;
-      await imClearTab(RETAIL_TAB);
-      await imPutValues(RETAIL_TAB,[IM_RETAIL_MONTHLY_HEADER].concat(p.monthlyRows));
-      lastStep='logging import';
-      await imEnsureLogHeader();
-      await imAppendValues(LOG_TAB,[[imNowStamp(),'RETAIL (dashboard import)',p.newRows.length,'','','','','','','replace dates '+p.rangeText+' ('+p.unmatched+' removed as not in file)']]);
-      html='<div class="im-ok">Retail report processed ✓\n'
-        +p.newRows.length+' line item(s) written for '+p.rangeText+'.\n'
-        +p.removed+' saved item(s) in those dates replaced, '+p.unmatched+' of them not in the file.\n\n'
-        +'Resort fee revenue: '+fmt$(p.resortFeeTotal)+'\n'
-        +'Retail/Other revenue: '+fmt$(p.otherTotal)+'</div>';
-    }else if(p.type==='retail'){
-      lastStep='appending to '+IM_RETAIL_CLEAN;
-      if(p.retailEmpty)await imPutValues(IM_RETAIL_CLEAN,[IM_RETAIL_HEADER]);
-      if(p.newRows.length)await imAppendValues(IM_RETAIL_CLEAN,p.newRows);
-      lastStep='rebuilding '+RETAIL_TAB;
-      await imClearTab(RETAIL_TAB);
-      await imPutValues(RETAIL_TAB,[IM_RETAIL_MONTHLY_HEADER].concat(p.monthlyRows));
-      lastStep='logging import';
-      await imEnsureLogHeader();
-      await imAppendValues(LOG_TAB,[[imNowStamp(),'RETAIL (dashboard import)',p.newRows.length,'','','','','','','add']]);
-      html='<div class="im-ok">Retail report processed ✓\n'
-        +p.newRows.length+' new line item(s) added.\n'
-        +p.skippedDup+' row(s) skipped as already-imported.\n\n'
-        +'Resort fee revenue: '+fmt$(p.resortFeeTotal)+'\n'
-        +'Retail/Other revenue: '+fmt$(p.otherTotal)+'</div>';
-      if(p.zeroOverlap)html+='<div class="im-warn">Note: none of these rows matched existing data — if you expected overlap with last week’s export, double-check you picked the right file.</div>';
-    }
+    let html=await imWriteOne(p,step);
     document.getElementById('im-step-preview').style.display='none';
     html+='<p style="font-size:12px;color:var(--text3);margin-top:12px;">Refreshing dashboard…</p>';
     document.getElementById('im-result-body').innerHTML=html;
@@ -1631,7 +1744,7 @@ async function confirmImportWrite(){
     imPending=null;
     try{await loadAll();}catch(e){}
   }catch(e){
-    document.getElementById('im-result-body').innerHTML='<div class="im-err">Import failed while '+lastStep+':\n'+e.message+'\n\nThe sheet may be partially written. Re-run the import once the issue is fixed (stays/pace/discounts imports, and retail with "Replace only the dates", rebuild their data, so re-running cleans up any partial write), or use the Apps Script menu (Revenue Tools) as a fallback.</div>';
+    document.getElementById('im-result-body').innerHTML='<div class="im-err">Import failed while '+step.v+':\n'+e.message+'\n\nThe sheet may be partially written. Re-run the import once the issue is fixed (stays/pace/discounts imports, and retail with "Replace only the dates", rebuild their data, so re-running cleans up any partial write), or use the Apps Script menu (Revenue Tools) as a fallback.</div>';
     document.getElementById('im-step-result').style.display='block';
   }finally{
     btn.disabled=false;btn.textContent='Confirm — write to sheet';
