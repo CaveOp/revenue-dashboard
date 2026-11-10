@@ -94,17 +94,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
 .panel-title{font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);}
 .panel-body{padding:24px;}
-.pkg-item{padding:22px 0;border-top:1px solid var(--border);}
-.pkg-item:first-child{padding-top:0;border-top:none;}
-.pkg-item:last-child{padding-bottom:0;}
-.pkg-name{font-size:17px;font-weight:700;color:var(--text);margin-bottom:10px;}
-.pkg-figs{width:100%;max-width:520px;border-collapse:collapse;margin-bottom:14px;}
-.pkg-figs th{font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);text-align:right;padding:0 0 6px 16px;}
-.pkg-figs th:first-child{text-align:left;padding-left:0;}
-.pkg-figs td{font-size:15px;color:var(--text2);padding:4px 0 4px 16px;text-align:right;border-top:1px solid var(--border);}
-.pkg-figs td:first-child{text-align:left;padding-left:0;}
-.pkg-figs td b{font-size:18px;color:var(--text);}
-.pkg-figs tr.dim td,.pkg-figs tr.dim td b{color:var(--text3);font-weight:400;}
+.disc-promo td{cursor:pointer;}
+.disc-caret{display:inline-block;width:18px;color:var(--slate);}
+.promo-tag{display:inline-block;margin-left:8px;font-size:9px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--green);background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:4px;padding:1px 6px;vertical-align:2px;}
+.promo-detail > td{background:var(--surface2);padding:18px 20px 20px 34px !important;}
+.data-table tr.promo-detail:hover td{background:var(--surface2);}
+.promo-whole{font-size:14px;color:var(--text2);margin-bottom:12px;}
+.promo-whole b{color:var(--text);}
+.promo-whole.dim,.promo-whole.dim b{color:var(--text3);font-weight:400;}
 .pkg-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);gap:2px;}
 .pkg-bar i{display:block;height:100%;}
 .pkg-legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:13px;color:var(--text2);}
@@ -114,7 +111,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .pkg-more{margin-top:12px;font-size:13px;font-weight:600;color:var(--slate);background:none;border:none;padding:0;cursor:pointer;font-family:var(--sans);}
 .pkg-more:hover{text-decoration:underline;}
 .pkg-detail{display:none;margin-top:12px;}
-.pkg-item.open .pkg-detail{display:block;}
+.promo-detail.open .pkg-detail{display:block;}
 .pkg-detail td{vertical-align:top;}
 @media print{.pkg-detail{display:block !important;}.pkg-more{display:none;}}
 .cat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
@@ -392,19 +389,15 @@ tr.unit-row.hidden{display:none;}
       </div>
     </div>
     <div class="panel full" id="discounts-panel" style="display:none">
-      <div class="panel-header"><span class="panel-title">Discounts &amp; Packages</span><span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)" id="disc-period-label"></span></div>
+      <div class="panel-header"><span class="panel-title">Discounts &amp; Promo Codes</span><span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)" id="disc-period-label"></span></div>
       <div class="panel-body">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;">
           <div style="background:var(--terra-bg);border:1px solid rgba(196,87,42,0.15);border-radius:12px;padding:18px 20px;"><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--terra);margin-bottom:8px;">Total Discounted</div><div style="font-size:28px;font-weight:700;color:var(--text);" id="disc-total">—</div></div>
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;"><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Reservations Affected</div><div style="font-size:28px;font-weight:700;color:var(--text);" id="disc-res-count">—</div></div>
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;"><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">% of Gross Revenue</div><div style="font-size:28px;font-weight:700;color:var(--text);" id="disc-pct">—</div></div>
         </div>
-        <table class="data-table"><thead><tr><th>Package / Discount</th><th class="right">Amount</th><th style="min-width:140px"></th><th class="right">Reservations</th><th class="right">Avg per Res</th></tr></thead><tbody id="disc-tbody"></tbody></table>
+        <table class="data-table"><thead><tr><th>Package / Discount</th><th class="right">Discount</th><th class="right">Reservations</th><th class="right">Booked revenue</th></tr></thead><tbody id="disc-tbody"></tbody></table>
       </div>
-    </div>
-    <div class="panel full" id="pkg-panel" style="display:none">
-      <div class="panel-header"><span class="panel-title">Promo Code Packages</span><span class="panel-title" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)" id="pkg-period-label"></span></div>
-      <div class="panel-body" id="pkg-cards"></div>
     </div>
     <div class="panel full" id="pace-panel">
       <div class="panel-header"><span class="panel-title">Year over Year Pace — 2026 vs 2025</span><span style="font-size:11px;color:var(--text3);">Full year · Booked as of today</span></div>
@@ -623,7 +616,7 @@ function buildFilters(){
   JUMP_LINKS.forEach(([id,label])=>{const b=document.createElement('button');b.type='button';b.className='jump-btn';b.dataset.target=id;b.textContent=label;b.onclick=()=>jumpTo(id);jr.appendChild(b);});
   bar.appendChild(jr);
 }
-const JUMP_LINKS=[['unit-panel','Unit Performance'],['retail-panel','Retail & Resort Fees'],['discounts-panel','Discounts & Packages'],['pkg-panel','Promo Code Packages'],['pace-panel','Pace']];
+const JUMP_LINKS=[['unit-panel','Unit Performance'],['retail-panel','Retail & Resort Fees'],['discounts-panel','Discounts & Promo Codes'],['pace-panel','Pace']];
 // scroll so the section's top sits just below the pinned header and month bar
 function jumpTo(id){
   const el=document.getElementById(id);if(!el)return;
@@ -640,7 +633,7 @@ window.addEventListener('scroll',()=>{const b=document.getElementById('filter-ba
 function mkBtn(label,val,active){const b=document.createElement('button');b.className='filter-btn'+(active?' active':'');b.textContent=label;b.onclick=()=>{activeFilter=val;document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderAll();};return b;}
 function filtered(){if(!activeFilter)return staysData;return staysData.filter(r=>mYr(r.nightDate)===activeFilter);}
 function getFilteredDiscounts(){if(!activeFilter)return discountsData;return discountsData.filter(r=>r.date&&mYr(r.date)===activeFilter);}
-function renderAll(){const rows=filtered();renderScores(rows);renderCats(rows);renderRevChart(rows);renderChChart(rows);renderUnits(rows);renderBW(rows);renderCatChart(rows);renderDiscounts();renderPromoPackages();renderPace();renderRetail();updateJumpLinks();}
+function renderAll(){const rows=filtered();renderScores(rows);renderCats(rows);renderRevChart(rows);renderChChart(rows);renderUnits(rows);renderBW(rows);renderCatChart(rows);renderDiscounts();renderPace();renderRetail();updateJumpLinks();}
 function renderScores(rows){
   const grossRev=rows.reduce((s,r)=>s+r.nightRevenue,0),n=rows.length;
   let days=1;if(n>0){const t=rows.map(r=>r.nightDate.getTime());days=Math.round((Math.max(...t)-Math.min(...t))/86400000)+1;}
@@ -747,21 +740,11 @@ function renderCatChart(rows){
   const totalRev=revs.reduce((a,b)=>a+b,0);
   document.getElementById('cat-detail-tbody').innerHTML=cats.map(cat=>{const rev=ct[cat],nights=cn[cat],adr=nights>0?rev/nights:0,pct=totalRev>0?(rev/totalRev)*100:0;return`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CAT_COLORS[cat]};margin-right:8px;vertical-align:middle;"></span><span style="color:var(--text);font-weight:500">${cat}</span></td><td class="right">${fmt$(rev)}</td><td class="right">${nights}</td><td class="right">${fmt$(adr)}</td><td class="right">${pct.toFixed(1)}%</td></tr>`;}).join('');
 }
-function renderDiscounts(){
-  const disc=getFilteredDiscounts(),panel=document.getElementById('discounts-panel');
-  if(!disc.length){panel.style.display='none';return;}panel.style.display='block';
-  document.getElementById('disc-period-label').textContent=activeFilter||'';
-  const totalDisc=disc.reduce((s,r)=>s+r.amount,0),uniqueRes=new Set(disc.map(r=>r.res)).size,grossRev=filtered().reduce((s,r)=>s+r.nightRevenue,0),pct=grossRev>0?(totalDisc/grossRev)*100:0;
-  document.getElementById('disc-total').textContent=fmt$(totalDisc);document.getElementById('disc-res-count').textContent=uniqueRes;document.getElementById('disc-pct').textContent=pct.toFixed(1)+'%';
-  const byLabel={};disc.forEach(r=>{if(!byLabel[r.details])byLabel[r.details]={amount:0,res:new Set()};byLabel[r.details].amount+=r.amount;byLabel[r.details].res.add(r.res);});
-  const sorted=Object.entries(byLabel).sort((a,b)=>b[1].amount-a[1].amount),maxAmt=sorted.length>0?sorted[0][1].amount:1;
-  document.getElementById('disc-tbody').innerHTML=sorted.map(([label,d])=>{const avg=d.res.size>0?d.amount/d.res.size:0,barPct=maxAmt>0?(d.amount/maxAmt)*100:0;return`<tr><td style="color:var(--text);font-weight:500">${label}</td><td class="right">${fmt$(d.amount)}</td><td><div style="display:flex;align-items:center;gap:8px;padding:0 8px;"><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${barPct}%;background:var(--terra);border-radius:2px;"></div></div></div></td><td class="right">${d.res.size}</td><td class="right">${fmt$(avg)}</td></tr>`;}).join('');
-}
 /* ---------- Promo Code Packages ----------
-   One card per package (discount rows whose Details start with "Package:").
+   Promo code packages are discount rows whose Details start with "Package:". They are rows in the
+   Discounts & Promo Codes table that open to the whole campaign.
    Booked revenue = room charge + resort fee − discounts and packages, the same as the Paid Ads page.
-   "Whole campaign" counts every reservation that used the package, all dates.
-   "Stays in <month>" counts only the nights, fees and discounts dated in the month picked above.
+   The table's Booked revenue is the part dated in the month picked; "Whole campaign" is all dates.
    The source bar is where GA4 says each reservation came from (GA4_AUTO, filled by the GA4 script). */
 const PROMO_GA4_TAB='GA4_AUTO',PROMO_RETAIL_TAB='RETAIL_CLEAN';
 let promo={pkgByRes:{},discRows:[],feeRows:[],smByRes:{}};
@@ -797,47 +780,57 @@ function promoSrc(sm){
   if(source==='(direct)')return 'Direct';
   return 'Other sites';
 }
-function renderPromoPackages(){
-  const panel=document.getElementById('pkg-panel');
-  const pkgRes=Object.keys(promo.pkgByRes);
-  if(!pkgRes.length){panel.style.display='none';return;}
+// Per package, from every reservation that used it: whole-campaign totals, GA4 sources and booking months.
+// val[res].mo is the part of each reservation dated in the month picked (nights, resort fees, discounts).
+function promoStats(){
+  const pkgRes=Object.keys(promo.pkgByRes),want=new Set(pkgRes),val={},by={};
+  if(!pkgRes.length)return {by,val};
   const inMonth=d=>!activeFilter||(d&&mYr(d)===activeFilter);
-  // per reservation: whole stay and the part in the month picked
-  const want=new Set(pkgRes),val={};
-  const v=res=>val[res]||(val[res]={all:0,mo:0,nights:0,moNights:0,booked:null});
-  staysData.forEach(r=>{const res=promoRes(r.res);if(!want.has(res))return;const e=v(res);e.all+=r.nightRevenue;e.nights++;if(r.reservedOn&&(!e.booked||r.reservedOn<e.booked))e.booked=r.reservedOn;if(inMonth(r.nightDate)){e.mo+=r.nightRevenue;e.moNights++;}});
+  const v=res=>val[res]||(val[res]={all:0,mo:0,nights:0,booked:null});
+  staysData.forEach(r=>{const res=promoRes(r.res);if(!want.has(res))return;const e=v(res);e.all+=r.nightRevenue;e.nights++;if(r.reservedOn&&(!e.booked||r.reservedOn<e.booked))e.booked=r.reservedOn;if(inMonth(r.nightDate))e.mo+=r.nightRevenue;});
   promo.feeRows.forEach(r=>{if(!want.has(r.res))return;const e=v(r.res);e.all+=r.amt;if(inMonth(r.date))e.mo+=r.amt;});
   promo.discRows.forEach(r=>{if(!want.has(r.res))return;const e=v(r.res);e.all-=r.amt;if(inMonth(r.date))e.mo-=r.amt;});
-  const by={};
   pkgRes.forEach(res=>{
     const e=val[res];if(!e||!e.nights)return;            // not in the stays data (not imported yet, or cancelled)
-    const grp=promoSrc(res in promo.smByRes?promo.smByRes[res]:null);
+    const sm=res in promo.smByRes?promo.smByRes[res]:null,grp=promoSrc(sm);
     promo.pkgByRes[res].forEach(n=>{
-      const p=by[n]||(by[n]={name:n,n:0,rn:0,moN:0,moRn:0,groups:{},bookedMonths:new Set()});
-      p.n++;p.rn+=e.all;if(e.booked)p.bookedMonths.add(mYr(e.booked));if(e.moNights){p.moN++;p.moRn+=e.mo;}
-      const g=p.groups[grp]||(p.groups[grp]={n:0,rn:0,list:[]});g.n++;g.rn+=e.all;g.list.push({res,sm:res in promo.smByRes?promo.smByRes[res]:''});
+      const p=by[n]||(by[n]={name:n,n:0,rn:0,groups:{},bookedMonths:new Set()});
+      p.n++;p.rn+=e.all;if(e.booked)p.bookedMonths.add(mYr(e.booked));
+      const g=p.groups[grp]||(p.groups[grp]={n:0,rn:0,list:[]});g.n++;g.rn+=e.all;g.list.push({res,sm:sm||''});
     });
   });
-  // with a month picked, only packages with nights in that month
-  const pk=Object.values(by).filter(p=>!activeFilter||p.moN).sort((a,b)=>(activeFilter?b.moN-a.moN:0)||b.n-a.n||a.name.localeCompare(b.name));
-  if(!pk.length){panel.style.display='none';return;}
-  panel.style.display='block';
-  document.getElementById('pkg-period-label').textContent=activeFilter||'';
-  document.getElementById('pkg-cards').innerHTML=pk.map((p,i)=>{
+  return {by,val};
+}
+// Discounts & Promo Codes: every package and discount dated in the month picked.
+// Promo code packages also show the month's booked revenue and open to the whole campaign.
+function renderDiscounts(){
+  const disc=getFilteredDiscounts(),panel=document.getElementById('discounts-panel');
+  if(!disc.length){panel.style.display='none';return;}panel.style.display='block';
+  document.getElementById('disc-period-label').textContent=activeFilter||'';
+  const totalDisc=disc.reduce((s,r)=>s+r.amount,0),uniqueRes=new Set(disc.map(r=>r.res)).size,grossRev=filtered().reduce((s,r)=>s+r.nightRevenue,0),pct=grossRev>0?(totalDisc/grossRev)*100:0;
+  document.getElementById('disc-total').textContent=fmt$(totalDisc);document.getElementById('disc-res-count').textContent=uniqueRes;document.getElementById('disc-pct').textContent=pct.toFixed(1)+'%';
+  const ps=promoStats();
+  const byLabel={};disc.forEach(r=>{if(!byLabel[r.details])byLabel[r.details]={amount:0,res:new Set()};byLabel[r.details].amount+=r.amount;byLabel[r.details].res.add(promoRes(r.res));});
+  const sorted=Object.entries(byLabel).sort((a,b)=>b[1].amount-a[1].amount);
+  document.getElementById('disc-tbody').innerHTML=sorted.map(([label,d],i)=>{
+    const p=ps.by[label];
+    if(!p)return '<tr><td style="color:var(--text);font-weight:500;padding-left:34px">'+escHtml(label)+'</td><td class="right">'+fmt$(d.amount)+'</td><td class="right">'+d.res.size+'</td><td class="right">—</td></tr>';
+    const moRn=[...d.res].reduce((t,res)=>t+(ps.val[res]?ps.val[res].mo:0),0);
     const gs=PROMO_SRC.filter(([g])=>p.groups[g]);
     const bar=gs.map(([g,col])=>'<i style="flex:'+p.groups[g].n+';background:'+col+'" title="'+escHtml(g)+': '+p.groups[g].n+'"></i>').join('');
     const leg=gs.map(([g,col])=>'<span><i style="background:'+col+'"></i>'+escHtml(g)+' <b>'+p.groups[g].n.toLocaleString()+'</b></span>').join('');
     const det=gs.map(([g])=>{const e=p.groups[g];return '<tr><td><b>'+escHtml(g)+'</b></td><td>'+e.list.sort((a,b)=>a.res.localeCompare(b.res)).map(x=>'<span title="'+escHtml(x.sm||'not in GA4')+'">'+escHtml(x.res)+'</span>').join(', ')+'</td><td class="right">'+e.n.toLocaleString()+'</td><td class="right">'+fmt$(e.rn)+'</td></tr>';}).join('');
-    const figs='<table class="pkg-figs"><tr><th></th><th>Bookings</th><th>Booked revenue</th></tr>'
-      +'<tr'+(p.bookedMonths.has(activeFilter)?'':' class="dim" title="Greyed: none of this package’s reservations were booked in '+escHtml(activeFilter)+'"')+'><td>Whole campaign</td><td><b>'+p.n.toLocaleString()+'</b></td><td><b>'+fmt$(p.rn)+'</b></td></tr>'
-      +(activeFilter?'<tr><td>Stays in '+escHtml(activeFilter)+'</td><td><b>'+p.moN.toLocaleString()+'</b></td><td><b>'+fmt$(p.moRn)+'</b></td></tr>':'')+'</table>';
-    return '<div class="pkg-item" id="pkg-'+i+'"><div class="pkg-name">'+escHtml(p.name)+'</div>'+figs
+    const dim=!p.bookedMonths.has(activeFilter);
+    return '<tr class="disc-promo" onclick="togglePromo('+i+')"><td style="color:var(--text);font-weight:500"><span class="disc-caret" id="promo-caret-'+i+'">▸</span>'+escHtml(label)+'<span class="promo-tag">Promo</span></td><td class="right">'+fmt$(d.amount)+'</td><td class="right">'+d.res.size+'</td><td class="right">'+fmt$(moRn)+'</td></tr>'
+      +'<tr class="promo-detail" id="promo-'+i+'" style="display:none"><td colspan="4">'
+      +'<div class="promo-whole'+(dim?' dim':'')+'"'+(dim?' title="Greyed: none of these reservations were booked in '+escHtml(activeFilter)+'"':'')+'>Whole campaign: <b>'+p.n.toLocaleString()+(p.n===1?' booking':' bookings')+'</b> · <b>'+fmt$(p.rn)+'</b> booked revenue</div>'
       +'<div class="pkg-bar">'+bar+'</div><div class="pkg-legend">'+leg+'</div>'
-      +'<button class="pkg-more" onclick="togglePkg('+i+')">Show reservations ▸</button>'
-      +'<div class="pkg-detail"><table class="data-table"><thead><tr><th>Source</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th></tr></thead><tbody>'+det+'</tbody></table></div></div>';
+      +'<button class="pkg-more" onclick="togglePromoRes('+i+')">Show reservations ▸</button>'
+      +'<div class="pkg-detail"><table class="data-table"><thead><tr><th>Source</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th></tr></thead><tbody>'+det+'</tbody></table></div></td></tr>';
   }).join('');
 }
-function togglePkg(i){const c=document.getElementById('pkg-'+i);const open=c.classList.toggle('open');c.querySelector('.pkg-more').textContent=open?'Hide reservations ▾':'Show reservations ▸';updateSwipeHints();}
+function togglePromo(i){const r=document.getElementById('promo-'+i),open=r.style.display==='none';r.style.display=open?'':'none';document.getElementById('promo-caret-'+i).textContent=open?'▾':'▸';updateSwipeHints();}
+function togglePromoRes(i){const r=document.getElementById('promo-'+i),open=r.classList.toggle('open');r.querySelector('.pkg-more').textContent=open?'Hide reservations ▾':'Show reservations ▸';updateSwipeHints();}
 function renderRetail(){
   const panel=document.getElementById('retail-panel');
   if(!retailMonthlyData||!retailMonthlyData.length){panel.style.display='none';return;}
