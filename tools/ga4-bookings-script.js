@@ -26,6 +26,19 @@ var GA4_HEADER = ['TransactionId', 'Date', 'Cycle', 'CycleStart', 'SourceMedium'
               'FirstUserCampaign', 'Revenue', 'ImportedOn', 'Keyword', 'SearchQuery'];
 var GA4_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// The Paid Ads page's "Refresh GA4" button opens this script's web app address, which runs the same refresh.
+// Deploy → New deployment → Web app, Execute as: Me, Who has access: Only myself.
+// If Code.gs already has a doGet, tell Claude before deploying: there can only be one in the project.
+function doGet() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return ga4Page('A GA4 refresh is already running. This window will close when it finishes.');
+  try { refreshGa4(); } finally { lock.releaseLock(); }
+  return ga4Page('GA4 bookings updated. You can close this window.');
+}
+function ga4Page(msg) {
+  return HtmlService.createHtmlOutput('<p style="font-family:sans-serif;font-size:15px;padding:20px;">' + msg + '</p>').setTitle('GA4 refresh');
+}
+
 function refreshGa4() {
   if (!/^\d+$/.test(GA4_PROPERTY_ID)) throw new Error('Fill in GA4_PROPERTY_ID at the top of the script (numbers only).');
   var tz = Session.getScriptTimeZone();

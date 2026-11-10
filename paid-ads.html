@@ -170,6 +170,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 .hero .scorecard.phone .scorecard-value{color:var(--text2);font-size:24px;}
 .status{font-size:14px;color:var(--text2);}
 .status .bad{color:var(--terra);font-weight:600;}
+.ga4-refresh{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.ga4-upd{font-size:14px;color:var(--text3);}
+.ga4-upd.bad{color:var(--terra);font-weight:600;}
+.hdr-btn:disabled{opacity:0.6;cursor:default;}
+.pkg-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:22px 26px;margin-bottom:16px;}
+.pkg-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px;}
+.pkg-name{font-size:18px;font-weight:700;color:var(--text);}
+.pkg-figs{display:flex;gap:28px;}
+.pkg-fig{text-align:right;}
+.pkg-fig b{display:block;font-size:22px;font-weight:700;color:var(--text);line-height:1.2;}
+.pkg-fig span{font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);}
+.pkg-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);gap:2px;}
+.pkg-bar i{display:block;height:100%;}
+.pkg-legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:14px;color:var(--text2);}
+.pkg-legend span{display:inline-flex;align-items:center;gap:7px;}
+.pkg-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;}
+.pkg-legend b{color:var(--text);}
+.pkg-more{margin-top:14px;font-size:13px;font-weight:600;color:var(--slate);background:none;border:none;padding:0;cursor:pointer;font-family:var(--sans);}
+.pkg-more:hover{text-decoration:underline;}
+.pkg-detail{display:none;margin-top:12px;border-top:1px solid var(--border);}
+.pkg-card.open .pkg-detail{display:block;}
+.pkg-detail td{vertical-align:top;}
+@media print{.ga4-refresh{display:none;}.pkg-detail{display:block !important;}.pkg-more{display:none;}}
 .tbl-toggle{font-size:13px;font-weight:600;color:var(--slate);background:none;border:1px solid var(--border2);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:var(--sans);}
 .tbl-toggle:hover{border-color:var(--slate3);}
 .data-table .det{display:table-cell;}
@@ -426,7 +449,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 52">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 54">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" id="import-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -446,6 +469,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
     <select class="filter-select" id="cycle-select" onchange="render()"></select>
     <span class="filter-sep"></span>
     <span class="status" id="status-line"></span>
+    <span class="ga4-refresh" id="ga4-refresh-wrap" style="display:none;"><span class="ga4-upd" id="ga4-upd"></span><button class="hdr-btn" id="ga4-refresh-btn" onclick="refreshGa4Now()">&#8635; Refresh GA4</button></span>
   </div>
 
   <div class="content">
@@ -523,6 +547,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         </table></div>
       </div>
 
+      <div id="pkg-section" style="display:none;">
+        <div class="sec"><h2>Packages</h2><span id="pkg-sub"></span></div>
+        <div id="pkg-cards"></div>
+      </div>
+
       <div class="fold collapsed" id="kw-fold">
       <div class="sec fold-head" onclick="toggleFold('kw-fold')" title="Show or hide the keyword rows"><h2>Which keywords earned it</h2><span id="kw-sub"></span></div>
       <div class="panel">
@@ -561,6 +590,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
         <p class="help" style="margin-top:14px;" id="cov-note"></p></div>
       </div>
 
+      <div class="sec"><h2>Other bookings</h2><span id="other-sub"></span></div>
+      <div class="panel">
+        <div class="table-scroll"><table class="data-table">
+          <thead><tr><th>Source / medium</th><th>Campaign</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">GA4 revenue</th></tr></thead>
+          <tbody id="other-tbody"></tbody><tfoot id="other-tfoot"></tfoot>
+        </table></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -573,6 +610,9 @@ const RETAIL_TAB= 'RETAIL_CLEAN';
 // Spend and GA4 bookings come from the tabs the daily scripts fill (*_AUTO); importing is off.
 // paid-ads.html?imported shows the old hand-imported tabs (*_CLEAN) instead, with the import button.
 const AUTO      = !new URLSearchParams(location.search).has('imported');
+const DISCOUNTS_TAB='DISCOUNTS_CLEAN';  // ResNexus Discounts report (imported on the Revenue page); only "Package:" rows are used here
+// Web app address of the GA4 bookings script (Deploy → Web app in the sheet's Apps Script). Empty hides the Refresh GA4 button.
+const GA4_REFRESH_URL='https://script.google.com/a/macros/cavesprings.com/s/AKfycbyv0YGvw0jxndac2KKd6imZotzyJu1DnKUJ7C6Gc9lPl6Ql0d6QqJocEpBw_V2fWlOS8Q/exec';
 const SPEND_TAB = AUTO?'AD_SPEND_AUTO':'AD_SPEND_CLEAN';
 const GA4_TAB   = AUTO?'GA4_AUTO':'GA4_TXN_CLEAN';
 const KW_TAB    = AUTO?'AD_KEYWORDS_AUTO':'AD_KEYWORDS_CLEAN';
@@ -592,6 +632,7 @@ const ord=n=>n+([,'st','nd','rd'][n%100>>3^1&&n%10]||'th');
 
 let tokenClient, accessToken;
 let staysByRes={}, feeByRes={}, feeLoaded=false, spendRows=[], ga4Rows=[], kwRows=[], dailyRows=[];
+let pkgByRes={};               // Res# → [package names], from DISCOUNTS_CLEAN
 let rnThrough='';             // newest "reserved on" date in the ResNexus stays (test page only)
 let knownCycles=[];            // [{label,start}] oldest → newest, from saved data
 let cycleChart, campChart;
@@ -1049,7 +1090,7 @@ if(AUTO)document.getElementById('import-btn').style.display='none';
 /* ---------- Load ---------- */
 async function loadAll(){
   try{
-    const [stayRaw,retailRaw,spendRaw,ga4Raw,kwRaw,dailyRaw]=await Promise.all([fetchTab(STAYS_TAB),fetchTab(RETAIL_TAB).catch(()=>[]),fetchTab(SPEND_TAB),fetchTab(GA4_TAB),fetchTab(KW_TAB),fetchTab(DAILY_TAB).catch(()=>[])]);
+    const [stayRaw,retailRaw,spendRaw,ga4Raw,kwRaw,dailyRaw,discRaw]=await Promise.all([fetchTab(STAYS_TAB),fetchTab(RETAIL_TAB).catch(()=>[]),fetchTab(SPEND_TAB),fetchTab(GA4_TAB),fetchTab(KW_TAB),fetchTab(DAILY_TAB).catch(()=>[]),fetchTab(DISCOUNTS_TAB).catch(()=>[])]);
     staysByRes={};
     toRows(stayRaw).forEach(r=>{
       const raw=String(r['Res#']||r['Res']||'').trim();if(!raw)return;const res=/^\d+$/.test(raw)?String(parseInt(raw,10)):raw;
@@ -1072,6 +1113,13 @@ async function loadAll(){
     ga4Rows=toRows(ga4Raw).map(r=>({id:String(parseInt(r['TransactionId'],10)),date:r['Date'],cycle:r['Cycle'],cycleStart:r['CycleStart'],sm:r['SourceMedium'],campaign:r['Campaign'],fusm:r['FirstUserSourceMedium'],fcamp:r['FirstUserCampaign'],revenue:r['Revenue']===''?null:pMoney(r['Revenue']),imported:r['ImportedOn'],keyword:r['Keyword']||'',query:r['SearchQuery']||''})).filter(r=>r.id&&r.id!=='NaN'&&r.cycleStart);
     kwRows=toRows(kwRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],keyword:r['Keyword'],cost:pMoney(r['Cost']),clicks:pInt(r['Clicks']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.keyword);
     dailyRows=toRows(dailyRaw).map(r=>{const d=parseDateLoose(r['Date']);return {date:d?toISO(d):'',cost:pMoney(r['Cost']),imported:r['ImportedOn']};}).filter(r=>r.date);
+    pkgByRes={};
+    toRows(discRaw).forEach(r=>{
+      const d=String(r['Details']||'').trim();if(!/^package:/i.test(d))return;
+      const raw=String(r['Res#']||r['Res']||'').trim();if(!raw)return;const res=/^\d+$/.test(raw)?String(parseInt(raw,10)):raw;
+      const name=d.replace(/^package:\s*/i,'').trim();if(!name)return;
+      const a=pkgByRes[res]||(pkgByRes[res]=[]);if(!a.includes(name))a.push(name);
+    });
     showDash();buildCycles();render();
   }catch(e){
     if(e.auth){clearToken();accessToken=null;showAuth();return;}
@@ -1213,6 +1261,9 @@ function render(){
   document.getElementById('camp-tfoot').innerHTML=rows.length?'<tr><td>All campaigns</td><td class="right">'+fmt$(s.spendTotal)+'</td><td class="right">'+fmtN(s.web.length)+'</td><td class="right">'+fmt$(s.rn)+'</td><td class="right">'+fmtX(ret)+'</td><td class="right det">'+(s.web.length&&s.spendTotal?fmt$(s.spendTotal/s.web.length):'—')+'</td><td class="right det">'+fmt$(s.ga4)+'</td><td class="right det">'+(s.um||'—')+'</td><td class="right det">'+(rows.some(r=>r.hasClicks)?fmtN(sum(rows,r=>r.clicks)):'—')+'</td><td class="right det">'+(rows.some(r=>r.hasConv)?sum(rows,r=>r.conv).toLocaleString('en-US',{maximumFractionDigits:1}):'—')+'</td></tr>':'';
 
   renderSocial(s,label);
+  renderPackages(starts,label);
+  renderOther(s,label);
+  renderGa4Updated();
   renderKeywords(starts,s,label);
 
   // trend
@@ -1341,6 +1392,107 @@ function renderSocial(s,label){
     :'<tr><td colspan="8" class="empty-state">No Facebook, Instagram or email bookings in this cycle</td></tr>';
   document.getElementById('social-tfoot').innerHTML=rows.length?'<tr><td colspan="4">All</td><td class="right">'+fmtN(sum(rows,r=>r.n))+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">—</td></tr>':'';
 }
+// Other bookings: every GA4 booking not in the Google Ads or Facebook, Instagram & Email tables,
+// so a new or unexpected tag (texts, other sites, plain search) is never left off the page.
+function renderOther(s,label){
+  document.getElementById('other-sub').textContent=label;
+  const by={};
+  s.allGa4.filter(r=>!isGoogleAds(r.sm)&&!isMetaSource(r.sm)&&!isEmail(r.sm)).forEach(r=>{
+    const sm=String(r.sm||'').trim()||'(not set)';const camp=String(r.campaign||'').trim();
+    const name=!camp||/^\((not set|referral|direct|none|organic)\)$/i.test(camp)?'':camp;
+    const k=sm.toLowerCase()+'|'+name.toLowerCase();
+    const e=by[k]||(by[k]={sm,name,ids:[],n:0,ga4:0,rn:0});const v=rnValue(r.id);
+    e.n++;e.ids.push(r.id);e.ga4+=r.revenue||0;if(v!=null)e.rn+=v;});
+  const rows=Object.values(by).sort((a,b)=>b.n-a.n||a.sm.localeCompare(b.sm)||a.name.localeCompare(b.name));
+  document.getElementById('other-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td>'+esc(r.sm)+'</td><td>'+(r.name?esc(r.name):'—')+'</td><td>'+esc(r.ids.join(', '))+'</td><td class="right">'+fmtN(r.n)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+fmt$(r.ga4)+'</td></tr>').join('')
+    :'<tr><td colspan="6" class="empty-state">No other bookings in this cycle</td></tr>';
+  document.getElementById('other-tfoot').innerHTML=rows.length?'<tr><td colspan="3">All</td><td class="right">'+fmtN(sum(rows,r=>r.n))+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td></tr>':'';
+}
+/* ---------- Packages ---------- */
+// Where GA4 says each booking came from, in plain names. Bookings GA4 has no record of are "No GA4 record".
+const SRC_GROUPS=[['Email','#3a7d5c'],['Text','#86b89e'],['Google Ads','#2f5d8a'],['Google search','#6f97c0'],['Bing search','#a9c2dc'],
+  ['AI assistants','#6b5b8c'],['Facebook','#c4572a'],['Instagram','#e3956f'],['Direct','#b87c2a'],['Other sites','#8a96a3'],['No GA4 record','#d6cec3']];
+function srcGroup(sm){
+  if(sm==null)return 'No GA4 record';
+  const {source,medium}=splitSM(sm);
+  if(isEmail(sm))return 'Email';
+  if(medium==='sms'||source==='sms'||medium==='text')return 'Text';
+  if(isGoogleAds(sm))return 'Google Ads';
+  if(source==='google'&&medium==='organic')return 'Google search';
+  if(source==='bing'&&medium==='organic')return 'Bing search';
+  if(medium==='ai-assistant'||/(^|\.)(chatgpt|openai|perplexity|gemini|copilot|claude)\.(com|ai)$/.test(source)||/^(chatgpt|perplexity|gemini|copilot|claude)$/.test(source))return 'AI assistants';
+  if(isMetaSource(sm))return /instagram|^ig$/.test(source)?'Instagram':'Facebook';
+  if(source==='(direct)')return 'Direct';
+  return 'Other sites';
+}
+// One card per package: bookings made in the cycle (ResNexus booked-on date), split by GA4 source.
+function renderPackages(starts,label){
+  const sec=document.getElementById('pkg-section');
+  if(!Object.keys(pkgByRes).length){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('pkg-sub').textContent=label;
+  const inSet=iso=>starts.includes(iso);
+  const ga4ById={};ga4Rows.forEach(r=>{if(!ga4ById[r.id])ga4ById[r.id]=r;});
+  const by={};
+  Object.entries(pkgByRes).forEach(([res,names])=>{
+    const st=staysByRes[res];if(!st||!st.reservedOn)return;
+    const c=cycleFor(st.reservedOn);if(!c||!inSet(c.startISO))return;
+    const g=ga4ById[res],grp=srcGroup(g?g.sm:null),v=rnValue(res);
+    names.forEach(n=>{
+      const p=by[n]||(by[n]={name:n,n:0,rn:0,groups:{}});p.n++;if(v!=null)p.rn+=v;
+      const e=p.groups[grp]||(p.groups[grp]={n:0,rn:0,list:[]});e.n++;if(v!=null)e.rn+=v;e.list.push({res,sm:g?g.sm:''});
+    });
+  });
+  const pk=Object.values(by).sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name));
+  const box=document.getElementById('pkg-cards');
+  if(!pk.length){box.innerHTML='<div class="panel"><div class="empty-state">No package bookings in this cycle</div></div>';return;}
+  box.innerHTML=pk.map((p,i)=>{
+    const gs=SRC_GROUPS.filter(([g])=>p.groups[g]);
+    const bar=gs.map(([g,col])=>'<i style="flex:'+p.groups[g].n+';background:'+col+'" title="'+esc(g)+': '+p.groups[g].n+'"></i>').join('');
+    const leg=gs.map(([g,col])=>'<span><i style="background:'+col+'"></i>'+esc(g)+' <b>'+fmtN(p.groups[g].n)+'</b></span>').join('');
+    const det=gs.map(([g])=>{const e=p.groups[g];return '<tr><td><b>'+esc(g)+'</b></td><td>'+e.list.sort((a,b)=>a.res.localeCompare(b.res)).map(x=>'<span title="'+esc(x.sm||'not in GA4')+'">'+esc(x.res)+'</span>').join(', ')+'</td><td class="right">'+fmtN(e.n)+'</td><td class="right">'+fmt$(e.rn)+'</td></tr>';}).join('');
+    return '<div class="pkg-card" id="pkg-'+i+'"><div class="pkg-top"><div class="pkg-name">'+esc(p.name)+'</div><div class="pkg-figs"><div class="pkg-fig"><b>'+fmtN(p.n)+'</b><span>Bookings</span></div><div class="pkg-fig"><b>'+fmt$(p.rn)+'</b><span>Booked revenue</span></div></div></div>'
+      +'<div class="pkg-bar">'+bar+'</div><div class="pkg-legend">'+leg+'</div>'
+      +'<button class="pkg-more" onclick="togglePkg('+i+')">Show reservations ▸</button>'
+      +'<div class="pkg-detail"><div class="table-scroll"><table class="data-table"><thead><tr><th>Source</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th></tr></thead><tbody>'+det+'</tbody></table></div></div></div>';
+  }).join('');
+}
+function togglePkg(i){const c=document.getElementById('pkg-'+i);const open=c.classList.toggle('open');c.querySelector('.pkg-more').textContent=open?'Hide reservations ▾':'Show reservations ▸';}
+
+/* ---------- GA4 refresh ---------- */
+// Newest "ImportedOn" stamp in the GA4 tab (the script writes "yyyy-MM-dd HH:mm" on every row).
+function ga4Stamp(rows){return rows.map(r=>String(r.imported||'')).sort().pop()||'';}
+function fmtStamp(s){const m=/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})/.exec(s);if(!m)return s;
+  const d=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).toLowerCase();}
+let ga4Refreshing=false;
+function renderGa4Updated(){
+  const wrap=document.getElementById('ga4-refresh-wrap');
+  if(!AUTO){wrap.style.display='none';return;}
+  wrap.style.display='';
+  document.getElementById('ga4-refresh-btn').style.display=GA4_REFRESH_URL?'':'none';
+  if(ga4Refreshing)return;
+  const st=ga4Stamp(ga4Rows),el=document.getElementById('ga4-upd');
+  el.className='ga4-upd';el.textContent=st?'GA4 bookings updated '+fmtStamp(st):'';
+}
+// Opens the GA4 script's web app in a small window (it runs the same refresh as the morning trigger),
+// then checks the GA4 tab every 5 seconds until its stamp changes and reloads the page data.
+async function refreshGa4Now(){
+  if(!GA4_REFRESH_URL||ga4Refreshing)return;
+  const btn=document.getElementById('ga4-refresh-btn'),el=document.getElementById('ga4-upd');
+  const before=ga4Stamp(ga4Rows);
+  const w=window.open(GA4_REFRESH_URL,'ga4refresh','width=480,height=360');
+  if(!w){el.className='ga4-upd bad';el.textContent='Allow pop-ups for this page, then try again';return;}
+  ga4Refreshing=true;btn.disabled=true;btn.textContent='Refreshing…';
+  const done=async ok=>{ga4Refreshing=false;btn.disabled=false;btn.innerHTML='&#8635; Refresh GA4';try{if(!w.closed)w.close();}catch(e){}
+    if(ok)await loadAll();else{el.className='ga4-upd bad';el.textContent='GA4 refresh didn’t finish. Try again.';}};
+  const t0=Date.now();
+  while(Date.now()-t0<4*60*1000){
+    await new Promise(r=>setTimeout(r,5000));
+    try{const raw=await fetchTab(GA4_TAB);const st=ga4Stamp(toRows(raw).map(r=>({imported:r['ImportedOn']})));if(st&&st!==before){await done(true);return;}}catch(e){}
+  }
+  await done(false);
+}
+
 function renderKeywords(starts,s,label){
   const tbody=document.getElementById('kw-tbody'),tfoot=document.getElementById('kw-tfoot');
   // Searches for the resort's name: a box under the campaign table, only for cycles whose GA4 import carried the search-text tab.
