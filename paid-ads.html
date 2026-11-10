@@ -449,7 +449,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 54">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 55">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" id="import-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -539,7 +539,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
       </div>
       <div class="unit brand-box" id="u-brand-box" style="display:none;"><span class="u-label">Bookings from people who searched “Cave Springs”</span><span class="u-value num" id="u-brand">—</span><span class="u-line" id="u-brand-c"></span><span class="u-line">Each booking’s Res# is in Reservations behind the numbers, in the Searched column.</span></div>
 
-      <div class="sec"><h2>Facebook, Instagram &amp; Email</h2><span id="social-sub"></span></div>
+      <div class="sec"><h2>Other website bookings</h2><span id="social-sub"></span></div>
+      <p class="help" style="margin:-6px 0 12px;">Booked on cavesprings.com and recorded by GA4. Phone and OTA bookings aren’t included.</p>
       <div class="panel">
         <div class="table-scroll"><table class="data-table">
           <thead><tr><th>Paid or unpaid</th><th>Where</th><th>Name</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">GA4 revenue</th><th class="right">Spend</th></tr></thead>
@@ -588,14 +589,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <table class="kv"><tbody id="meta-tbody"></tbody></table>
         </div>
         <p class="help" style="margin-top:14px;" id="cov-note"></p></div>
-      </div>
-
-      <div class="sec"><h2>Other bookings</h2><span id="other-sub"></span></div>
-      <div class="panel">
-        <div class="table-scroll"><table class="data-table">
-          <thead><tr><th>Source / medium</th><th>Campaign</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th><th class="right">GA4 revenue</th></tr></thead>
-          <tbody id="other-tbody"></tbody><tfoot id="other-tfoot"></tfoot>
-        </table></div>
       </div>
 
     </div>
@@ -1262,7 +1255,6 @@ function render(){
 
   renderSocial(s,label);
   renderPackages(starts,label);
-  renderOther(s,label);
   renderGa4Updated();
   renderKeywords(starts,s,label);
 
@@ -1375,38 +1367,23 @@ function trendSum(per,sel){
 /* Keywords: spend and clicks from the Google Ads Search keywords card, bookings from the
    GA4 Session Google Ads keyword text of each Google Ads booking. Only cycles whose GA4
    import carried the keyword column are counted, so older imports don't land in "No keyword recorded". */
-// Facebook, Instagram & Email: every GA4 booking with a Facebook or Instagram source or an email medium,
-// one row per paid/unpaid + where + name.
-// Spend stays "—" until Meta spend is imported.
+// Other sources: every GA4 booking that isn't Google Ads, so a new or unexpected tag is never left off the page.
+// One row per paid/unpaid + where + name. "Where" uses the same source names as the Packages cards.
+// Paid/unpaid is only known for Facebook, Instagram and email tags; the rest show "—".
+// Spend stays "—" until Meta spend is imported. Hovering a Res# shows GA4's source / medium.
 function renderSocial(s,label){
   document.getElementById('social-sub').textContent=label;
   const by={};
-  s.allGa4.filter(r=>isMetaSource(r.sm)||isEmail(r.sm)).forEach(r=>{
-    const camp=String(r.campaign||'').trim();const name=!camp||/^\((not set|referral|direct|none)\)$/i.test(camp)?'':camp;
-    const tag=metaTag(r.sm),where=metaWhere(r.sm),k=tag+'|'+where+'|'+name.toLowerCase();
+  s.allGa4.filter(r=>!isGoogleAds(r.sm)).forEach(r=>{
+    const camp=String(r.campaign||'').trim();const name=!camp||/^\((not set|referral|direct|none|organic)\)$/i.test(camp)?'':camp;
+    const tag=isMetaSource(r.sm)||isEmail(r.sm)?metaTag(r.sm):'—',where=srcGroup(r.sm||''),k=tag+'|'+where+'|'+name.toLowerCase();
     const e=by[k]||(by[k]={tag,where,name,ids:[],n:0,ga4:0,rn:0});const v=rnValue(r.id);
-    e.n++;e.ids.push(r.id);e.ga4+=r.revenue||0;if(v!=null)e.rn+=v;});
-  const order={'Paid':0,'Unpaid':1,'Not tagged':2},whereOrder={'Email':0,'Facebook':1,'Instagram':2};
+    e.n++;e.ids.push({id:r.id,sm:r.sm||''});e.ga4+=r.revenue||0;if(v!=null)e.rn+=v;});
+  const order={'Paid':0,'Unpaid':1,'Not tagged':2,'—':3},whereOrder={};SRC_GROUPS.forEach(([g],i)=>whereOrder[g]=i);
   const rows=Object.values(by).sort((a,b)=>order[a.tag]-order[b.tag]||whereOrder[a.where]-whereOrder[b.where]||b.n-a.n||a.name.localeCompare(b.name));
-  document.getElementById('social-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+r.tag+'</b></td><td>'+r.where+'</td><td>'+(r.name?esc(r.name):'—')+'</td><td>'+esc(r.ids.join(', '))+'</td><td class="right">'+fmtN(r.n)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+fmt$(r.ga4)+'</td><td class="right">—</td></tr>').join('')
-    :'<tr><td colspan="8" class="empty-state">No Facebook, Instagram or email bookings in this cycle</td></tr>';
+  document.getElementById('social-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td><b>'+r.tag+'</b></td><td>'+esc(r.where)+'</td><td>'+(r.name?esc(r.name):'—')+'</td><td>'+r.ids.map(x=>'<span title="'+esc(x.sm||'(not set)')+'">'+esc(x.id)+'</span>').join(', ')+'</td><td class="right">'+fmtN(r.n)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+fmt$(r.ga4)+'</td><td class="right">—</td></tr>').join('')
+    :'<tr><td colspan="8" class="empty-state">No other bookings in this cycle</td></tr>';
   document.getElementById('social-tfoot').innerHTML=rows.length?'<tr><td colspan="4">All</td><td class="right">'+fmtN(sum(rows,r=>r.n))+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td><td class="right">—</td></tr>':'';
-}
-// Other bookings: every GA4 booking not in the Google Ads or Facebook, Instagram & Email tables,
-// so a new or unexpected tag (texts, other sites, plain search) is never left off the page.
-function renderOther(s,label){
-  document.getElementById('other-sub').textContent=label;
-  const by={};
-  s.allGa4.filter(r=>!isGoogleAds(r.sm)&&!isMetaSource(r.sm)&&!isEmail(r.sm)).forEach(r=>{
-    const sm=String(r.sm||'').trim()||'(not set)';const camp=String(r.campaign||'').trim();
-    const name=!camp||/^\((not set|referral|direct|none|organic)\)$/i.test(camp)?'':camp;
-    const k=sm.toLowerCase()+'|'+name.toLowerCase();
-    const e=by[k]||(by[k]={sm,name,ids:[],n:0,ga4:0,rn:0});const v=rnValue(r.id);
-    e.n++;e.ids.push(r.id);e.ga4+=r.revenue||0;if(v!=null)e.rn+=v;});
-  const rows=Object.values(by).sort((a,b)=>b.n-a.n||a.sm.localeCompare(b.sm)||a.name.localeCompare(b.name));
-  document.getElementById('other-tbody').innerHTML=rows.length?rows.map(r=>'<tr><td>'+esc(r.sm)+'</td><td>'+(r.name?esc(r.name):'—')+'</td><td>'+esc(r.ids.join(', '))+'</td><td class="right">'+fmtN(r.n)+'</td><td class="right">'+fmt$(r.rn)+'</td><td class="right">'+fmt$(r.ga4)+'</td></tr>').join('')
-    :'<tr><td colspan="6" class="empty-state">No other bookings in this cycle</td></tr>';
-  document.getElementById('other-tfoot').innerHTML=rows.length?'<tr><td colspan="3">All</td><td class="right">'+fmtN(sum(rows,r=>r.n))+'</td><td class="right">'+fmt$(sum(rows,r=>r.rn))+'</td><td class="right">'+fmt$(sum(rows,r=>r.ga4))+'</td></tr>':'';
 }
 /* ---------- Packages ---------- */
 // Where GA4 says each booking came from, in plain names. Bookings GA4 has no record of are "No GA4 record".
