@@ -449,7 +449,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 58">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 59">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" id="import-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -1405,6 +1405,7 @@ function srcGroup(sm){
   if(source==='bing'&&medium==='organic')return 'Bing search';
   if(medium==='ai-assistant'||/(^|\.)(chatgpt|openai|perplexity|gemini|copilot|claude)\.(com|ai)$/.test(source)||/^(chatgpt|perplexity|gemini|copilot|claude)$/.test(source))return 'AI assistants';
   if(isMetaSource(sm))return /instagram|^ig$/.test(source)?'Instagram':'Facebook';
+  if(/(^|.)linktr.ee$/.test(source))return 'Instagram';   // Linktree is only used as the Instagram bio link
   if(source==='(direct)')return 'Direct';
   return 'Other sites';
 }
