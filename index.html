@@ -1351,8 +1351,10 @@ async function imAnalyzeDiscounts(rows,status){
     if(!details||amount===0||!res)continue;
     const date=imParseFlexDate(row[idx.date]);
     if(!date)continue;
+    // "Package:" is kept in the sheet so the Paid Ads page can tell packages from other discounts;
+    // this page strips it when it reads the tab.
     const cleanDetails=details.replace(/^Package:\s*/i,'').trim();
-    output.push([res,imFmtDate(date),cleanDetails,amount]);
+    output.push([res,imFmtDate(date),details,amount]);
     total+=amount;packages.add(cleanDetails);
   }
   if(!output.length){status.textContent='No usable discount rows found in this file.';return;}
