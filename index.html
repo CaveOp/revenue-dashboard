@@ -104,6 +104,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .pkg-figs td{font-size:15px;color:var(--text2);padding:4px 0 4px 16px;text-align:right;border-top:1px solid var(--border);}
 .pkg-figs td:first-child{text-align:left;padding-left:0;}
 .pkg-figs td b{font-size:18px;color:var(--text);}
+.pkg-figs tr.dim td,.pkg-figs tr.dim td b{color:var(--text3);font-weight:400;}
 .pkg-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);gap:2px;}
 .pkg-bar i{display:block;height:100%;}
 .pkg-legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:13px;color:var(--text2);}
@@ -803,8 +804,8 @@ function renderPromoPackages(){
   const inMonth=d=>!activeFilter||(d&&mYr(d)===activeFilter);
   // per reservation: whole stay and the part in the month picked
   const want=new Set(pkgRes),val={};
-  const v=res=>val[res]||(val[res]={all:0,mo:0,nights:0,moNights:0});
-  staysData.forEach(r=>{const res=promoRes(r.res);if(!want.has(res))return;const e=v(res);e.all+=r.nightRevenue;e.nights++;if(inMonth(r.nightDate)){e.mo+=r.nightRevenue;e.moNights++;}});
+  const v=res=>val[res]||(val[res]={all:0,mo:0,nights:0,moNights:0,booked:null});
+  staysData.forEach(r=>{const res=promoRes(r.res);if(!want.has(res))return;const e=v(res);e.all+=r.nightRevenue;e.nights++;if(r.reservedOn&&(!e.booked||r.reservedOn<e.booked))e.booked=r.reservedOn;if(inMonth(r.nightDate)){e.mo+=r.nightRevenue;e.moNights++;}});
   promo.feeRows.forEach(r=>{if(!want.has(r.res))return;const e=v(r.res);e.all+=r.amt;if(inMonth(r.date))e.mo+=r.amt;});
   promo.discRows.forEach(r=>{if(!want.has(r.res))return;const e=v(r.res);e.all-=r.amt;if(inMonth(r.date))e.mo-=r.amt;});
   const by={};
@@ -812,8 +813,8 @@ function renderPromoPackages(){
     const e=val[res];if(!e||!e.nights)return;            // not in the stays data (not imported yet, or cancelled)
     const grp=promoSrc(res in promo.smByRes?promo.smByRes[res]:null);
     promo.pkgByRes[res].forEach(n=>{
-      const p=by[n]||(by[n]={name:n,n:0,rn:0,moN:0,moRn:0,groups:{}});
-      p.n++;p.rn+=e.all;if(e.moNights){p.moN++;p.moRn+=e.mo;}
+      const p=by[n]||(by[n]={name:n,n:0,rn:0,moN:0,moRn:0,groups:{},bookedMonths:new Set()});
+      p.n++;p.rn+=e.all;if(e.booked)p.bookedMonths.add(mYr(e.booked));if(e.moNights){p.moN++;p.moRn+=e.mo;}
       const g=p.groups[grp]||(p.groups[grp]={n:0,rn:0,list:[]});g.n++;g.rn+=e.all;g.list.push({res,sm:res in promo.smByRes?promo.smByRes[res]:''});
     });
   });
@@ -828,7 +829,7 @@ function renderPromoPackages(){
     const leg=gs.map(([g,col])=>'<span><i style="background:'+col+'"></i>'+escHtml(g)+' <b>'+p.groups[g].n.toLocaleString()+'</b></span>').join('');
     const det=gs.map(([g])=>{const e=p.groups[g];return '<tr><td><b>'+escHtml(g)+'</b></td><td>'+e.list.sort((a,b)=>a.res.localeCompare(b.res)).map(x=>'<span title="'+escHtml(x.sm||'not in GA4')+'">'+escHtml(x.res)+'</span>').join(', ')+'</td><td class="right">'+e.n.toLocaleString()+'</td><td class="right">'+fmt$(e.rn)+'</td></tr>';}).join('');
     const figs='<table class="pkg-figs"><tr><th></th><th>Bookings</th><th>Booked revenue</th></tr>'
-      +'<tr><td>Whole campaign</td><td><b>'+p.n.toLocaleString()+'</b></td><td><b>'+fmt$(p.rn)+'</b></td></tr>'
+      +'<tr'+(p.bookedMonths.has(activeFilter)?'':' class="dim" title="Greyed: none of this package’s reservations were booked in '+escHtml(activeFilter)+'"')+'><td>Whole campaign</td><td><b>'+p.n.toLocaleString()+'</b></td><td><b>'+fmt$(p.rn)+'</b></td></tr>'
       +(activeFilter?'<tr><td>Stays in '+escHtml(activeFilter)+'</td><td><b>'+p.moN.toLocaleString()+'</b></td><td><b>'+fmt$(p.moRn)+'</b></td></tr>':'')+'</table>';
     return '<div class="pkg-item" id="pkg-'+i+'"><div class="pkg-name">'+escHtml(p.name)+'</div>'+figs
       +'<div class="pkg-bar">'+bar+'</div><div class="pkg-legend">'+leg+'</div>'
