@@ -449,7 +449,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="header">
-    <div><div class="header-title" title="build 56">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
+    <div><div class="header-title" title="build 57">Cave Springs</div><div class="header-sub">Paid Ads Performance · Dunsmuir, CA</div></div>
     <div class="header-right">
       <button class="hdr-btn" onclick="window.print()">&#128438; Print cycle report</button>
       <button class="hdr-btn" id="import-btn" onclick="openImport()">&#8679; Import cycle data</button>
@@ -571,7 +571,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:17
           <thead><tr><th>Figure</th><th class="right">Google Ads account</th><th class="right">GA4 revenue</th><th class="right">Booked revenue</th><th class="right">Difference</th></tr></thead>
           <tbody id="cmp-tbody"></tbody>
         </table></div>
-        <p class="help" style="margin-top:14px;">GA4 revenue is what GA4 recorded at the moment of booking. Booked revenue is the room charge plus resort fee for the same reservation numbers in ResNexus. They differ when a stay is changed or cancelled after booking.</p></div>
+        <p class="help" style="margin-top:14px;">GA4 revenue is what GA4 recorded at the moment of booking. Booked revenue is the room charge plus resort fee, minus discounts and packages, for the same reservation numbers in ResNexus. They differ when a stay is changed or cancelled after booking.</p></div>
       </div>
 
       <div class="panel">
@@ -626,6 +626,7 @@ const ord=n=>n+([,'st','nd','rd'][n%100>>3^1&&n%10]||'th');
 let tokenClient, accessToken;
 let staysByRes={}, feeByRes={}, feeLoaded=false, spendRows=[], ga4Rows=[], kwRows=[], dailyRows=[];
 let pkgByRes={};               // Res# → [package names], from DISCOUNTS_CLEAN
+let discByRes={}, discLoaded=false;  // Res# → total discounts and packages, from DISCOUNTS_CLEAN
 let rnThrough='';             // newest "reserved on" date in the ResNexus stays (test page only)
 let knownCycles=[];            // [{label,start}] oldest → newest, from saved data
 let cycleChart, campChart;
@@ -652,7 +653,7 @@ async function signIn(){
 }
 function signOut(){
   if(accessToken&&window.google&&window.google.accounts)google.accounts.oauth2.revoke(accessToken);
-  clearToken();accessToken=null;staysByRes={};feeByRes={};spendRows=[];ga4Rows=[];kwRows=[];dailyRows=[];
+  clearToken();accessToken=null;staysByRes={};feeByRes={};discByRes={};pkgByRes={};spendRows=[];ga4Rows=[];kwRows=[];dailyRows=[];
   document.getElementById('dashboard').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
   [cycleChart,campChart].forEach(c=>{if(c)c.destroy();});cycleChart=campChart=null;
@@ -1106,10 +1107,13 @@ async function loadAll(){
     ga4Rows=toRows(ga4Raw).map(r=>({id:String(parseInt(r['TransactionId'],10)),date:r['Date'],cycle:r['Cycle'],cycleStart:r['CycleStart'],sm:r['SourceMedium'],campaign:r['Campaign'],fusm:r['FirstUserSourceMedium'],fcamp:r['FirstUserCampaign'],revenue:r['Revenue']===''?null:pMoney(r['Revenue']),imported:r['ImportedOn'],keyword:r['Keyword']||'',query:r['SearchQuery']||''})).filter(r=>r.id&&r.id!=='NaN'&&r.cycleStart);
     kwRows=toRows(kwRaw).map(r=>({cycle:r['Cycle'],cycleStart:r['CycleStart'],keyword:r['Keyword'],cost:pMoney(r['Cost']),clicks:pInt(r['Clicks']),imported:r['ImportedOn']})).filter(r=>r.cycleStart&&r.keyword);
     dailyRows=toRows(dailyRaw).map(r=>{const d=parseDateLoose(r['Date']);return {date:d?toISO(d):'',cost:pMoney(r['Cost']),imported:r['ImportedOn']};}).filter(r=>r.date);
-    pkgByRes={};
+    pkgByRes={};discByRes={};discLoaded=false;
     toRows(discRaw).forEach(r=>{
-      const d=String(r['Details']||'').trim();if(!/^package:/i.test(d))return;
+      const d=String(r['Details']||'').trim();
       const raw=String(r['Res#']||r['Res']||'').trim();if(!raw)return;const res=/^\d+$/.test(raw)?String(parseInt(raw,10)):raw;
+      // every discount and package comes off booked revenue (same rows the Revenue page subtracts for net)
+      const amt=pMoney(r['Amount']);if(d&&amt>0){discByRes[res]=(discByRes[res]||0)+amt;discLoaded=true;}
+      if(!/^package:/i.test(d))return;
       const name=d.replace(/^package:\s*/i,'').trim();if(!name)return;
       const a=pkgByRes[res]||(pkgByRes[res]=[]);if(!a.includes(name))a.push(name);
     });
@@ -1144,7 +1148,8 @@ function isBrand(q){return String(q||'').toLowerCase().replace(/\s+/g,' ').inclu
 function hasKw(k){const t=kwKey(k);return !!t&&t!=='(not set)'&&t!=='(not provided)';}
 // A booking GA4 recorded after the newest ResNexus booking: not imported yet, rather than missing (test page only).
 function isWaiting(r){if(!AUTO||!rnThrough||staysByRes[r.id])return false;const d=parseDateLoose(r.date);return !!d&&toISO(d)>rnThrough;}
-function rnValue(res){const s=staysByRes[res];if(!s)return null;return +(s.room+(feeByRes[res]||0)).toFixed(2);}
+// Booked revenue: room charge + resort fee − discounts and packages, from ResNexus.
+function rnValue(res){const s=staysByRes[res];if(!s)return null;return +(s.room+(feeByRes[res]||0)-(discByRes[res]||0)).toFixed(2);}
 
 /* ---------- Stats ---------- */
 function stats(starts){
@@ -1207,7 +1212,7 @@ function render(){
   const label=all?'all '+knownCycles.length+' cycles':(cyc?cyc.label:'');
   const hasSpend=s.spend.length>0,hasGa4=s.allGa4.length>0,hasStays=Object.keys(staysByRes).length>0;
 
-  const missing=[];if(!hasSpend)missing.push('Google Ads spend not loaded for this cycle');if(!hasGa4)missing.push('GA4 transactions not loaded for this cycle');if(!hasStays)missing.push('stays data not loaded');if(hasStays&&!feeLoaded)missing.push('resort fee lines not found, booked revenue is room charge only');
+  const missing=[];if(!hasSpend)missing.push('Google Ads spend not loaded for this cycle');if(!hasGa4)missing.push('GA4 transactions not loaded for this cycle');if(!hasStays)missing.push('stays data not loaded');if(hasStays&&!feeLoaded)missing.push('resort fee lines not found, booked revenue is room charge only');if(hasStays&&!discLoaded)missing.push('discounts not loaded, booked revenue is before discounts');
   // The daily Google Ads script fills in yesterday. Warn when the newest day is more than 2 days old.
   if(AUTO){const newest=spendRows.map(r=>{const d=r.through?parseDateLoose(String(r.through)):null;return d?toISO(d):'';}).concat(dailyRows.map(r=>r.date)).filter(Boolean).sort().pop();
     const t=new Date(),cutoff=toISO(new Date(t.getFullYear(),t.getMonth(),t.getDate()-2));
