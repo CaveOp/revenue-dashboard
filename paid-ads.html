@@ -1405,7 +1405,7 @@ function srcGroup(sm){
   if(source==='bing'&&medium==='organic')return 'Bing search';
   if(medium==='ai-assistant'||/(^|\.)(chatgpt|openai|perplexity|gemini|copilot|claude)\.(com|ai)$/.test(source)||/^(chatgpt|perplexity|gemini|copilot|claude)$/.test(source))return 'AI assistants';
   if(isMetaSource(sm))return /instagram|^ig$/.test(source)?'Instagram':'Facebook';
-  if(/(^|.)linktr.ee$/.test(source))return 'Instagram';   // Linktree is only used as the Instagram bio link
+  if(/(^|\.)linktr\.ee$/.test(source))return 'Instagram';   // Linktree is only used as the Instagram bio link
   if(source==='(direct)')return 'Direct';
   return 'Other sites';
 }
