@@ -1030,7 +1030,7 @@ function imDetectType(rows){
     if(has(IM_AL.res)&&has(IM_AL.date)&&has(IM_AL.accom)&&has(IM_AL.amount)&&has(IM_AL.bookedOnline))hits.add('stays');
     else if(has(IM_RETAIL_AL.res)&&has(IM_RETAIL_AL.date)&&has(IM_RETAIL_AL.item)&&(has(IM_RETAIL_AL.total)||has(IM_RETAIL_AL.amount)))hits.add('retail');
     else if(has(IM_DISC_AL.res)&&has(IM_DISC_AL.date)&&has(IM_DISC_AL.details)&&has(IM_DISC_AL.amount))hits.add('discounts');
-    else if(H[1]==='ReservationDates'||H[1]==='NightDate')hits.add('pace');
+    else{const n=x=>String(x||'').toLowerCase().replace(/[^a-z]/g,'');if(n(H[0])==='reservedon'&&(n(H[1])==='reservationdates'||n(H[1])==='nightdate'))hits.add('pace');}
   }
   return hits.size===1?[...hits][0]:'';
 }
