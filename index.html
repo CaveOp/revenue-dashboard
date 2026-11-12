@@ -99,7 +99,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .promo-tag{display:inline-block;margin-left:8px;font-size:9px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--green);background:var(--green-bg);border:1px solid rgba(58,125,92,0.25);border-radius:4px;padding:1px 6px;vertical-align:2px;}
 .promo-detail > td{background:var(--surface2);padding:18px 20px 20px 34px !important;}
 .data-table tr.promo-detail:hover td{background:var(--surface2);}
-.promo-whole{font-size:14px;color:var(--text2);margin-bottom:12px;}
+.promo-whole{font-size:16px;color:var(--text2);margin-bottom:12px;}
+.promo-whole-label{display:block;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text);margin-bottom:6px;}
+.promo-whole.dim .promo-whole-label{color:var(--text3);}
 .promo-whole b{color:var(--text);}
 .promo-whole.dim,.promo-whole.dim b{color:var(--text3);font-weight:400;}
 .pkg-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);gap:2px;}
@@ -396,7 +398,7 @@ tr.unit-row.hidden{display:none;}
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;"><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Reservations Affected</div><div style="font-size:28px;font-weight:700;color:var(--text);" id="disc-res-count">—</div></div>
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;"><div style="font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">% of Gross Revenue</div><div style="font-size:28px;font-weight:700;color:var(--text);" id="disc-pct">—</div></div>
         </div>
-        <table class="data-table"><thead><tr><th>Package / Discount</th><th class="right">Discount</th><th class="right">Reservations</th><th class="right">Booked revenue</th></tr></thead><tbody id="disc-tbody"></tbody></table>
+        <table class="data-table"><thead><tr><th>Package / Discount</th><th class="right" id="disc-col-label">Discount</th><th class="right">Reservations</th><th class="right" id="disc-rev-col-label">Booked revenue</th></tr></thead><tbody id="disc-tbody"></tbody></table>
       </div>
     </div>
     <div class="panel full" id="pace-panel">
@@ -807,6 +809,8 @@ function renderDiscounts(){
   const disc=getFilteredDiscounts(),panel=document.getElementById('discounts-panel');
   if(!disc.length){panel.style.display='none';return;}panel.style.display='block';
   document.getElementById('disc-period-label').textContent=activeFilter||'';
+  document.getElementById('disc-col-label').textContent=(activeFilter?activeFilter+' ':'')+'Discount';
+  document.getElementById('disc-rev-col-label').textContent=(activeFilter?activeFilter+' ':'')+'Booked revenue';
   const totalDisc=disc.reduce((s,r)=>s+r.amount,0),uniqueRes=new Set(disc.map(r=>r.res)).size,grossRev=filtered().reduce((s,r)=>s+r.nightRevenue,0),pct=grossRev>0?(totalDisc/grossRev)*100:0;
   document.getElementById('disc-total').textContent=fmt$(totalDisc);document.getElementById('disc-res-count').textContent=uniqueRes;document.getElementById('disc-pct').textContent=pct.toFixed(1)+'%';
   const ps=promoStats();
@@ -823,7 +827,7 @@ function renderDiscounts(){
     const dim=!p.bookedMonths.has(activeFilter);
     return '<tr class="disc-promo" onclick="togglePromo('+i+')"><td style="color:var(--text);font-weight:500"><span class="disc-caret" id="promo-caret-'+i+'">▸</span>'+escHtml(label)+'<span class="promo-tag">Promo</span></td><td class="right">'+fmt$(d.amount)+'</td><td class="right">'+d.res.size+'</td><td class="right">'+fmt$(moRn)+'</td></tr>'
       +'<tr class="promo-detail" id="promo-'+i+'" style="display:none"><td colspan="4">'
-      +'<div class="promo-whole'+(dim?' dim':'')+'"'+(dim?' title="Greyed: none of these reservations were booked in '+escHtml(activeFilter)+'"':'')+'>Whole campaign: <b>'+p.n.toLocaleString()+(p.n===1?' booking':' bookings')+'</b> · <b>'+fmt$(p.rn)+'</b> booked revenue</div>'
+      +'<div class="promo-whole'+(dim?' dim':'')+'"'+(dim?' title="Greyed: none of these reservations were booked in '+escHtml(activeFilter)+'"':'')+'><span class="promo-whole-label">Whole campaign</span><b>'+p.n.toLocaleString()+(p.n===1?' booking':' bookings')+'</b> · <b>'+fmt$(p.rn)+'</b> booked revenue</div>'
       +'<div class="pkg-bar">'+bar+'</div><div class="pkg-legend">'+leg+'</div>'
       +'<button class="pkg-more" onclick="togglePromoRes('+i+')">Show reservations ▸</button>'
       +'<div class="pkg-detail"><table class="data-table"><thead><tr><th>Source</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th></tr></thead><tbody>'+det+'</tbody></table></div></td></tr>';
