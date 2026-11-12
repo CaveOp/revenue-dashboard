@@ -796,11 +796,13 @@ function promoStats(){
     const e=val[res];if(!e||!e.nights)return;            // not in the stays data (not imported yet, or cancelled)
     const sm=res in promo.smByRes?promo.smByRes[res]:null,grp=promoSrc(sm);
     promo.pkgByRes[res].forEach(n=>{
-      const p=by[n]||(by[n]={name:n,n:0,rn:0,groups:{},bookedMonths:new Set()});
+      const p=by[n]||(by[n]={name:n,n:0,rn:0,disc:0,groups:{},bookedMonths:new Set()});
       p.n++;p.rn+=e.all;if(e.booked)p.bookedMonths.add(mYr(e.booked));
       const g=p.groups[grp]||(p.groups[grp]={n:0,rn:0,list:[]});g.n++;g.rn+=e.all;g.list.push({res,sm:sm||''});
     });
   });
+  // Whole-campaign discount: this package's discount rows on every date, for the reservations counted above.
+  discountsData.forEach(r=>{const p=by[r.details],e=val[promoRes(r.res)];if(p&&e&&e.nights)p.disc+=r.amount;});
   return {by,val};
 }
 // Discounts & Promo Codes: every package and discount dated in the month picked.
@@ -827,7 +829,7 @@ function renderDiscounts(){
     const dim=!p.bookedMonths.has(activeFilter);
     return '<tr class="disc-promo" onclick="togglePromo('+i+')"><td style="color:var(--text);font-weight:500"><span class="disc-caret" id="promo-caret-'+i+'">▸</span>'+escHtml(label)+'<span class="promo-tag">Promo</span></td><td class="right">'+fmt$(d.amount)+'</td><td class="right">'+d.res.size+'</td><td class="right">'+fmt$(moRn)+'</td></tr>'
       +'<tr class="promo-detail" id="promo-'+i+'" style="display:none"><td colspan="4">'
-      +'<div class="promo-whole'+(dim?' dim':'')+'"'+(dim?' title="Greyed: none of these reservations were booked in '+escHtml(activeFilter)+'"':'')+'><span class="promo-whole-label">Whole campaign</span><b>'+p.n.toLocaleString()+(p.n===1?' booking':' bookings')+'</b> · <b>'+fmt$(p.rn)+'</b> booked revenue</div>'
+      +'<div class="promo-whole'+(dim?' dim':'')+'"'+(dim?' title="Greyed: none of these reservations were booked in '+escHtml(activeFilter)+'"':'')+'><span class="promo-whole-label">Whole campaign</span><b>'+p.n.toLocaleString()+(p.n===1?' booking':' bookings')+'</b> · <b>'+fmt$(p.disc)+'</b> discount · <b>'+fmt$(p.rn)+'</b> booked revenue</div>'
       +'<div class="pkg-bar">'+bar+'</div><div class="pkg-legend">'+leg+'</div>'
       +'<button class="pkg-more" onclick="togglePromoRes('+i+')">Show reservations ▸</button>'
       +'<div class="pkg-detail"><table class="data-table"><thead><tr><th>Source</th><th>Res#</th><th class="right">Bookings</th><th class="right">Booked revenue</th></tr></thead><tbody>'+det+'</tbody></table></div></td></tr>';
