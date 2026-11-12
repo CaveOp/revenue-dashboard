@@ -1301,24 +1301,40 @@ function imStayRowForWrite(r){
    coverage:     one {res,s,e} per file row with readable dates — zero-amount rows included,
                  because a $0 stay is still "in the file".
    protectedRes: reservations whose file row could not be read; their saved rows are left alone. */
+function imDayStep(k,n){const d=imKeyToDate(k);return imDayKey(new Date(d.getFullYear(),d.getMonth(),d.getDate()+n));}
+/* A stay that runs past the file's first or last date (a New Year stay in a yearly export) is cut
+   off at that date in the file. Its saved nights on the other side are kept: only the unbroken run
+   of days that directly continues the stay past the edge. Anything else saved for a reservation in
+   the file is replaced, as before, so a stay moved to other dates does not leave its old nights. */
 function imPlanStayRange(existingRows,coverage,protectedRes){
   const fileRes=new Set(coverage.map(c=>c.res));
-  let lo=null,hi=null;
-  coverage.forEach(c=>{const e=imDayKey(c.e),s=imDayKey(c.s);if(lo===null||e<lo)lo=e;if(hi===null||s>hi)hi=s;});
+  let lo=null,hi=null,fmin=null,fmax=null;
+  coverage.forEach(c=>{const e=imDayKey(c.e),s=imDayKey(c.s);if(lo===null||e<lo)lo=e;if(hi===null||s>hi)hi=s;if(fmin===null||s<fmin)fmin=s;if(fmax===null||e>fmax)fmax=e;});
+  const atFirst=new Set(),atLast=new Set();   // reservations whose file row touches the file's first / last date
+  coverage.forEach(c=>{if(imDayKey(c.s)===fmin)atFirst.add(c.res);if(imDayKey(c.e)===fmax)atLast.add(c.res);});
   const hasRange=lo!==null&&lo<=hi;
   const byRes=new Map();
   existingRows.forEach((r,i)=>{
     const res=String(r[0]==null?'':r[0]).trim();if(!res)return;
-    let g=byRes.get(res);if(!g){g={res,idx:[],inRange:false,first:null,last:null,rev:0,units:new Set()};byRes.set(res,g);}
+    let g=byRes.get(res);if(!g){g={res,idx:[],days:[],inRange:false,first:null,last:null,rev:0,units:new Set()};byRes.set(res,g);}
     g.idx.push(i);g.rev+=imToNumber(r[3]);g.units.add(String(r[2]==null?'':r[2]).trim());
-    const d=imParseFlexDate(r[1]);
+    const d=imParseFlexDate(r[1]);g.days.push(d?imDayKey(d):null);
     if(d){const k=imDayKey(d);if(hasRange&&k>=lo&&k<=hi)g.inRange=true;if(!g.first||d<g.first)g.first=d;if(!g.last||d>g.last)g.last=d;}
   });
   const drop=new Set(),refreshed=[],absent=[];let inRangeRes=0;
+  const contDays=new Map();let contNights=0,contRevenue=0;   // nights kept because they continue a stay past the file's edge
   byRes.forEach(g=>{
     if(g.inRange)inRangeRes++;
     if(protectedRes.has(g.res))return;
-    if(fileRes.has(g.res)){g.idx.forEach(i=>drop.add(i));refreshed.push(g);}
+    if(fileRes.has(g.res)){
+      const keep=new Set(),days=new Set();
+      const run=(k,step)=>{for(;;k=imDayStep(k,step)){let hit=false;g.days.forEach((dk,j)=>{if(dk===k){keep.add(g.idx[j]);hit=true;}});if(!hit)break;days.add(k);}};
+      if(atLast.has(g.res))run(imDayStep(fmax,1),1);
+      if(atFirst.has(g.res))run(imDayStep(fmin,-1),-1);
+      g.idx.forEach(i=>{if(keep.has(i)){contNights++;const v=imToNumber(existingRows[i][3]);contRevenue+=v;g.rev-=v;}else drop.add(i);});
+      if(days.size)contDays.set(g.res,days);
+      refreshed.push(g);
+    }
     else if(g.inRange){g.idx.forEach(i=>drop.add(i));absent.push(g);}
   });
   const keptRaw=existingRows.filter((r,i)=>!drop.has(i)&&String(r[0]==null?'':r[0]).trim()!=='');
@@ -1331,11 +1347,13 @@ function imPlanStayRange(existingRows,coverage,protectedRes){
   absent.sort((a,b)=>b.rev-a.rev);
   return {keepWrite,keepCheck,refreshed,absent,inRangeRes,range:hasRange?[imKeyToDate(lo),imKeyToDate(hi)]:null,
     removedRows:drop.size,refreshedRevenue:refreshed.reduce((t,g)=>t+g.rev,0),absentRevenue:absent.reduce((t,g)=>t+g.rev,0),
-    dropRes:new Set(refreshed.concat(absent).map(g=>g.res))};
+    dropRes:new Set(refreshed.concat(absent).map(g=>g.res)),contDays,contNights,contRevenue};
 }
-/* STAYS_IMPORT (the raw copy behind the partial-payments warning) follows the same decisions. */
-function imPlanImportTabRange(existingImportRows,dropRes){
-  return existingImportRows.filter(r=>{const res=String(r[0]==null?'':r[0]).trim();return res&&!dropRes.has(res);})
+/* STAYS_IMPORT (the raw copy behind the partial-payments warning) follows the same decisions:
+   a replaced reservation's row is kept only when every one of its dates is a kept continuation night. */
+function imPlanImportTabRange(existingImportRows,dropRes,contDays){
+  return existingImportRows.filter(r=>{const res=String(r[0]==null?'':r[0]).trim();if(!res)return false;if(!dropRes.has(res))return true;
+      const days=contDays&&contDays.get(res);if(!days)return false;const span=imExpandDates(r[1]);return span.length>0&&span.every(d=>days.has(imDayKey(d)));})
     .map(r=>{const ro=imParseFlexDate(r[7]);return [r[0],"'"+imCleanDateText(r[1]),r[2]==null?'':r[2],typeof r[3]==='number'?r[3]:imToNumber(r[3]),typeof r[4]==='number'?r[4]:imToNumber(r[4]),imKeepBool(r[5]),imKeepBool(r[6]),ro?imFmtDate(ro):(r[7]==null?'':r[7])];});
 }
 /* Discounts: a discount row is in an export when its own date is inside the export's range, so
@@ -1479,7 +1497,7 @@ async function imAnalyzeStays(rows,status){
   const afterMetrics=imCalcMetrics(finalRows);
   const dupWarnings=imDuplicateCheck(finalRows);
   imPending={type:'stays',mode,newRows,importRows,finalRows,newResCount,skippedExisting,fileRevenue,afterMetrics,existingCount:existingRows.length};
-  if(mode==='range'){imPending.writeRows=plan.keepWrite.concat(newRows);imPending.importWriteRows=imPlanImportTabRange(existingImportRaw.length>1?existingImportRaw.slice(1):[],plan.dropRes).concat(importRows);
+  if(mode==='range'){imPending.writeRows=plan.keepWrite.concat(newRows);imPending.importWriteRows=imPlanImportTabRange(existingImportRaw.length>1?existingImportRaw.slice(1):[],plan.dropRes,plan.contDays).concat(importRows);
     imPending.prevLen=existingRaw.length;imPending.prevImportLen=existingImportRaw.length;imPending.rangeText=plan.range?imFmtDateLong(plan.range[0])+' – '+imFmtDateLong(plan.range[1]):'';imPending.absentCount=plan.absent.length;}
   const lines=[
     ['Reservations in file (usable)',newResCount.toLocaleString()],
@@ -1497,6 +1515,7 @@ async function imAnalyzeStays(rows,status){
       ['Saved reservations refreshed from this file',plan.refreshed.length.toLocaleString()+' · was '+fmt$(plan.refreshedRevenue)],
       ['Saved reservations in those dates but NOT in this file — removed',plan.absent.length.toLocaleString()+' · '+fmt$(plan.absentRevenue)],
       ['Night rows left exactly as they are (other dates, other years)',plan.keepWrite.length.toLocaleString()+' · '+fmt$(plan.keepWrite.reduce((t,r)=>t+imToNumber(r[3]),0))]);
+    if(plan.contNights)lines.push(['Nights kept because the stay continues past this file’s dates',plan.contNights.toLocaleString()+' · '+fmt$(plan.contRevenue)]);
     if(protectedRes.size)lines.push(['Reservations with an unreadable row — saved copy left alone',protectedRes.size.toLocaleString()]);
   }
   if(skippedBad>0)lines.push(['Rows skipped (blank/invalid)',skippedBad.toLocaleString()]);
