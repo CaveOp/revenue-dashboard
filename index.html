@@ -401,6 +401,13 @@ tr.unit-row.hidden{display:none;}
         <table class="data-table"><thead><tr><th>Package / Discount</th><th class="right" id="disc-col-label">Discount</th><th class="right">Reservations</th><th class="right" id="disc-rev-col-label">Booked revenue</th></tr></thead><tbody id="disc-tbody"></tbody></table>
       </div>
     </div>
+    <div class="panel full" id="promo-yoy-panel" style="display:none">
+      <div class="panel-header"><span class="panel-title">Promo Campaigns by Year</span></div>
+      <div class="panel-body">
+        <table class="data-table" id="promo-yoy-table"><thead><tr><th>Campaign</th><th class="right">Bookings</th><th class="right">Discount</th><th class="right">Booked revenue</th></tr></thead><tbody id="promo-yoy-tbody"></tbody></table>
+        <div id="promo-yoy-note" style="font-size:13px;color:var(--text3);margin-top:14px;white-space:pre-line;"></div>
+      </div>
+    </div>
     <div class="panel full" id="pace-panel">
       <div class="panel-header"><span class="panel-title">Year over Year Pace — 2026 vs 2025</span><span style="font-size:11px;color:var(--text3);">Full year · Booked as of today</span></div>
       <div class="panel-body">
@@ -635,7 +642,7 @@ window.addEventListener('scroll',()=>{const b=document.getElementById('filter-ba
 function mkBtn(label,val,active){const b=document.createElement('button');b.className='filter-btn'+(active?' active':'');b.textContent=label;b.onclick=()=>{activeFilter=val;document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');renderAll();};return b;}
 function filtered(){if(!activeFilter)return staysData;return staysData.filter(r=>mYr(r.nightDate)===activeFilter);}
 function getFilteredDiscounts(){if(!activeFilter)return discountsData;return discountsData.filter(r=>r.date&&mYr(r.date)===activeFilter);}
-function renderAll(){const rows=filtered();renderScores(rows);renderCats(rows);renderRevChart(rows);renderChChart(rows);renderUnits(rows);renderBW(rows);renderCatChart(rows);renderDiscounts();renderPace();renderRetail();updateJumpLinks();}
+function renderAll(){const rows=filtered();renderScores(rows);renderCats(rows);renderRevChart(rows);renderChChart(rows);renderUnits(rows);renderBW(rows);renderCatChart(rows);renderDiscounts();renderPromoYoY();renderPace();renderRetail();updateJumpLinks();}
 function renderScores(rows){
   const grossRev=rows.reduce((s,r)=>s+r.nightRevenue,0),n=rows.length;
   let days=1;if(n>0){const t=rows.map(r=>r.nightDate.getTime());days=Math.round((Math.max(...t)-Math.min(...t))/86400000)+1;}
@@ -748,7 +755,7 @@ function renderCatChart(rows){
    Booked revenue = room charge + resort fee − discounts and packages, the same as the Paid Ads page.
    The table's Booked revenue is the part dated in the month picked; "Whole campaign" is all dates.
    The source bar is where GA4 says each reservation came from (GA4_AUTO, filled by the GA4 script). */
-const PROMO_GA4_TAB='GA4_AUTO',PROMO_RETAIL_TAB='RETAIL_CLEAN';
+const PROMO_GA4_TAB='GA4_AUTO',PROMO_RETAIL_TAB='RETAIL_CLEAN',PROMO_GROUPS_TAB='PROMO_GROUPS';
 let promo={pkgByRes:{},discRows:[],feeRows:[],smByRes:{}};
 function promoRes(v){const s=String(v==null?'':v).trim();return /^\d+$/.test(s)?String(parseInt(s,10)):s;}
 async function loadPromoData(discRaw){
@@ -764,6 +771,11 @@ async function loadPromoData(discRaw){
     if(!/resort fee/i.test((r['Bucket']||'')+' '+(r['Item']||'')))return;
     const res=promoRes(r['Res#']),date=pDate(r['Date']);if(res&&date)promo.feeRows.push({res,date,amt:pMoney(r['Total'])});});}catch(e){}
   try{toRows(await fetchTab(PROMO_GA4_TAB)).forEach(r=>{const res=promoRes(r['TransactionId']);if(res&&!(res in promo.smByRes))promo.smByRes[res]=r['SourceMedium']||'';});}catch(e){}
+  // PROMO_GROUPS: which packages are the same campaign in which year. Filled in by hand in the sheet.
+  try{
+    const col=(r,names)=>{for(const k in r){if(names.includes(k.toLowerCase().replace(/[^a-z]/g,'')))return r[k];}return '';};
+    promo.groups=toRows(await fetchTab(PROMO_GROUPS_TAB)).map(r=>({pkg:col(r,['packagename','package']),campaign:col(r,['campaign']),year:col(r,['year']),channel:col(r,['channel'])})).filter(g=>g.pkg);
+  }catch(e){promo.groups=null;}
 }
 // Where GA4 says a booking came from, in plain names (same names as the Paid Ads page).
 const PROMO_SRC=[['Email','#3a7d5c'],['Text','#86b89e'],['Google Ads','#2f5d8a'],['Google search','#6f97c0'],['Bing search','#a9c2dc'],
@@ -796,8 +808,8 @@ function promoStats(){
     const e=val[res];if(!e||!e.nights)return;            // not in the stays data (not imported yet, or cancelled)
     const sm=res in promo.smByRes?promo.smByRes[res]:null,grp=promoSrc(sm);
     promo.pkgByRes[res].forEach(n=>{
-      const p=by[n]||(by[n]={name:n,n:0,rn:0,disc:0,groups:{},bookedMonths:new Set()});
-      p.n++;p.rn+=e.all;if(e.booked)p.bookedMonths.add(mYr(e.booked));
+      const p=by[n]||(by[n]={name:n,n:0,rn:0,disc:0,res:[],groups:{},bookedMonths:new Set()});
+      p.n++;p.rn+=e.all;p.res.push(res);if(e.booked)p.bookedMonths.add(mYr(e.booked));
       const g=p.groups[grp]||(p.groups[grp]={n:0,rn:0,list:[]});g.n++;g.rn+=e.all;g.list.push({res,sm:sm||''});
     });
   });
@@ -837,6 +849,42 @@ function renderDiscounts(){
 }
 function togglePromo(i){const r=document.getElementById('promo-'+i),open=r.style.display==='none';r.style.display=open?'':'none';document.getElementById('promo-caret-'+i).textContent=open?'▾':'▸';updateSwipeHints();}
 function togglePromoRes(i){const r=document.getElementById('promo-'+i),open=r.classList.toggle('open');r.querySelector('.pkg-more').textContent=open?'Hide reservations ▾':'Show reservations ▸';updateSwipeHints();}
+// Promo Campaigns by Year: whole-campaign bookings, discount and booked revenue (all dates), grouped by
+// the PROMO_GROUPS tab. A reservation with two packages of the same campaign and year is counted once.
+function renderPromoYoY(){
+  const panel=document.getElementById('promo-yoy-panel');
+  if(!Object.keys(promo.pkgByRes).length){panel.style.display='none';return;}
+  panel.style.display='block';
+  const ps=promoStats(),norm=s=>String(s||'').replace(/^package:\s*/i,'').trim().toLowerCase();
+  const byName={};Object.values(ps.by).forEach(p=>{byName[norm(p.name)]=p;});
+  const camps={},used=new Set(),notFound=[];
+  (promo.groups||[]).forEach(g=>{
+    const k=norm(g.pkg);if(!g.campaign||used.has(k))return;
+    const p=byName[k];if(!p){notFound.push(g.pkg);return;}
+    used.add(k);
+    const c=camps[g.campaign]||(camps[g.campaign]={}),y=c[g.year||'—']||(c[g.year||'—']={}),ch=y[g.channel||'—']||(y[g.channel||'—']={res:new Set(),disc:0});
+    p.res.forEach(r=>ch.res.add(r));ch.disc+=p.disc;
+  });
+  const rev=set=>[...set].reduce((t,r)=>t+(ps.val[r]?ps.val[r].all:0),0);
+  const line=(label,pad,strong,n,disc,rn)=>'<tr><td style="padding-left:'+pad+'px;color:var(--text'+(strong?'':'3')+');font-weight:'+(strong?600:400)+'">'+escHtml(label)+'</td><td class="right">'+n.toLocaleString()+'</td><td class="right">'+fmt$(disc)+'</td><td class="right">'+fmt$(rn)+'</td></tr>';
+  let html='';
+  Object.keys(camps).sort((a,b)=>a.localeCompare(b)).forEach(c=>{
+    html+='<tr><td colspan="4" style="color:var(--text);font-weight:700">'+escHtml(c)+'</td></tr>';
+    Object.keys(camps[c]).sort().forEach(y=>{
+      const chs=camps[c][y],names=Object.keys(chs).sort((a,b)=>a.localeCompare(b)),all=new Set();let disc=0;
+      names.forEach(n=>{chs[n].res.forEach(r=>all.add(r));disc+=chs[n].disc;});
+      html+=line(y,34,true,all.size,disc,rev(all));
+      if(names.length>1)names.forEach(n=>{html+=line(n,58,false,chs[n].res.size,chs[n].disc,rev(chs[n].res));});
+    });
+  });
+  document.getElementById('promo-yoy-table').style.display=html?'':'none';
+  document.getElementById('promo-yoy-tbody').innerHTML=html;
+  const notes=[],left=Object.values(ps.by).filter(p=>!used.has(norm(p.name))).map(p=>p.name).sort((a,b)=>a.localeCompare(b));
+  if(!promo.groups||!promo.groups.length)notes.push('No rows found in the '+PROMO_GROUPS_TAB+' tab. Columns: Package name, Campaign, Year, Channel.');
+  if(left.length)notes.push('Not grouped: '+left.join(', '));
+  if(notFound.length)notes.push('In '+PROMO_GROUPS_TAB+' but no bookings found under that name: '+notFound.join(', '));
+  document.getElementById('promo-yoy-note').textContent=notes.join('\n');
+}
 function renderRetail(){
   const panel=document.getElementById('retail-panel');
   if(!retailMonthlyData||!retailMonthlyData.length){panel.style.display='none';return;}
